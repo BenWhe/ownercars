@@ -1,65 +1,85 @@
-import Image from "next/image";
+import Link from "next/link";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main>
+      <section className="hero">
+        <div className="hero-content">
+          <p className="eyebrow">Private cars. Private sellers. One simple price.</p>
+          <h1>Sell your car privately for £9.99</h1>
+          <p className="hero-subtitle">
+            Advertise until sold, upload up to 10 photos, and interact with buyers through the platform to keep your phone number and email safe.
           </p>
+          <div className="hero-actions">
+            <Link className="button primary" href="/create-advert">Sell my car</Link>
+            <Link className="button secondary" href="/browse">Browse private cars</Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="hero-card">
+          <div className="mock-photo"></div>
+          <div className="mock-listing">
+            <p className="mock-title">2019 BMW 3 Series</p>
+            <p className="mock-price">£18,995</p>
+            <p className="mock-meta">Private seller · 42,000 miles · Exeter</p>
+          </div>
         </div>
-      </main>
-    </div>
+      </section>
+
+      <section className="search-panel">
+        <h2>Find a privately owned car</h2>
+        <form className="search-form">
+          <input type="text" placeholder="Make or model" />
+          <input type="text" placeholder="Postcode" />
+          <select defaultValue="Any price">
+            <option>Any price</option>
+          </select>
+          <button type="button">Search</button>
+        </form>
+      </section>
+
+      <section className="cards-section">
+        <div className="section-heading">
+          <p className="eyebrow">Why OwnerCars?</p>
+          <h2>A marketplace built for private sellers</h2>
+        </div>
+
+        <div className="feature-grid">
+          <article className="feature-card">
+            <h3>£9.99 fixed price</h3>
+            <p>One simple advert price. No upgrade pressure or complicated package choices.</p>
+          </article>
+          <article className="feature-card">
+            <h3>Advertise until sold</h3>
+            <p>Your advert stays live while the car is available, with periodic checks to keep listings fresh.</p>
+          </article>
+          <article className="feature-card">
+            <h3>Contact details protected</h3>
+            <p>Buyer enquiries are handled through the platform so sellers do not need to expose their email or phone number.</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="steps-section">
+        <div className="section-heading">
+          <p className="eyebrow">How it works</p>
+          <h2>List your car in five simple steps</h2>
+        </div>
+
+        <div className="steps">
+          <div><span>1</span><p>Create your seller account</p></div>
+          <div><span>2</span><p>Add vehicle details and description</p></div>
+          <div><span>3</span><p>Upload up to 10 photos</p></div>
+          <div><span>4</span><p>Pay £9.99 and submit for approval</p></div>
+          <div><span>5</span><p>Interact with buyers securely until sold</p></div>
+        </div>
+      </section>
+
+      <section className="cta-band">
+        <h2>Ready to sell your car privately?</h2>
+        <p>Create your advert for £9.99 and keep your seller details protected.</p>
+        <Link className="button light" href="/create-advert">Start your advert</Link>
+      </section>
+    </main>
   );
 }
