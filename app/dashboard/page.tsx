@@ -21,7 +21,7 @@ export default function DashboardPage() {
 
       const { data, error } = await supabase
         .from("adverts")
-        .select("*")
+        .select("*, advert_photos(*)")
         .eq("seller_id", user.id)
         .order("created_at", { ascending: false });
 
@@ -64,7 +64,16 @@ export default function DashboardPage() {
         <div className="dashboard-grid">
           {adverts.map((ad) => (
             <article className="dashboard-card" key={ad.id}>
-              <div className="dashboard-photo"></div>
+              
+              {ad.advert_photos?.[0]?.image_url ? (
+  <img
+    className="dashboard-photo-img"
+    src={ad.advert_photos[0].image_url}
+    alt={ad.title}
+  />
+) : (
+  <div className="dashboard-photo"></div>
+)}
 
               <div className="dashboard-card-body">
 

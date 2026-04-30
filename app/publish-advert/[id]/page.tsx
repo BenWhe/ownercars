@@ -10,6 +10,7 @@ export default function PublishAdvertPage() {
   const router = useRouter();
 
   const [advert, setAdvert] = useState<any>(null);
+  const [photos, setPhotos] = useState<any[]>([]);
   const [promoCode, setPromoCode] = useState("");
   const [message, setMessage] = useState("Loading advert...");
 
@@ -35,11 +36,66 @@ export default function PublishAdvertPage() {
       } else {
         setAdvert(data);
         setMessage("");
+        await fetchPhotos();
       }
     }
 
     if (params.id) fetchAdvert();
   }, [params.id]);
+
+  async function fetchPhotos() {
+    const { data } = await supabase
+      .from("advert_photos")
+      .select("*")
+      .eq("advert_id", params.id)
+      .order("sort_order", { ascending: true });
+
+    setPhotos(data || []);
+  }
+
+  async function uploadPhotos(files: FileList | null) {
+    if (!files || !params.id) return;
+
+    if (photos.length + files.length > 10) {
+      setMessage("You can upload up to 10 photos per advert.");
+      return;
+    }
+
+    setMessage("Uploading photos...");
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileExt = file.name.split(".").pop();
+      const filePath = `${params.id}/${Date.now()}-${i}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("advert-photos")
+        .upload(filePath, file);
+
+      if (uploadError) {
+        setMessage(uploadError.message);
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("advert-photos")
+        .getPublicUrl(filePath);
+
+      const { error: dbError } = await supabase.from("advert_photos").insert({
+        advert_id: params.id,
+        image_url: publicUrlData.publicUrl,
+        sort_order: photos.length + i,
+      });
+
+      if (dbError) {
+        setMessage(dbError.message);
+        return;
+      }
+    }
+
+    setMessage("");
+    await fetchPhotos();
+  }
 
   async function applyPromo() {
     if (promoCode.trim().toUpperCase() !== "LAUNCH") {
@@ -63,14 +119,32 @@ export default function PublishAdvertPage() {
     }
   }
 
+  async function startPayment() {
+    const res = await fetch("/api/create-checkout-session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ advertId: params.id }),
+    });
+
+    const data = await res.json();
+
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      setMessage(data.error || "Could not start payment.");
+    }
+  }
+
   return (
     <main>
       <section className="dashboard-hero">
         <p className="eyebrow">Publish advert</p>
         <h1>Publish your listing</h1>
         <p>
-          Advertise until sold for £9.99, or use a valid launch promo code to
-          publish your advert free.
+          Upload up to 10 photos, then publish using a launch promo code or by
+          paying £9.99.
         </p>
       </section>
 
@@ -86,6 +160,48 @@ export default function PublishAdvertPage() {
             <p>{Number(advert.mileage).toLocaleString()} miles</p>
 
             <hr style={{ margin: "24px 0", borderTop: "1px solid var(--line)" }} />
+
+            <h3>Photos</h3>
+            <p style={{ color: "var(--muted)" }}>
+              Upload up to 10 photos. The first photo will be used on browse and
+              advert pages.
+            </p>
+
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => uploadPhotos(e.target.files)}
+            />
+
+            {photos.length > 0 && (
+              <div className="photo-preview-grid">
+                {photos.map((photo) => (
+  <div className="photo-preview-item" key={photo.id}>
+    <img src={photo.image_url} alt="Advert photo" />
+    <button
+      type="button"
+      onClick={async () => {
+        const { error } = await supabase
+          .from("advert_photos")
+          .delete()
+          .eq("id", photo.id);
+
+        if (error) {
+          setMessage(error.message);
+        } else {
+          await fetchPhotos();
+        }
+      }}
+    >
+      Delete
+    </button>
+  </div>
+))}
+              </div>
+            )}
+
+            <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
 
             <h3>Launch promo code</h3>
             <p style={{ color: "var(--muted)" }}>
@@ -113,32 +229,16 @@ export default function PublishAdvertPage() {
 
             <h3>Pay £9.99</h3>
             <p style={{ color: "var(--muted)" }}>
-              Payment will be connected next.
+              Pay once and advertise until sold.
             </p>
 
             <button
-  type="button"
-  onClick={async () => {
-    const res = await fetch("/api/create-checkout-session", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ advertId: params.id }),
-    });
-
-    const data = await res.json();
-
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      setMessage(data.error || "Could not start payment.");
-    }
-  }}
-  style={{ background: "#111827", marginTop: "8px" }}
->
-  Pay £9.99 and publish
-</button>
+              type="button"
+              onClick={startPayment}
+              style={{ background: "#111827", marginTop: "8px" }}
+            >
+              Pay £9.99 and publish
+            </button>
           </div>
         )}
       </section>

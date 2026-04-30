@@ -13,7 +13,7 @@ export default function BrowsePage() {
     async function fetchAdverts() {
       const { data, error } = await supabase
         .from("adverts")
-        .select("*")
+        .select("*, advert_photos(*)")
         .eq("status", "live")
         .order("created_at", { ascending: false });
 
@@ -67,8 +67,17 @@ export default function BrowsePage() {
         <div className="listing-grid">
           {adverts.map((ad) => (
             <Link className="listing-card" href={`/advert/${ad.id}`} key={ad.id}>
-              <div className="listing-photo"></div>
+            
 
+{ad.advert_photos?.[0]?.image_url ? (
+  <img
+    className="listing-photo-img"
+    src={ad.advert_photos[0].image_url}
+    alt={ad.title}
+  />
+) : (
+  <div className="listing-photo"></div>
+)}
               <div className="listing-body">
                 <div className="listing-topline">
                   <span className="seller-badge">Private seller</span>
