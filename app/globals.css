@@ -2468,3 +2468,25 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
     color: #2563ff !important;
   }
 }
+.message-input-warning {
+  border-color: rgba(239, 68, 68, 0.55) !important;
+  background: rgba(239, 68, 68, 0.035);
+}
+
+.message-safety-warning {
+  margin: -6px 0 4px;
+  padding: 14px 16px;
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: 18px;
+  background: rgba(239, 68, 68, 0.055);
+  color: #991b1b;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.message-compose button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}

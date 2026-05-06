@@ -54,18 +54,20 @@ export default function MessageThreadPage() {
   const [body, setBody] = useState("");
   const [notice, setNotice] = useState("Loading conversation...");
 
-  async function markIncomingAsRead(currentUserId: string) {
-  const { error } = await supabase
-    .from("messages")
-    .update({ read_at: new Date().toISOString() })
-    .eq("conversation_id", conversationId)
-    .neq("sender_id", currentUserId)
-    .is("read_at", null);
+  const blockedContactDetails = containsContactDetails(body);
 
-  if (!error) {
-    window.dispatchEvent(new Event("ownercars:messages-read"));
+  async function markIncomingAsRead(currentUserId: string) {
+    const { error } = await supabase
+      .from("messages")
+      .update({ read_at: new Date().toISOString() })
+      .eq("conversation_id", conversationId)
+      .neq("sender_id", currentUserId)
+      .is("read_at", null);
+
+    if (!error) {
+      window.dispatchEvent(new Event("ownercars:messages-read"));
+    }
   }
-}
 
   async function fetchThread() {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -149,24 +151,7 @@ export default function MessageThreadPage() {
     e.preventDefault();
 
     const cleanBody = body.trim();
-    if (!cleanBody || !conversation) return;
-
-    if (containsContactDetails(cleanBody)) {
-      await supabase.from("buyer_security_events").insert({
-        buyer_id: conversation.buyer_id,
-        seller_id: conversation.seller_id,
-        advert_id: conversation.advert_id,
-        conversation_id: conversation.id,
-        event_type: "off_platform_contact_attempt",
-        event_status: "recorded",
-        message_excerpt: cleanBody.slice(0, 180),
-      });
-
-      setNotice(
-        "For safety, please keep contact details on OwnerCars until both parties are ready."
-      );
-      return;
-    }
+    if (!cleanBody || !conversation || blockedContactDetails) return;
 
     const { error } = await supabase.from("messages").insert({
       conversation_id: conversationId,
@@ -187,6 +172,28 @@ export default function MessageThreadPage() {
     setBody("");
     await fetchThread();
   }
+
+  useEffect(() => {
+    async function recordBlockedAttempt() {
+      const cleanBody = body.trim();
+
+      if (!blockedContactDetails || !conversation || cleanBody.length < 6) return;
+
+      await supabase.from("buyer_security_events").insert({
+        buyer_id: conversation.buyer_id,
+        seller_id: conversation.seller_id,
+        advert_id: conversation.advert_id,
+        conversation_id: conversation.id,
+        event_type: "off_platform_contact_attempt",
+        event_status: "recorded",
+        message_excerpt: cleanBody.slice(0, 180),
+      });
+    }
+
+    const timer = window.setTimeout(recordBlockedAttempt, 800);
+
+    return () => window.clearTimeout(timer);
+  }, [blockedContactDetails, body, conversation]);
 
   const advert = conversation?.adverts;
   const title = advertTitle(advert);
@@ -212,7 +219,7 @@ export default function MessageThreadPage() {
             </p>
           )}
 
-          {messages.map((msg) => {
+          {messages.map((msg: any) => {
             const ownMessage = msg.sender_id === userId;
 
             return (
@@ -234,9 +241,20 @@ export default function MessageThreadPage() {
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Write a message..."
+            className={blockedContactDetails ? "message-input-warning" : ""}
           />
 
-          <button type="submit">Send message</button>
+          {blockedContactDetails && (
+            <p className="message-safety-warning">
+              For seller and buyer protection, phone numbers, email addresses and
+              WhatsApp links cannot be sent at this stage. Please continue the
+              conversation through OwnerCars.
+            </p>
+          )}
+
+          <button type="submit" disabled={!body.trim() || blockedContactDetails}>
+            Send message
+          </button>
         </form>
       </section>
     </main>
