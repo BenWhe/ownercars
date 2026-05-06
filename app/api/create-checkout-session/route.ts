@@ -2,26 +2,36 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
-// ⚠️ Use SERVICE ROLE KEY (server-side only)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function POST(req: Request) {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return NextResponse.json(
+      { error: "Missing Supabase server environment variables" },
+      { status: 500 }
+    );
+  }
+
+  if (!siteUrl) {
+    return NextResponse.json(
+      { error: "Missing NEXT_PUBLIC_SITE_URL" },
+      { status: 500 }
+    );
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
   const { advertId, promoCode } = await req.json();
 
   if (!advertId) {
     return NextResponse.json({ error: "Missing advertId" }, { status: 400 });
   }
 
-  let finalAmount = 999; // always start from £9.99
+  let finalAmount = 999;
 
-  // =========================
-  // PROMO CODE VALIDATION
-  // =========================
   if (promoCode) {
     const code = promoCode.toUpperCase();
 
@@ -33,21 +43,13 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (error || !data) {
-      return NextResponse.json(
-        { error: "Invalid promo code" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid promo code" }, { status: 400 });
     }
 
-    // Check usage limit
     if (data.max_uses && data.uses >= data.max_uses) {
-      return NextResponse.json(
-        { error: "Promo code expired" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Promo code expired" }, { status: 400 });
     }
 
-    // Apply discount
     if (data.discount_type === "free") {
       finalAmount = 0;
     }
@@ -56,16 +58,12 @@ export async function POST(req: Request) {
       finalAmount = Math.max(0, finalAmount - Math.round(data.discount_value * 100));
     }
 
-    // ✅ Track usage immediately (simple version for launch)
     await supabase
       .from("promo_codes")
       .update({ uses: data.uses + 1 })
       .eq("id", data.id);
   }
 
-  // =========================
-  // FREE FLOW (no Stripe)
-  // =========================
   if (finalAmount === 0) {
     const { error } = await supabase
       .from("adverts")
@@ -86,9 +84,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: "/dashboard" });
   }
 
-  // =========================
-  // STRIPE PAYMENT
-  // =========================
+  if (!stripeSecretKey) {
+    return NextResponse.json(
+      { error: "Missing STRIPE_SECRET_KEY" },
+      { status: 500 }
+    );
+  }
+
+  const stripe = new Stripe(stripeSecretKey);
+
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     payment_method_types: ["card"],
@@ -109,8 +113,8 @@ export async function POST(req: Request) {
       advertId,
       promoCode: promoCode || "",
     },
-    success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`,
+    success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${siteUrl}/dashboard`,
   });
 
   return NextResponse.json({ url: session.url });
