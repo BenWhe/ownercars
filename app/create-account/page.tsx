@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function LoginPage() {
+export default function CreateAccountPage() {
   const supabase = createClient();
   const router = useRouter();
 
@@ -12,10 +12,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
 
-  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
+  async function handleCreateAccount(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
     });
@@ -23,25 +23,24 @@ export default function LoginPage() {
     if (error) {
       setMessage(error.message);
     } else {
-      router.push("/dashboard");
+      setMessage("Account created. You can now sign in.");
+      setTimeout(() => router.push("/login"), 1200);
     }
   }
-
-  
 
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <p className="eyebrow">Secure access</p>
+        <p className="eyebrow">Create account</p>
 
-        <h1>Sign in to manage your advert</h1>
+        <h1>Start selling privately</h1>
 
         <p className="auth-sub">
-          OwnerCars protects sellers by keeping contact details hidden and allowing
-          only verified buyers to message through the platform.
+          Create your OwnerCars account to list your car, manage your advert and
+          keep your seller details protected.
         </p>
 
-        <form onSubmit={handleLogin} className="auth-form">
+        <form onSubmit={handleCreateAccount} className="auth-form">
           <label>
             Email address
             <input
@@ -56,24 +55,24 @@ export default function LoginPage() {
             Password
             <input
               type="password"
-              placeholder="Enter password"
+              placeholder="Create a password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </label>
 
-          <button type="submit">Sign in</button>
+          <button type="submit">Create account</button>
 
           {message && <p className="auth-message">{message}</p>}
         </form>
 
-    <div className="auth-divider">
-  <span>New to OwnerCars?</span>
-</div>
+        <div className="auth-divider">
+          <span>Already have an account?</span>
+        </div>
 
-<a className="auth-secondary-link" href="/create-account">
-  Create your account
-</a>
+        <a className="auth-secondary-link" href="/login">
+          Sign in
+        </a>
       </section>
     </main>
   );

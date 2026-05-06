@@ -10,9 +10,13 @@ export default function PublishAdvertPage() {
   const router = useRouter();
 
   const [advert, setAdvert] = useState<any>(null);
-  const [photos, setPhotos] = useState<any[]>([]);
-  const [promoCode, setPromoCode] = useState("");
-  const [message, setMessage] = useState("Loading advert...");
+const [photos, setPhotos] = useState<any[]>([]);
+
+const [promoCode, setPromoCode] = useState("");
+const [discountedPrice, setDiscountedPrice] = useState(9.99);
+const [promoMessage, setPromoMessage] = useState("");
+
+const [message, setMessage] = useState("Loading advert...");
 
   useEffect(() => {
     async function fetchAdvert() {
@@ -98,17 +102,45 @@ export default function PublishAdvertPage() {
   }
 
   async function applyPromo() {
-    if (promoCode.trim().toUpperCase() !== "LAUNCH") {
-      setMessage("Promo code not recognised.");
-      return;
-    }
+  setPromoMessage("Checking code...");
 
+  const { data, error } = await supabase
+    .from("promo_codes")
+    .select("*")
+    .eq("code", promoCode.toUpperCase())
+    .eq("active", true)
+    .maybeSingle();
+
+  if (error || !data) {
+    setPromoMessage("Invalid promo code");
+    return;
+  }
+
+  if (data.max_uses && data.uses >= data.max_uses) {
+    setPromoMessage("This code has expired");
+    return;
+  }
+
+  if (data.discount_type === "free") {
+    setDiscountedPrice(0);
+  }
+
+  if (data.discount_type === "fixed") {
+    setDiscountedPrice(Math.max(0, 9.99 - data.discount_value));
+  }
+
+  setPromoMessage("Promo applied");
+
+  }
+
+  async function startPayment() {
+  if (discountedPrice === 0) {
     const { error } = await supabase
       .from("adverts")
       .update({
         status: "live",
-        promo_code: promoCode.trim().toUpperCase(),
         paid: false,
+        promo_code: promoCode.toUpperCase(),
       })
       .eq("id", params.id);
 
@@ -117,25 +149,29 @@ export default function PublishAdvertPage() {
     } else {
       router.push("/dashboard");
     }
+
+    return;
   }
 
-  async function startPayment() {
-    const res = await fetch("/api/create-checkout-session", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ advertId: params.id }),
-    });
+  const res = await fetch("/api/create-checkout-session", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      advertId: params.id,
+      promoCode: promoCode.toUpperCase(),
+    }),
+  });
 
-    const data = await res.json();
+  const data = await res.json();
 
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      setMessage(data.error || "Could not start payment.");
-    }
+  if (data.url) {
+    window.location.href = data.url;
+  } else {
+    setMessage(data.error || "Could not start payment.");
   }
+}
 
   return (
     <main>
@@ -143,7 +179,7 @@ export default function PublishAdvertPage() {
         <p className="eyebrow">Publish advert</p>
         <h1>Publish your listing</h1>
         <p>
-          Upload up to 10 photos, then publish using a launch promo code or by
+          Upload up to 10 photos, then publish using the £2.50 launch offer or by
           paying £9.99.
         </p>
       </section>
@@ -203,9 +239,9 @@ export default function PublishAdvertPage() {
 
             <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
 
-            <h3>Launch promo code</h3>
+            <h3>Apply launch offer</h3>
             <p style={{ color: "var(--muted)" }}>
-              Have an early access promo code? Enter it below to publish free.
+              Enter launch code LAUNCH250 to advertise until sold for £2.50. Standard price is £9.99
             </p>
 
             <input
@@ -227,18 +263,19 @@ export default function PublishAdvertPage() {
 
             <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
 
-            <h3>Pay £9.99</h3>
-            <p style={{ color: "var(--muted)" }}>
-              Pay once and advertise until sold.
-            </p>
+            <h3>Pay £{discountedPrice.toFixed(2)}</h3>
 
-            <button
-              type="button"
-              onClick={startPayment}
-              style={{ background: "#111827", marginTop: "8px" }}
-            >
-              Pay £9.99 and publish
-            </button>
+<p style={{ color: "var(--muted)" }}>
+  Pay once and advertise until sold.
+</p>
+
+<button
+  type="button"
+  onClick={startPayment}
+  style={{ background: "#111827", marginTop: "8px" }}
+>
+  Pay £{discountedPrice.toFixed(2)} and publish
+</button>
           </div>
         )}
       </section>

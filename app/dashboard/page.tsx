@@ -4,6 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
+function capitaliseWords(str?: string) {
+  if (!str) return "";
+  return str
+    .trim()
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export default function DashboardPage() {
   const supabase = createClient();
   const [adverts, setAdverts] = useState<any[]>([]);
@@ -88,7 +97,11 @@ export default function DashboardPage() {
                 </p>
 
                 <div className="dashboard-actions">
-                  <Link href={`/advert/${ad.id}`}>View advert</Link>
+                 {ad.status === "live" ? (
+  <Link href={`/advert/${ad.id}`}>View advert</Link>
+) : (
+  <Link href={`/publish-advert/${ad.id}`}>Publish advert</Link>
+)}
                   <Link href={`/edit-advert/${ad.id}`}>Edit</Link>
 
                 

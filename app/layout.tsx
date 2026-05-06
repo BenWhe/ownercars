@@ -1,5 +1,6 @@
 import "./globals.css";
 import Link from "next/link";
+import Header from "./components/Header";
 
 export default function RootLayout({
   children,
@@ -11,21 +12,7 @@ export default function RootLayout({
       <body>
 
         {/* HEADER */}
-        <header className="site-header">
-          <Link className="brand" href="/">
-            OwnerCars<span>.co.uk</span>
-          </Link>
-
-          <nav className="nav">
-            <Link href="/browse">Browse cars</Link>
-            <Link href="/create-advert">Sell your car</Link>
-            <Link href="#">Pricing</Link>
-            <Link href="#">How it works</Link>
-            <Link className="nav-cta" href="/create-advert">
-              Advertise for £9.99
-            </Link>
-          </nav>
-        </header>
+        <Header />
 
         {children}
 
@@ -33,8 +20,8 @@ export default function RootLayout({
         <footer className="site-footer">
           <p>© OwnerCars.co.uk</p>
           <div>
-            <Link href="#">Safety advice</Link>
-            <Link href="#">Contact</Link>
+            <Link href="/safety-advice">Safety advice</Link>
+            <Link href="/contact">Contact</Link>
           </div>
         </footer>
 
