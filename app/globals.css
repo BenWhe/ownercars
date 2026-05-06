@@ -2305,4 +2305,30 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
     font-size: 24px;
     line-height: 1.15;
   }
+}@media (max-width: 760px) {
+  .site-header {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    column-gap: 10px;
+    padding: 18px 14px;
+  }
+
+  .site-logo {
+    font-size: 21px;
+    max-width: none;
+    overflow: visible;
+    white-space: nowrap;
+    letter-spacing: -0.06em;
+  }
+
+  .nav-cta {
+    padding: 13px 18px;
+    font-size: 15px;
+  }
+
+  .nav-menu-button {
+    padding: 13px 16px;
+    font-size: 15px;
+  }
 }
