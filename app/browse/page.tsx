@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -66,8 +66,7 @@ function parseSearch(query: string) {
   return filters;
 }
 
-export default function BrowsePage() {
-  const supabase = createClient();
+function BrowseContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q") || "";
 
@@ -76,6 +75,8 @@ export default function BrowsePage() {
 
   useEffect(() => {
     async function fetchAdverts() {
+      const supabase = createClient();
+
       const { data, error } = await supabase
         .from("adverts")
         .select("*, advert_photos(*)")
@@ -92,7 +93,7 @@ export default function BrowsePage() {
       if (query) {
         const filters = parseSearch(query);
 
-        filtered = filtered.filter((ad) => {
+        filtered = filtered.filter((ad: any) => {
           const searchableText = `
             ${ad.make || ""}
             ${ad.model || ""}
@@ -138,7 +139,7 @@ export default function BrowsePage() {
   }, [query]);
 
   return (
-    <main>
+    <>
       <section className="browse-hero">
         <p className="eyebrow">Private cars only</p>
         <h1>Browse private cars</h1>
@@ -172,7 +173,7 @@ export default function BrowsePage() {
         )}
 
         <div className="listing-grid">
-          {adverts.map((ad) => {
+          {adverts.map((ad: any) => {
             const displayTitle = advertDisplayTitle(ad);
 
             return (
@@ -214,6 +215,16 @@ export default function BrowsePage() {
           })}
         </div>
       </section>
+    </>
+  );
+}
+
+export default function BrowsePage() {
+  return (
+    <main>
+      <Suspense fallback={<p style={{ padding: "80px" }}>Loading cars...</p>}>
+        <BrowseContent />
+      </Suspense>
     </main>
   );
 }

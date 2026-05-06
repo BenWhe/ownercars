@@ -34,13 +34,13 @@ function formatMessageDate(value?: string) {
 }
 
 export default function MessagesPage() {
-  const supabase = createClient();
-
   const [userId, setUserId] = useState("");
   const [conversations, setConversations] = useState<any[]>([]);
   const [message, setMessage] = useState("Loading messages...");
 
   async function fetchConversations() {
+    const supabase = createClient();
+
     const { data: sessionData } = await supabase.auth.getSession();
     const user = sessionData.session?.user;
 
@@ -79,8 +79,8 @@ export default function MessagesPage() {
     }
 
     const conversationsWithMessages = (data || [])
-      .filter((conversation) => conversation.messages?.length > 0)
-      .map((conversation) => {
+      .filter((conversation: any) => conversation.messages?.length > 0)
+      .map((conversation: any) => {
         const sortedMessages = [...conversation.messages].sort(
           (a: any, b: any) =>
             new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -104,6 +104,8 @@ export default function MessagesPage() {
   }
 
   useEffect(() => {
+    const supabase = createClient();
+
     fetchConversations();
 
     const channel = supabase
@@ -141,7 +143,7 @@ export default function MessagesPage() {
         )}
 
         <div className="messages-list">
-          {conversations.map((conversation) => {
+          {conversations.map((conversation: any) => {
             const advert = conversation.adverts;
 
             return (

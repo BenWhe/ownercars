@@ -5,13 +5,13 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export default function AccountPage() {
-  const supabase = createClient();
-
   const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadUser() {
+      const supabase = createClient();
+
       const { data } = await supabase.auth.getUser();
       setEmail(data.user?.email ?? null);
       setLoading(false);
@@ -21,6 +21,8 @@ export default function AccountPage() {
   }, []);
 
   async function logout() {
+    const supabase = createClient();
+
     await supabase.auth.signOut();
     setEmail(null);
   }

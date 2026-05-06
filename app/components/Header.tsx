@@ -5,13 +5,13 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export default function Header() {
-  const supabase = createClient();
-
   const [loggedIn, setLoggedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
   async function fetchUnreadCount() {
+    const supabase = createClient();
+
     const { data: sessionData } = await supabase.auth.getSession();
     const user = sessionData.session?.user;
 
@@ -25,7 +25,7 @@ export default function Header() {
       .select("id")
       .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`);
 
-    const conversationIds = conversations?.map((c) => c.id) || [];
+    const conversationIds = conversations?.map((c: any) => c.id) || [];
 
     if (conversationIds.length === 0) {
       setUnreadCount(0);
@@ -43,46 +43,51 @@ export default function Header() {
   }
 
   useEffect(() => {
+    const supabase = createClient();
+
     async function checkSession() {
       const { data } = await supabase.auth.getSession();
       setLoggedIn(!!data.session);
-      await fetchUnreadCount();
+
+      if (data.session) {
+        await fetchUnreadCount();
+      }
     }
 
     checkSession();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
       setLoggedIn(!!session);
-      await fetchUnreadCount();
+
+      if (session) {
+        await fetchUnreadCount();
+      } else {
+        setUnreadCount(0);
+      }
     });
 
     const channel = supabase
-  .channel("header-message-notifications")
-  .on(
-    "postgres_changes",
-    { event: "*", schema: "public", table: "messages" },
-    () => {
-      fetchUnreadCount();
-    }
-  )
-  .subscribe();
-
-function handleMessagesRead() {
-  fetchUnreadCount();
-}
-
-window.addEventListener("ownercars:messages-read", handleMessagesRead);
+      .channel("header-message-notifications")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "messages" },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .subscribe();
 
     return () => {
       subscription.unsubscribe();
       supabase.removeChannel(channel);
-window.removeEventListener("ownercars:messages-read", handleMessagesRead);
     };
   }, []);
 
   async function handleLogout() {
+    const supabase = createClient();
+
     await supabase.auth.signOut();
     setLoggedIn(false);
     setUnreadCount(0);

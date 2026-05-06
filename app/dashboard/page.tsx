@@ -4,22 +4,25 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-function capitaliseWords(str?: string) {
-  if (!str) return "";
-  return str
-    .trim()
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
-
 export default function DashboardPage() {
-  const supabase = createClient();
   const [adverts, setAdverts] = useState<any[]>([]);
   const [message, setMessage] = useState("Loading your adverts...");
 
+  async function markAsSold(advertId: string) {
+    const supabase = createClient();
+
+    await supabase
+      .from("adverts")
+      .update({ status: "sold" })
+      .eq("id", advertId);
+
+    window.location.reload();
+  }
+
   useEffect(() => {
     async function fetchAdverts() {
+      const supabase = createClient();
+
       const { data: userData } = await supabase.auth.getUser();
       const user = userData.user;
 
@@ -50,7 +53,10 @@ export default function DashboardPage() {
       <section className="dashboard-hero">
         <p className="eyebrow">Seller dashboard</p>
         <h1>Your adverts</h1>
-        <p>Manage your private car adverts, view listings, and prepare for secure buyer messaging.</p>
+        <p>
+          Manage your private car adverts, view listings, and prepare for secure
+          buyer messaging.
+        </p>
 
         <Link className="button primary" href="/create-advert">
           Create new advert
@@ -71,53 +77,46 @@ export default function DashboardPage() {
         )}
 
         <div className="dashboard-grid">
-          {adverts.map((ad) => (
+          {adverts.map((ad: any) => (
             <article className="dashboard-card" key={ad.id}>
-              
               {ad.advert_photos?.[0]?.image_url ? (
-  <img
-    className="dashboard-photo-img"
-    src={ad.advert_photos[0].image_url}
-    alt={ad.title}
-  />
-) : (
-  <div className="dashboard-photo"></div>
-)}
+                <img
+                  className="dashboard-photo-img"
+                  src={ad.advert_photos[0].image_url}
+                  alt={ad.title}
+                />
+              ) : (
+                <div className="dashboard-photo"></div>
+              )}
 
               <div className="dashboard-card-body">
-
                 <div style={{ display: "flex", gap: "8px" }}>
                   <span className="seller-badge">Private seller</span>
                   <span className="status-badge">{ad.status}</span>
-              </div>
+                </div>
+
                 <h2>{ad.title}</h2>
-                <p className="listing-price">£{Number(ad.price).toLocaleString()}</p>
+
+                <p className="listing-price">
+                  £{Number(ad.price).toLocaleString()}
+                </p>
+
                 <p className="dashboard-meta">
                   {Number(ad.mileage).toLocaleString()} miles
                 </p>
 
                 <div className="dashboard-actions">
-                 {ad.status === "live" ? (
-  <Link href={`/advert/${ad.id}`}>View advert</Link>
-) : (
-  <Link href={`/publish-advert/${ad.id}`}>Publish advert</Link>
-)}
+                  {ad.status === "live" ? (
+                    <Link href={`/advert/${ad.id}`}>View advert</Link>
+                  ) : (
+                    <Link href={`/publish-advert/${ad.id}`}>Publish advert</Link>
+                  )}
+
                   <Link href={`/edit-advert/${ad.id}`}>Edit</Link>
 
-                
-                <button
-                  onClick={async () => {
-                    await supabase
-                      .from("adverts")
-                      .update({ status: "sold" })
-                      .eq("id", ad.id);
-
-                    window.location.reload();
-                }}
-              >
-                Mark as sold
-              </button>
-
+                  <button onClick={() => markAsSold(ad.id)}>
+                    Mark as sold
+                  </button>
                 </div>
               </div>
             </article>

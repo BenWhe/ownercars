@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  const supabase = createClient();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -14,6 +13,8 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
+    const supabase = createClient();
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -27,7 +28,9 @@ export default function LoginPage() {
     }
   }
 
-  
+  useEffect(() => {
+    createClient();
+  }, []);
 
   return (
     <main className="auth-page">
@@ -67,13 +70,13 @@ export default function LoginPage() {
           {message && <p className="auth-message">{message}</p>}
         </form>
 
-    <div className="auth-divider">
-  <span>New to OwnerCars?</span>
-</div>
+        <div className="auth-divider">
+          <span>New to OwnerCars?</span>
+        </div>
 
-<a className="auth-secondary-link" href="/create-account">
-  Create your account
-</a>
+        <a className="auth-secondary-link" href="/create-account">
+          Create your account
+        </a>
       </section>
     </main>
   );

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function CreateAccountPage() {
-  const supabase = createClient();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -14,6 +13,8 @@ export default function CreateAccountPage() {
 
   async function handleCreateAccount(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
+    const supabase = createClient();
 
     const { error } = await supabase.auth.signUp({
       email,
