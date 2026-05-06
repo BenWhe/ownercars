@@ -2490,3 +2490,7 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   cursor: not-allowed;
   transform: none;
 }
+.apple-menu-logout {
+  cursor: pointer;
+  user-select: none;
+}

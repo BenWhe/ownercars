@@ -189,9 +189,17 @@ export default function Header() {
                     Dashboard
                   </Link>
 
-                  <button className="apple-menu-logout" onClick={handleLogout}>
-                    Log out
-                  </button>
+                  <div
+  className="apple-menu-logout"
+  role="button"
+  tabIndex={0}
+  onClick={handleLogout}
+  onKeyDown={(e) => {
+    if (e.key === "Enter") handleLogout();
+  }}
+>
+  Log out
+</div>
                 </>
               ) : (
                 <>
