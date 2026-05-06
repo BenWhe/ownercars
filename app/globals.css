@@ -2332,3 +2332,35 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
     font-size: 15px;
   }
 }
+@media (max-width: 760px) {
+  .site-logo {
+    font-size: 0;
+    max-width: 120px;
+  }
+
+  .site-logo::before {
+    content: "OwnerCars";
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -0.06em;
+    color: var(--ink);
+  }
+
+  .site-logo::after {
+    content: ".co.uk";
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -0.06em;
+    color: var(--blue);
+  }
+
+  .nav-cta {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+
+  .nav-menu-button {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+}
