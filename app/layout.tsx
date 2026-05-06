@@ -2,6 +2,16 @@ import "./globals.css";
 import Link from "next/link";
 import Header from "./components/Header";
 
+export const metadata = {
+  title: "OwnerCars",
+  description: "Private cars. Private sellers.",
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: {
