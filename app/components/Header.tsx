@@ -51,10 +51,19 @@ export default function Header() {
 
       if (data.session) {
         await fetchUnreadCount();
+      } else {
+        setUnreadCount(0);
       }
     }
 
+    function handleMessagesRead() {
+      fetchUnreadCount();
+    }
+
     checkSession();
+
+    window.addEventListener("ownercars:messages-read", handleMessagesRead);
+    window.addEventListener("focus", handleMessagesRead);
 
     const {
       data: { subscription },
@@ -80,10 +89,21 @@ export default function Header() {
       .subscribe();
 
     return () => {
+      window.removeEventListener("ownercars:messages-read", handleMessagesRead);
+      window.removeEventListener("focus", handleMessagesRead);
       subscription.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, []);
+
+  async function handleMenuClick() {
+    const nextState = !menuOpen;
+    setMenuOpen(nextState);
+
+    if (nextState && loggedIn) {
+      await fetchUnreadCount();
+    }
+  }
 
   async function handleLogout() {
     const supabase = createClient();
@@ -110,7 +130,7 @@ export default function Header() {
 
         <button
           className={menuOpen ? "nav-menu-button active" : "nav-menu-button"}
-          onClick={() => setMenuOpen(!menuOpen)}
+          onClick={handleMenuClick}
           aria-label="Open menu"
           aria-expanded={menuOpen}
         >
