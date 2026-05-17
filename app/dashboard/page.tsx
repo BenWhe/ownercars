@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
 import { createClient } from "@/lib/supabase/client";
 
 export default function DashboardPage() {
@@ -118,6 +119,12 @@ export default function DashboardPage() {
                     Mark as sold
                   </button>
                 </div>
+
+                <PromoteAdvertTools
+                  advertId={ad.id}
+                  title={ad.title || "OwnerCars advert"}
+                  compact
+                />
               </div>
             </article>
           ))}

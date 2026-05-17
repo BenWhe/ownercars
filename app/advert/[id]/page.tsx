@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
 import { createClient } from "@/lib/supabase/client";
 
 function capitaliseWords(str?: string) {
@@ -209,6 +210,8 @@ export default function AdvertPage() {
               </button>
             </div>
           </div>
+
+          <PromoteAdvertTools advertId={advert.id} title={displayTitle} />
 
           <div className="spec-grid">
             <div>
