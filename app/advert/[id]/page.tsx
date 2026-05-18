@@ -30,6 +30,7 @@ export default function AdvertPage() {
 
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [advert, setAdvert] = useState<any>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [message, setMessage] = useState("Loading advert...");
   const touchStartX = useRef<number | null>(null);
 
@@ -47,7 +48,10 @@ export default function AdvertPage() {
       } else if (!data) {
         setMessage("This advert isn’t live yet.");
       } else {
+        const { data: userData } = await supabase.auth.getUser();
+
         setAdvert(data);
+        setCurrentUserId(userData.user?.id ?? null);
         setMessage("");
       }
     }
@@ -155,6 +159,7 @@ export default function AdvertPage() {
   }
 
   const displayTitle = advertDisplayTitle(advert);
+  const isAdvertOwner = currentUserId === advert.seller_id;
 
   return (
     <main>
@@ -211,7 +216,9 @@ export default function AdvertPage() {
             </div>
           </div>
 
-          <PromoteAdvertTools advertId={advert.id} title={displayTitle} />
+          {isAdvertOwner && (
+            <PromoteAdvertTools advertId={advert.id} title={displayTitle} />
+          )}
 
           <div className="spec-grid">
             <div>
