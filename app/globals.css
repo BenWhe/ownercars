@@ -753,11 +753,14 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 
 .advert-form .promote-actions button,
 .promote-actions button {
-  min-height: 52px;
+  min-height: 54px;
   border: 0;
   border-radius: 999px;
-  padding: 13px 16px;
-  font-weight: 900;
+  padding: 14px 18px;
+  font-size: 15px;
+  font-weight: 950;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
   cursor: pointer;
 }
 
@@ -775,9 +778,19 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 }
 
 .promote-status {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid rgba(20, 92, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(20, 92, 255, 0.08);
   color: var(--accent-dark);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 900;
+  line-height: 1;
   margin: -4px 0 0;
 }
 

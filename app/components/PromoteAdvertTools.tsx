@@ -4,7 +4,7 @@ import { useState } from "react";
 
 const OWNER_CARS_DOMAIN = "https://www.ownercars.co.uk";
 const PROMOTE_REASSURANCE_COPY =
-  "Promote your advert safely. Share your OwnerCars listing instead of exposing your personal details.";
+  "Share your secure OwnerCars listing with friends, social media and buyer groups — without exposing your personal details.";
 
 function advertUrl(advertId: string) {
   return `${OWNER_CARS_DOMAIN}/advert/${advertId}`;
@@ -24,12 +24,12 @@ export default function PromoteAdvertTools({
   const [status, setStatus] = useState("");
   const url = advertUrl(advertId);
 
-  async function copyAdvertLink(message = "Advert link copied.") {
+  async function copyAdvertLink(message = "✓ Link copied") {
     try {
       await navigator.clipboard.writeText(url);
       setStatus(message);
     } catch {
-      setStatus("Copy failed. Please copy the link from your browser.");
+      setStatus("Copy failed — please copy the link from your browser.");
     }
   }
 
@@ -41,7 +41,7 @@ export default function PromoteAdvertTools({
           text: `View my OwnerCars advert: ${title}`,
           url,
         });
-        setStatus("Share sheet opened.");
+        setStatus("✓ Share sheet opened");
         return;
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -50,14 +50,14 @@ export default function PromoteAdvertTools({
       }
     }
 
-    await copyAdvertLink("Sharing is not available here, so the advert link was copied.");
+    await copyAdvertLink("✓ Link copied");
   }
 
   return (
     <section className={`promote-advert-card${compact ? " compact" : ""}`}>
       <div>
         <p className="promote-kicker">Promote your advert</p>
-        <h3>Share your listing</h3>
+        <h3>Help sell your car faster</h3>
         <p>{PROMOTE_REASSURANCE_COPY}</p>
       </div>
 
@@ -70,7 +70,11 @@ export default function PromoteAdvertTools({
         </button>
       </div>
 
-      {status && <p className="promote-status">{status}</p>}
+      {status && (
+        <p className="promote-status" role="status" aria-live="polite">
+          {status}
+        </p>
+      )}
     </section>
   );
 }
