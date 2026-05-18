@@ -24,7 +24,16 @@ export async function POST(req: Request) {
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  const { advertId, promoCode } = await req.json();
+  let advertId: string | undefined;
+  let promoCode = "";
+
+  try {
+    const body = await req.json();
+    advertId = body.advertId;
+    promoCode = String(body.promoCode || "").trim().toUpperCase();
+  } catch {
+    return NextResponse.json({ error: "Invalid checkout request" }, { status: 400 });
+  }
 
   if (!advertId) {
     return NextResponse.json({ error: "Missing advertId" }, { status: 400 });
@@ -33,12 +42,10 @@ export async function POST(req: Request) {
   let finalAmount = 999;
 
   if (promoCode) {
-    const code = promoCode.toUpperCase();
-
     const { data, error } = await supabase
       .from("promo_codes")
       .select("*")
-      .eq("code", code)
+      .eq("code", promoCode)
       .eq("active", true)
       .maybeSingle();
 
@@ -93,29 +100,41 @@ export async function POST(req: Request) {
 
   const stripe = new Stripe(stripeSecretKey);
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    line_items: [
-      {
-        price_data: {
-          currency: "gbp",
-          product_data: {
-            name: "OwnerCars advert",
-            description: "Advertise until sold",
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "gbp",
+            product_data: {
+              name: "OwnerCars advert",
+              description: "Advertise until sold",
+            },
+            unit_amount: finalAmount,
           },
-          unit_amount: finalAmount,
+          quantity: 1,
         },
-        quantity: 1,
+      ],
+      metadata: {
+        advertId,
+        promoCode,
       },
-    ],
-    metadata: {
-      advertId,
-      promoCode: promoCode || "",
-    },
-    success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${siteUrl}/dashboard`,
-  });
+      success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/dashboard`,
+    });
 
-  return NextResponse.json({ url: session.url });
+    return NextResponse.json({ url: session.url });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Could not create Stripe checkout session";
+
+    return NextResponse.json(
+      { error: `Could not start Stripe checkout: ${message}` },
+      { status: 500 }
+    );
+  }
 }

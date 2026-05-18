@@ -8,15 +8,19 @@ export default function PublishAdvertPage() {
   const supabase = createClient();
   const params = useParams();
   const router = useRouter();
+  const advertId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const [advert, setAdvert] = useState<any>(null);
-const [photos, setPhotos] = useState<any[]>([]);
+  const [photos, setPhotos] = useState<any[]>([]);
 
-const [promoCode, setPromoCode] = useState("");
-const [discountedPrice, setDiscountedPrice] = useState(9.99);
-const [promoMessage, setPromoMessage] = useState("");
+  const [promoCode, setPromoCode] = useState("");
+  const [discountedPrice, setDiscountedPrice] = useState(9.99);
+  const [promoMessage, setPromoMessage] = useState("");
+  const [paymentMessage, setPaymentMessage] = useState("");
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+  const [isStartingPayment, setIsStartingPayment] = useState(false);
 
-const [message, setMessage] = useState("Loading advert...");
+  const [message, setMessage] = useState("Loading advert...");
 
   useEffect(() => {
     async function fetchAdvert() {
@@ -31,7 +35,7 @@ const [message, setMessage] = useState("Loading advert...");
       const { data, error } = await supabase
         .from("adverts")
         .select("*")
-        .eq("id", params.id)
+        .eq("id", advertId)
         .eq("seller_id", user.id)
         .single();
 
@@ -44,21 +48,21 @@ const [message, setMessage] = useState("Loading advert...");
       }
     }
 
-    if (params.id) fetchAdvert();
-  }, [params.id]);
+    if (advertId) fetchAdvert();
+  }, [advertId]);
 
   async function fetchPhotos() {
     const { data } = await supabase
       .from("advert_photos")
       .select("*")
-      .eq("advert_id", params.id)
+      .eq("advert_id", advertId)
       .order("sort_order", { ascending: true });
 
     setPhotos(data || []);
   }
 
   async function uploadPhotos(files: FileList | null) {
-    if (!files || !params.id) return;
+    if (!files || !advertId) return;
 
     if (photos.length + files.length > 10) {
       setMessage("You can upload up to 10 photos per advert.");
@@ -70,7 +74,7 @@ const [message, setMessage] = useState("Loading advert...");
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const fileExt = file.name.split(".").pop();
-      const filePath = `${params.id}/${Date.now()}-${i}.${fileExt}`;
+      const filePath = `${advertId}/${Date.now()}-${i}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("advert-photos")
@@ -86,7 +90,7 @@ const [message, setMessage] = useState("Loading advert...");
         .getPublicUrl(filePath);
 
       const { error: dbError } = await supabase.from("advert_photos").insert({
-        advert_id: params.id,
+        advert_id: advertId,
         image_url: publicUrlData.publicUrl,
         sort_order: photos.length + i,
       });
@@ -102,76 +106,111 @@ const [message, setMessage] = useState("Loading advert...");
   }
 
   async function applyPromo() {
-  setPromoMessage("Checking code...");
+    const code = promoCode.trim().toUpperCase();
 
-  const { data, error } = await supabase
-    .from("promo_codes")
-    .select("*")
-    .eq("code", promoCode.toUpperCase())
-    .eq("active", true)
-    .maybeSingle();
+    if (!code) {
+      setPromoMessage("Enter a promo code first.");
+      return;
+    }
 
-  if (error || !data) {
-    setPromoMessage("Invalid promo code");
-    return;
-  }
+    setIsApplyingPromo(true);
+    setPromoMessage("Checking code...");
+    setPaymentMessage("");
 
-  if (data.max_uses && data.uses >= data.max_uses) {
-    setPromoMessage("This code has expired");
-    return;
-  }
+    const { data, error } = await supabase
+      .from("promo_codes")
+      .select("*")
+      .eq("code", code)
+      .eq("active", true)
+      .maybeSingle();
 
-  if (data.discount_type === "free") {
-    setDiscountedPrice(0);
-  }
+    setIsApplyingPromo(false);
 
-  if (data.discount_type === "fixed") {
-    setDiscountedPrice(Math.max(0, 9.99 - data.discount_value));
-  }
+    if (error) {
+      setPromoMessage(
+        "We couldn't check that code in the browser. You can still continue — it will be validated securely at payment."
+      );
+      return;
+    }
 
-  setPromoMessage("Promo applied");
+    if (!data) {
+      setDiscountedPrice(9.99);
+      setPromoMessage("That promo code wasn't recognised.");
+      return;
+    }
 
+    if (data.max_uses && data.uses >= data.max_uses) {
+      setDiscountedPrice(9.99);
+      setPromoMessage("This code has expired.");
+      return;
+    }
+
+    if (data.discount_type === "free") {
+      setDiscountedPrice(0);
+    }
+
+    if (data.discount_type === "fixed") {
+      setDiscountedPrice(Math.max(0, 9.99 - data.discount_value));
+    }
+
+    setPromoCode(code);
+    setPromoMessage("Promo applied. Final validation happens securely when you publish.");
   }
 
   async function startPayment() {
-  if (discountedPrice === 0) {
-    const { error } = await supabase
-      .from("adverts")
-      .update({
-        status: "live",
-        paid: false,
-        promo_code: promoCode.toUpperCase(),
-      })
-      .eq("id", params.id);
+    const code = promoCode.trim().toUpperCase();
 
-    if (error) {
-      setMessage(error.message);
-    } else {
-      router.push("/dashboard");
+    if (!advertId) {
+      setPaymentMessage("We couldn't find this advert. Please refresh and try again.");
+      return;
     }
 
-    return;
+    setIsStartingPayment(true);
+    setMessage("");
+    setPaymentMessage("Preparing secure checkout...");
+
+    try {
+      const res = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          advertId,
+          promoCode: code,
+        }),
+      });
+
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : null;
+
+      if (!res.ok) {
+        setPaymentMessage(
+          data?.error ||
+            "We couldn't start payment just now. Please try again in a moment."
+        );
+        return;
+      }
+
+      if (data?.url) {
+        setPaymentMessage("Success — redirecting you now...");
+        window.location.href = data.url;
+        return;
+      }
+
+      setPaymentMessage(
+        "Checkout did not return a payment link. Please try again in a moment."
+      );
+    } catch {
+      setPaymentMessage(
+        "We couldn't reach the payment service. Please check your connection and try again."
+      );
+    } finally {
+      setIsStartingPayment(false);
+    }
   }
-
-  const res = await fetch("/api/create-checkout-session", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      advertId: params.id,
-      promoCode: promoCode.toUpperCase(),
-    }),
-  });
-
-  const data = await res.json();
-
-  if (data.url) {
-    window.location.href = data.url;
-  } else {
-    setMessage(data.error || "Could not start payment.");
-  }
-}
 
   return (
     <main>
@@ -213,27 +252,27 @@ const [message, setMessage] = useState("Loading advert...");
             {photos.length > 0 && (
               <div className="photo-preview-grid">
                 {photos.map((photo) => (
-  <div className="photo-preview-item" key={photo.id}>
-    <img src={photo.image_url} alt="Advert photo" />
-    <button
-      type="button"
-      onClick={async () => {
-        const { error } = await supabase
-          .from("advert_photos")
-          .delete()
-          .eq("id", photo.id);
+                  <div className="photo-preview-item" key={photo.id}>
+                    <img src={photo.image_url} alt="Advert photo" />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const { error } = await supabase
+                          .from("advert_photos")
+                          .delete()
+                          .eq("id", photo.id);
 
-        if (error) {
-          setMessage(error.message);
-        } else {
-          await fetchPhotos();
-        }
-      }}
-    >
-      Delete
-    </button>
-  </div>
-))}
+                        if (error) {
+                          setMessage(error.message);
+                        } else {
+                          await fetchPhotos();
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -241,12 +280,17 @@ const [message, setMessage] = useState("Loading advert...");
 
             <h3>Apply launch offer</h3>
             <p style={{ color: "var(--muted)" }}>
-              Enter launch code LAUNCH250 to advertise until sold for £2.50. Standard price is £9.99
+              Enter launch code LAUNCH250 to advertise until sold for £2.50.
+              Standard price is £9.99
             </p>
 
             <input
               value={promoCode}
-              onChange={(e) => setPromoCode(e.target.value)}
+              onChange={(e) => {
+                setPromoCode(e.target.value);
+                setPromoMessage("");
+                setPaymentMessage("");
+              }}
               placeholder="Enter promo code"
               style={{
                 width: "100%",
@@ -257,25 +301,72 @@ const [message, setMessage] = useState("Loading advert...");
               }}
             />
 
-            <button type="button" onClick={applyPromo}>
-              Apply promo code and publish
+            <button
+              type="button"
+              onClick={applyPromo}
+              disabled={isApplyingPromo || isStartingPayment}
+            >
+              {isApplyingPromo ? "Checking promo code..." : "Apply promo code"}
             </button>
+
+            {promoMessage && (
+              <p
+                role="status"
+                aria-live="polite"
+                style={{
+                  marginTop: "14px",
+                  padding: "14px 16px",
+                  borderRadius: "16px",
+                  border: "1px solid rgba(17, 24, 39, 0.12)",
+                  background:
+                    "linear-gradient(135deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92))",
+                  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+                  color: "#111827",
+                  fontWeight: 600,
+                }}
+              >
+                {promoMessage}
+              </p>
+            )}
 
             <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
 
             <h3>Pay £{discountedPrice.toFixed(2)}</h3>
 
-<p style={{ color: "var(--muted)" }}>
-  Pay once and advertise until sold.
-</p>
+            <p style={{ color: "var(--muted)" }}>
+              Pay once and advertise until sold.
+            </p>
 
-<button
-  type="button"
-  onClick={startPayment}
-  style={{ background: "#111827", marginTop: "8px" }}
->
-  Pay £{discountedPrice.toFixed(2)} and publish
-</button>
+            <button
+              type="button"
+              onClick={startPayment}
+              disabled={isStartingPayment || isApplyingPromo}
+              style={{ background: "#111827", marginTop: "8px" }}
+            >
+              {isStartingPayment
+                ? "Preparing checkout..."
+                : `Pay £${discountedPrice.toFixed(2)} and publish`}
+            </button>
+
+            {paymentMessage && (
+              <p
+                role="status"
+                aria-live="polite"
+                style={{
+                  marginTop: "14px",
+                  padding: "14px 16px",
+                  borderRadius: "16px",
+                  border: "1px solid rgba(17, 24, 39, 0.12)",
+                  background:
+                    "linear-gradient(135deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92))",
+                  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+                  color: "#111827",
+                  fontWeight: 600,
+                }}
+              >
+                {paymentMessage}
+              </p>
+            )}
           </div>
         )}
       </section>
