@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -12,6 +12,8 @@ export default function PublishAdvertPage() {
 
   const [advert, setAdvert] = useState<any>(null);
   const [photos, setPhotos] = useState<any[]>([]);
+  const [isDraggingPhotos, setIsDraggingPhotos] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [promoCode, setPromoCode] = useState("");
   const [discountedPrice, setDiscountedPrice] = useState(9.99);
@@ -61,18 +63,27 @@ export default function PublishAdvertPage() {
     setPhotos(data || []);
   }
 
-  async function uploadPhotos(files: FileList | null) {
+  async function uploadPhotos(files: FileList | File[] | null) {
     if (!files || !advertId) return;
 
-    if (photos.length + files.length > 10) {
+    const imageFiles = Array.from(files).filter((file) =>
+      file.type.startsWith("image/")
+    );
+
+    if (imageFiles.length === 0) {
+      setMessage("Please choose image files to upload.");
+      return;
+    }
+
+    if (photos.length + imageFiles.length > 10) {
       setMessage("You can upload up to 10 photos per advert.");
       return;
     }
 
     setMessage("Uploading photos...");
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i];
       const fileExt = file.name.split(".").pop();
       const filePath = `${advertId}/${Date.now()}-${i}.${fileExt}`;
 
@@ -242,11 +253,46 @@ export default function PublishAdvertPage() {
               advert pages.
             </p>
 
+            <div
+              className={`photo-upload-zone ${
+                isDraggingPhotos ? "photo-upload-zone-active" : ""
+              }`}
+              role="button"
+              tabIndex={0}
+              onClick={() => fileInputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  fileInputRef.current?.click();
+                }
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDraggingPhotos(true);
+              }}
+              onDragLeave={() => setIsDraggingPhotos(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDraggingPhotos(false);
+                uploadPhotos(e.dataTransfer.files);
+              }}
+            >
+              <strong>Drag photos here or click to choose files.</strong>
+              <span>
+                The first photo appears on browse and advert pages.
+              </span>
+            </div>
+
             <input
+              ref={fileInputRef}
+              className="photo-upload-input"
               type="file"
               accept="image/*"
               multiple
-              onChange={(e) => uploadPhotos(e.target.files)}
+              onChange={(e) => {
+                uploadPhotos(e.target.files);
+                e.target.value = "";
+              }}
             />
 
             {photos.length > 0 && (

@@ -2594,3 +2594,70 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   cursor: pointer;
   user-select: none;
 }
+.signin-required-card {
+  border: 1px solid rgba(20, 92, 255, 0.16);
+  border-radius: 30px;
+  padding: 32px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.98), rgba(248,250,252,0.94)),
+    radial-gradient(circle at top right, rgba(20,92,255,0.12), transparent 34%);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.10);
+}
+
+.signin-required-card h2 {
+  font-size: clamp(30px, 4vw, 46px);
+  line-height: 1;
+  letter-spacing: -0.055em;
+  margin: 0 0 14px;
+}
+
+.signin-required-card p:not(.eyebrow) {
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.signin-required-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.photo-upload-zone {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin: 18px 0 14px;
+  padding: 30px;
+  border: 2px dashed rgba(20, 92, 255, 0.30);
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(238,242,255,0.88), rgba(255,255,255,0.96));
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.photo-upload-zone strong {
+  font-size: 18px;
+}
+
+.photo-upload-zone span {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.photo-upload-zone:hover,
+.photo-upload-zone:focus-visible,
+.photo-upload-zone-active {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, rgba(219,234,254,0.95), rgba(255,255,255,0.98));
+  box-shadow: 0 18px 44px rgba(20, 92, 255, 0.14);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.photo-upload-input {
+  margin-top: 0 !important;
+}

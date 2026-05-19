@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -14,6 +14,9 @@ function capitaliseWords(str: string) {
 
 export default function CreateAdvertPage() {
   const router = useRouter();
+
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const [price, setPrice] = useState("");
   const [mileage, setMileage] = useState("");
@@ -30,6 +33,18 @@ export default function CreateAdvertPage() {
   const [seats, setSeats] = useState("");
   const [fuelType, setFuelType] = useState("");
   const [previouslyWrittenOff, setPreviouslyWrittenOff] = useState("");
+
+  useEffect(() => {
+    async function checkAuth() {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+
+      setIsLoggedIn(Boolean(data.user));
+      setIsCheckingAuth(false);
+    }
+
+    checkAuth();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -104,6 +119,29 @@ export default function CreateAdvertPage() {
       </section>
 
       <section className="form-section">
+        {isCheckingAuth && <p>Checking your account...</p>}
+
+        {!isCheckingAuth && !isLoggedIn && (
+          <div className="premium-card signin-required-card">
+            <p className="eyebrow">OwnerCars account</p>
+            <h2>Sign in before creating your advert</h2>
+            <p>
+              Create or sign in to your OwnerCars account before entering your car
+              details, so your advert is saved safely.
+            </p>
+            <div className="signin-required-actions">
+              <Link className="button primary" href="/login">
+                Sign in
+              </Link>
+              <Link className="button secondary" href="/create-account">
+                Create account
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {!isCheckingAuth && isLoggedIn && (
+          <>
         <div className="preview-card">
           <p className="preview-label">Advert preview</p>
 
@@ -325,6 +363,8 @@ export default function CreateAdvertPage() {
 
           {message && <p style={{ marginTop: "18px" }}>{message}</p>}
         </form>
+          </>
+        )}
       </section>
     </main>
   );
