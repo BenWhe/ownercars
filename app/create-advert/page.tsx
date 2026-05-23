@@ -12,11 +12,30 @@ function capitaliseWords(str: string) {
     .join(" ");
 }
 
+const SAVED_ADVERT_DRAFT_KEY = "ownercars:create-advert-draft";
+const PENDING_ADVERT_SUBMIT_KEY = "ownercars_pending_advert_submit";
+
+type AdvertDraft = {
+  make: string;
+  model: string;
+  year: string;
+  mileage: string;
+  fuelType: string;
+  gearbox: string;
+  price: string;
+  bodyType: string;
+  colour: string;
+  doors: string;
+  seats: string;
+  previouslyWrittenOff: string;
+  confirmedPrivateSeller: boolean;
+  description: string;
+};
+
 export default function CreateAdvertPage() {
   const router = useRouter();
-
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showSaveAdvertPrompt, setShowSaveAdvertPrompt] = useState(false);
 
   const [price, setPrice] = useState("");
   const [mileage, setMileage] = useState("");
@@ -33,73 +52,181 @@ export default function CreateAdvertPage() {
   const [seats, setSeats] = useState("");
   const [fuelType, setFuelType] = useState("");
   const [previouslyWrittenOff, setPreviouslyWrittenOff] = useState("");
+  const [confirmedPrivateSeller, setConfirmedPrivateSeller] = useState(false);
 
-  useEffect(() => {
-    async function checkAuth() {
-      const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
+  function currentDraft(): AdvertDraft {
+    return {
+      make,
+      model,
+      year,
+      mileage,
+      fuelType,
+      gearbox,
+      price,
+      bodyType,
+      colour,
+      doors,
+      seats,
+      previouslyWrittenOff,
+      confirmedPrivateSeller,
+      description,
+    };
+  }
 
-      setIsLoggedIn(Boolean(data.user));
-      setIsCheckingAuth(false);
+  function applyDraft(draft: Partial<AdvertDraft>) {
+    setMake(draft.make || "");
+    setModel(draft.model || "");
+    setYear(draft.year || "");
+    setMileage(draft.mileage || "");
+    setFuelType(draft.fuelType || "");
+    setGearbox(draft.gearbox || "");
+    setPrice(draft.price || "");
+    setBodyType(draft.bodyType || "");
+    setColour(draft.colour || "");
+    setDoors(draft.doors || "");
+    setSeats(draft.seats || "");
+    setPreviouslyWrittenOff(draft.previouslyWrittenOff || "");
+    setConfirmedPrivateSeller(Boolean(draft.confirmedPrivateSeller));
+    setDescription(draft.description || "");
+  }
+
+  function readSavedDraft() {
+    const savedDraft = window.localStorage.getItem(SAVED_ADVERT_DRAFT_KEY);
+    if (!savedDraft) return null;
+
+    try {
+      return JSON.parse(savedDraft) as AdvertDraft;
+    } catch {
+      window.localStorage.removeItem(SAVED_ADVERT_DRAFT_KEY);
+      return null;
     }
+  }
 
-    checkAuth();
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
+  async function createAdvertForUser(sellerId: string, draft: AdvertDraft) {
     const supabase = createClient();
 
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
-
-    if (!user) {
-      setMessage("You must be logged in to create an advert.");
-      return;
-    }
-
-    const { data, error } = await supabase
+    return supabase
       .from("adverts")
       .insert({
-        seller_id: user.id,
-        title: `${year} ${make} ${model}`.trim(),
-        make,
-        model,
-        year: Number(year),
-        mileage: Number(mileage),
-        fuel_type: fuelType,
-        gearbox,
-        price: Number(price),
-        body_type: bodyType,
-        colour,
-        doors: Number(doors),
-        seats: Number(seats),
-        previously_written_off: previouslyWrittenOff,
-        description,
+        seller_id: sellerId,
+        title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
+        make: draft.make,
+        model: draft.model,
+        year: Number(draft.year),
+        mileage: Number(draft.mileage),
+        fuel_type: draft.fuelType,
+        gearbox: draft.gearbox,
+        price: Number(draft.price),
+        body_type: draft.bodyType,
+        colour: draft.colour,
+        doors: Number(draft.doors),
+        seats: Number(draft.seats),
+        previously_written_off: draft.previouslyWrittenOff,
+        description: draft.description,
         status: "draft",
         paid: false,
         promo_code: null,
       })
       .select()
       .single();
+  }
+
+  useEffect(() => {
+    const savedDraft = readSavedDraft();
+    if (savedDraft) applyDraft(savedDraft);
+
+    const supabase = createClient();
+
+    async function checkAuth() {
+      try {
+        await supabase.auth.getUser();
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    }
+
+    checkAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      setIsCheckingAuth(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  function saveDraftToLocalStorage() {
+    window.localStorage.setItem(
+      SAVED_ADVERT_DRAFT_KEY,
+      JSON.stringify(currentDraft())
+    );
+  }
+
+  function validateDraft() {
+    const missingFields = [
+      ["make", make],
+      ["model", model],
+      ["year", year],
+      ["mileage", mileage],
+      ["fuel type", fuelType],
+      ["gearbox", gearbox],
+      ["price", price],
+      ["body type", bodyType],
+      ["colour", colour],
+      ["doors", doors],
+      ["seats", seats],
+      ["write-off status", previouslyWrittenOff],
+      ["seller note", description.trim()],
+    ]
+      .filter(([, value]) => !value)
+      .map(([label]) => label);
+
+    if (missingFields.length > 0) {
+      return `Please complete: ${missingFields.join(", ")}.`;
+    }
+
+    if (!confirmedPrivateSeller) {
+      return "Please confirm you are a private seller before creating your draft advert.";
+    }
+
+    return "";
+  }
+
+  async function handleCreateAdvertClick() {
+    setMessage("");
+
+    const validationError = validateDraft();
+    if (validationError) {
+      setMessage(validationError);
+      return;
+    }
+
+    const supabase = createClient();
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const user = userData.user;
+
+    if (userError || !user) {
+      saveDraftToLocalStorage();
+      window.localStorage.setItem(PENDING_ADVERT_SUBMIT_KEY, "true");
+      setShowSaveAdvertPrompt(true);
+      return;
+    }
+
+    setShowSaveAdvertPrompt(false);
+
+    const { data, error } = await createAdvertForUser(user.id, currentDraft());
 
     if (error) {
       setMessage(error.message);
-    } else {
-      router.push(`/publish-advert/${data.id}`);
+      return;
     }
-  }
 
-  const formReady =
-    make &&
-    model &&
-    year &&
-    mileage &&
-    fuelType &&
-    gearbox &&
-    price &&
-    description.length > 0;
+    window.localStorage.removeItem(SAVED_ADVERT_DRAFT_KEY);
+    window.localStorage.removeItem(PENDING_ADVERT_SUBMIT_KEY);
+    router.push(`/publish-advert/${data.id}`);
+  }
 
   return (
     <main>
@@ -119,29 +246,8 @@ export default function CreateAdvertPage() {
       </section>
 
       <section className="form-section">
-        {isCheckingAuth && <p>Checking your account...</p>}
+        {isCheckingAuth && <p className="auth-check-note">Checking your account quietly — you can keep creating your advert.</p>}
 
-        {!isCheckingAuth && !isLoggedIn && (
-          <div className="premium-card signin-required-card">
-            <p className="eyebrow">OwnerCars account</p>
-            <h2>Sign in before creating your advert</h2>
-            <p>
-              Create or sign in to your OwnerCars account before entering your car
-              details, so your advert is saved safely.
-            </p>
-            <div className="signin-required-actions">
-              <Link className="button primary" href="/login">
-                Sign in
-              </Link>
-              <Link className="button secondary" href="/create-account">
-                Create account
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {!isCheckingAuth && isLoggedIn && (
-          <>
         <div className="preview-card">
           <p className="preview-label">Advert preview</p>
 
@@ -162,7 +268,7 @@ export default function CreateAdvertPage() {
           </p>
         </div>
 
-        <form className="advert-form" onSubmit={handleSubmit}>
+        <div className="advert-form">
           <label>
             Make
             <input
@@ -346,24 +452,72 @@ export default function CreateAdvertPage() {
           </label>
 
           <label className="checkbox-row">
-            <input required type="checkbox" />
+            <input
+              required
+              type="checkbox"
+              checked={confirmedPrivateSeller}
+              onChange={(e) => setConfirmedPrivateSeller(e.target.checked)}
+            />
             <span>
               I confirm I am a private seller and the information in this advert
               is accurate.
             </span>
           </label>
 
-          <button
-            type="submit"
-            disabled={!formReady}
-            className={!formReady ? "button-disabled" : ""}
-          >
+          <p className="submit-reassurance">
+            We’ll save your advert to your account before you publish.
+          </p>
+
+          <button type="button" onClick={handleCreateAdvertClick}>
             Create draft advert
           </button>
 
-          {message && <p style={{ marginTop: "18px" }}>{message}</p>}
-        </form>
-          </>
+          {message && (
+            <p role="alert" style={{ marginTop: "18px" }}>
+              {message}
+            </p>
+          )}
+        </div>
+
+        {showSaveAdvertPrompt && (
+          <div
+            className="save-advert-modal-backdrop"
+            role="presentation"
+            onClick={() => setShowSaveAdvertPrompt(false)}
+          >
+            <div
+              className="save-advert-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="save-advert-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="eyebrow">Almost there</p>
+              <h2 id="save-advert-title">Save your advert</h2>
+              <p>
+                Create or sign in to your OwnerCars account so your advert is
+                saved safely and only you can manage it.
+              </p>
+              <div className="save-advert-actions">
+                <Link className="button primary" href="/login?next=/create-advert/resume">
+                  Sign in and continue
+                </Link>
+                <Link
+                  className="button secondary"
+                  href="/create-account?next=/create-advert/resume"
+                >
+                  Create account and continue
+                </Link>
+              </div>
+              <button
+                className="save-advert-close"
+                type="button"
+                onClick={() => setShowSaveAdvertPrompt(false)}
+              >
+                Keep editing
+              </button>
+            </div>
+          </div>
         )}
       </section>
     </main>

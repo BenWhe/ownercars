@@ -4,6 +4,10 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+function safeNextPath(next: string | null) {
+  return next?.startsWith("/") && !next.startsWith("//") ? next : null;
+}
+
 export default function CreateAccountPage() {
   const router = useRouter();
 
@@ -16,7 +20,7 @@ export default function CreateAccountPage() {
 
     const supabase = createClient();
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
@@ -24,8 +28,28 @@ export default function CreateAccountPage() {
     if (error) {
       setMessage(error.message);
     } else {
-      setMessage("Account created. You can now sign in.");
-      setTimeout(() => router.push("/login"), 1200);
+      const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
+
+      setMessage(
+        next
+          ? data.session
+            ? "Account created. Taking you back to your advert..."
+            : "Account created. Sign in to continue your advert."
+          : "Account created. You can now sign in."
+      );
+      setTimeout(() => {
+        if (next && data.session) {
+          window.location.href = next;
+          return;
+        }
+
+        if (next) {
+          window.location.href = `/login?next=${encodeURIComponent(next)}`;
+          return;
+        }
+
+        router.push("/login");
+      }, 1200);
     }
   }
 

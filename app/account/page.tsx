@@ -20,11 +20,24 @@ export default function AccountPage() {
     loadUser();
   }, []);
 
+  function clearSupabaseAuthStorage() {
+    [window.localStorage, window.sessionStorage].forEach((storage) => {
+      Object.keys(storage).forEach((key) => {
+        if (key.startsWith("sb-") && key.includes("auth-token")) {
+          storage.removeItem(key);
+        }
+      });
+    });
+  }
+
   async function logout() {
     const supabase = createClient();
 
+    await supabase.auth.signOut({ scope: "local" });
     await supabase.auth.signOut();
+    clearSupabaseAuthStorage();
     setEmail(null);
+    window.location.replace("/");
   }
 
   return (

@@ -105,14 +105,26 @@ export default function Header() {
     }
   }
 
+  function clearSupabaseAuthStorage() {
+    [window.localStorage, window.sessionStorage].forEach((storage) => {
+      Object.keys(storage).forEach((key) => {
+        if (key.startsWith("sb-") && key.includes("auth-token")) {
+          storage.removeItem(key);
+        }
+      });
+    });
+  }
+
   async function handleLogout() {
     const supabase = createClient();
 
+    await supabase.auth.signOut({ scope: "local" });
     await supabase.auth.signOut();
+    clearSupabaseAuthStorage();
     setLoggedIn(false);
     setUnreadCount(0);
     setMenuOpen(false);
-    window.location.href = "/";
+    window.location.replace("/");
   }
 
   return (
@@ -189,17 +201,13 @@ export default function Header() {
                     Dashboard
                   </Link>
 
-                  <div
-  className="apple-menu-logout"
-  role="button"
-  tabIndex={0}
-  onClick={handleLogout}
-  onKeyDown={(e) => {
-    if (e.key === "Enter") handleLogout();
-  }}
->
-  Log out
-</div>
+                  <button
+                    type="button"
+                    className="apple-menu-logout"
+                    onClick={handleLogout}
+                  >
+                    Log out
+                  </button>
                 </>
               ) : (
                 <>
