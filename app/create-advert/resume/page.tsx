@@ -39,6 +39,7 @@ type ResumeState =
   | "error";
 
 const TIMEOUT_MS = 10_000;
+const LOG_PREFIX = "[OC-01 resume debug]";
 
 function withTimeout<T>(promise: PromiseLike<T>, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -68,23 +69,43 @@ function readSavedDraft() {
 async function waitForAuthenticatedUser(): Promise<User | null> {
   const supabase = createClient();
 
+  console.log(`${LOG_PREFIX} checking Supabase session with getSession()`);
+
   const {
     data: { session },
+    error: sessionError,
   } = await supabase.auth.getSession();
+
+  console.log(`${LOG_PREFIX} getSession result`, {
+    hasSession: Boolean(session),
+    userId: session?.user?.id ?? null,
+    error: sessionError?.message ?? null,
+  });
 
   if (session?.user) {
     return session.user;
   }
 
+  console.log(`${LOG_PREFIX} no session yet; waiting for auth state change`);
+
   return new Promise((resolve) => {
     const timeout = window.setTimeout(() => {
+      console.log(`${LOG_PREFIX} auth state wait timed out`, {
+        waitedMs: TIMEOUT_MS,
+      });
       subscription.unsubscribe();
       resolve(null);
     }, TIMEOUT_MS);
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, nextSession: Session | null) => {
+    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, nextSession: Session | null) => {
+      console.log(`${LOG_PREFIX} auth state change`, {
+        event,
+        hasSession: Boolean(nextSession),
+        userId: nextSession?.user?.id ?? null,
+      });
+
       if (!nextSession?.user) return;
 
       window.clearTimeout(timeout);
@@ -94,33 +115,49 @@ async function waitForAuthenticatedUser(): Promise<User | null> {
   });
 }
 
+function advertInsertPayload(sellerId: string, draft: AdvertDraft) {
+  return {
+    seller_id: sellerId,
+    title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
+    make: draft.make,
+    model: draft.model,
+    year: Number(draft.year),
+    mileage: Number(draft.mileage),
+    fuel_type: draft.fuelType,
+    gearbox: draft.gearbox,
+    price: Number(draft.price),
+    body_type: draft.bodyType,
+    colour: draft.colour,
+    doors: Number(draft.doors),
+    seats: Number(draft.seats),
+    previously_written_off: draft.previouslyWrittenOff,
+    description: draft.description,
+    status: "draft",
+    paid: false,
+    promo_code: null,
+  };
+}
+
 async function createAdvertForUser(sellerId: string, draft: AdvertDraft) {
   const supabase = createClient();
+  const payload = advertInsertPayload(sellerId, draft);
 
-  return supabase
-    .from("adverts")
-    .insert({
-      seller_id: sellerId,
-      title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
-      make: draft.make,
-      model: draft.model,
-      year: Number(draft.year),
-      mileage: Number(draft.mileage),
-      fuel_type: draft.fuelType,
-      gearbox: draft.gearbox,
-      price: Number(draft.price),
-      body_type: draft.bodyType,
-      colour: draft.colour,
-      doors: Number(draft.doors),
-      seats: Number(draft.seats),
-      previously_written_off: draft.previouslyWrittenOff,
-      description: draft.description,
-      status: "draft",
-      paid: false,
-      promo_code: null,
-    })
-    .select()
-    .single();
+  console.log(`${LOG_PREFIX} Supabase insert call`, {
+    table: "adverts",
+    method: "insert(...).select().single()",
+    payload,
+  });
+
+  const response = await supabase.from("adverts").insert(payload).select().single();
+
+  console.log(`${LOG_PREFIX} Supabase insert response`, {
+    data: response.data,
+    error: response.error,
+    status: response.status,
+    statusText: response.statusText,
+  });
+
+  return response;
 }
 
 export default function CreateAdvertResumePage() {
@@ -135,7 +172,13 @@ export default function CreateAdvertResumePage() {
     setError("");
 
     try {
+      console.log(`${LOG_PREFIX} resumeAdvert started`);
       const user = await withTimeout(waitForAuthenticatedUser(), "Checking your account");
+
+      console.log(`${LOG_PREFIX} authenticated user result`, {
+        hasUser: Boolean(user),
+        userId: user?.id ?? null,
+      });
 
       if (!user) {
         setError("Please sign in or create an account to continue.");
@@ -145,6 +188,11 @@ export default function CreateAdvertResumePage() {
 
       setState("loading-draft");
       const savedDraft = readSavedDraft();
+
+      console.log(`${LOG_PREFIX} saved draft result`, {
+        hasDraft: Boolean(savedDraft),
+        draft: savedDraft,
+      });
 
       if (!savedDraft) {
         window.localStorage.removeItem(PENDING_ADVERT_SUBMIT_KEY);
@@ -168,6 +216,7 @@ export default function CreateAdvertResumePage() {
       setState("redirecting");
       router.replace(`/publish-advert/${data.id}`);
     } catch (err) {
+      console.error(`${LOG_PREFIX} resumeAdvert failed`, err);
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       setState("error");
     }
