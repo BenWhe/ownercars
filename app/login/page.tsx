@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [isRecoverySession, setIsRecoverySession] = useState(false);
+  const [nextPath, setNextPath] = useState<string | null>(null);
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -96,6 +97,8 @@ export default function LoginPage() {
   useEffect(() => {
     const supabase = createClient();
     const searchParams = new URLSearchParams(window.location.search);
+    const next = safeNextPath(searchParams.get("next"));
+    const nextPathTimer = window.setTimeout(() => setNextPath(next), 0);
 
     async function initialiseSession() {
       const {
@@ -112,7 +115,6 @@ export default function LoginPage() {
         return;
       }
 
-      const next = safeNextPath(searchParams.get("next"));
       if (user && !searchParams.get("reset")) {
         window.location.replace(next || "/dashboard");
       }
@@ -129,7 +131,10 @@ export default function LoginPage() {
 
     initialiseSession();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      window.clearTimeout(nextPathTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (
@@ -207,7 +212,14 @@ export default function LoginPage() {
               <span>New to OwnerCars?</span>
             </div>
 
-            <a className="auth-secondary-link" href="/create-account">
+            <a
+              className="auth-secondary-link"
+              href={
+                nextPath
+                  ? `/create-account?next=${encodeURIComponent(nextPath)}`
+                  : "/create-account"
+              }
+            >
               Create your account
             </a>
           </>
