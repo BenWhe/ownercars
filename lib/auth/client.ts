@@ -42,7 +42,10 @@ function clearSupabaseAuthCookies() {
 export async function signOutAndClearSession() {
   const supabase = createClient();
 
-  await supabase.auth.signOut({ scope: "local" }).catch(() => null);
+  // Do not block the UI on Supabase's network sign-out. The server route below
+  // is the source of truth for clearing auth cookies, and local storage is
+  // cleared synchronously before navigating away.
+  void supabase.auth.signOut({ scope: "local" }).catch(() => null);
   clearSupabaseAuthStorage();
   clearSupabaseAuthCookies();
   resetSupabaseClient();
