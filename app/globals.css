@@ -910,6 +910,28 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   color: #dc2626;
 }
 
+.auth-inline-form {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.auth-inline-form button {
+  border: none;
+  background: transparent;
+  color: var(--accent-dark);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 0;
+  text-align: left;
+}
+
+.auth-inline-form button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .auth-footer {
   margin-top: 18px;
   font-size: 13px;

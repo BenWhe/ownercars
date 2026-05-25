@@ -1,6 +1,7 @@
 import "./globals.css";
 import Link from "next/link";
 import Header from "./components/Header";
+import AuthSessionSync from "./components/AuthSessionSync";
 
 export const metadata = {
   title: "OwnerCars",
@@ -22,6 +23,7 @@ export default function RootLayout({
       <body>
 
         {/* HEADER */}
+        <AuthSessionSync />
         <Header />
 
         {children}
