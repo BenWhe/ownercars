@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
 const SAVED_ADVERT_DRAFT_KEY = "ownercars:create-advert-draft";
 const PENDING_ADVERT_SUBMIT_KEY = "ownercars_pending_advert_submit";
@@ -64,6 +65,35 @@ function readSavedDraft() {
   }
 }
 
+async function waitForAuthenticatedUser(): Promise<User | null> {
+  const supabase = createClient();
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    return session.user;
+  }
+
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(() => {
+      subscription.unsubscribe();
+      resolve(null);
+    }, TIMEOUT_MS);
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, nextSession: Session | null) => {
+      if (!nextSession?.user) return;
+
+      window.clearTimeout(timeout);
+      subscription.unsubscribe();
+      resolve(nextSession.user);
+    });
+  });
+}
+
 async function createAdvertForUser(sellerId: string, draft: AdvertDraft) {
   const supabase = createClient();
 
@@ -105,14 +135,10 @@ export default function CreateAdvertResumePage() {
     setError("");
 
     try {
-      const supabase = createClient();
-      const { data: userData, error: userError } = await withTimeout<
-        Awaited<ReturnType<typeof supabase.auth.getUser>>
-      >(supabase.auth.getUser(), "Checking your account");
-      const user = userData.user;
+      const user = await withTimeout(waitForAuthenticatedUser(), "Checking your account");
 
-      if (userError || !user) {
-        setError(userError?.message || "Please sign in or create an account to continue.");
+      if (!user) {
+        setError("Please sign in or create an account to continue.");
         setState("needs-auth");
         return;
       }
