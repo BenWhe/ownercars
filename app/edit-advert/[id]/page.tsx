@@ -34,10 +34,12 @@ export default function EditAdvertPage() {
         .select("*")
         .eq("id", params.id)
         .eq("seller_id", user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         setMessage(error.message);
+      } else if (!data) {
+        setMessage("Not authorised to manage this advert.");
       } else {
         setTitle(data.title || "");
         setPrice(String(data.price || ""));
