@@ -2,6 +2,10 @@ import { createBrowserClient } from "@supabase/ssr";
 
 let browserClient: ReturnType<typeof createBrowserClient> | null = null;
 
+export function resetSupabaseClient() {
+  browserClient = null;
+}
+
 export function createClient() {
   if (browserClient) return browserClient;
 

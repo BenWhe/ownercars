@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import Link from "next/link";
+import { signOutAndClearSession } from "@/lib/auth/client";
 import { createClient } from "@/lib/supabase/client";
 
 export default function Header() {
@@ -112,22 +113,8 @@ export default function Header() {
     }
   }
 
-  function clearSupabaseAuthStorage() {
-    [window.localStorage, window.sessionStorage].forEach((storage) => {
-      Object.keys(storage).forEach((key) => {
-        if (key.startsWith("sb-") && key.includes("auth-token")) {
-          storage.removeItem(key);
-        }
-      });
-    });
-  }
-
   async function handleLogout() {
-    const supabase = createClient();
-
-    await supabase.auth.signOut({ scope: "local" });
-    await supabase.auth.signOut();
-    clearSupabaseAuthStorage();
+    await signOutAndClearSession();
     setLoggedIn(false);
     setUnreadCount(0);
     setMenuOpen(false);
