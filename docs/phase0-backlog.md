@@ -73,7 +73,7 @@ You are working on OwnerCars, a live UK web marketplace for private car sellers
 (https://ownercars.co.uk). This is an existing MVP, not a greenfield build.
 
 Stack: Next.js (App Router, TypeScript); Supabase (auth, database, storage);
-Stripe (payments); hosted on Vercel. Repo: [GITHUB REPO URL].
+Stripe (payments); hosted on Vercel. Repo: https://github.com/BenWhe/ownercars.git.
 
 Environment rules:
 - Work on a new feature branch named for the ticket (e.g. oc-04-auth-reliability).
