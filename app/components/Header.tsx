@@ -114,11 +114,10 @@ export default function Header() {
   }
 
   async function handleLogout() {
-    await signOutAndClearSession();
     setLoggedIn(false);
     setUnreadCount(0);
     setMenuOpen(false);
-    window.location.replace("/");
+    await signOutAndClearSession();
   }
 
   return (

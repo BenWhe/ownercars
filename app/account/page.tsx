@@ -22,9 +22,8 @@ export default function AccountPage() {
   }, []);
 
   async function logout() {
-    await signOutAndClearSession();
     setEmail(null);
-    window.location.replace("/");
+    await signOutAndClearSession();
   }
 
   return (

@@ -2,10 +2,14 @@
 
 import { createClient, resetSupabaseClient } from "@/lib/supabase/client";
 
+function isSupabaseAuthKey(key: string) {
+  return key.startsWith("sb-");
+}
+
 function clearSupabaseAuthStorage() {
   [window.localStorage, window.sessionStorage].forEach((storage) => {
     Object.keys(storage).forEach((key) => {
-      if (key.startsWith("sb-") && key.includes("auth-token")) {
+      if (isSupabaseAuthKey(key)) {
         storage.removeItem(key);
       }
     });
@@ -24,7 +28,7 @@ function clearSupabaseAuthCookies() {
   document.cookie.split(";").forEach((cookie) => {
     const name = cookie.split("=")[0]?.trim();
 
-    if (!name || !name.startsWith("sb-") || !name.includes("auth-token")) {
+    if (!name || !name.startsWith("sb-")) {
       return;
     }
 
@@ -38,10 +42,10 @@ function clearSupabaseAuthCookies() {
 export async function signOutAndClearSession() {
   const supabase = createClient();
 
-  await supabase.auth.signOut();
-  await supabase.auth.signOut({ scope: "local" });
+  await supabase.auth.signOut({ scope: "local" }).catch(() => null);
   clearSupabaseAuthStorage();
   clearSupabaseAuthCookies();
   resetSupabaseClient();
   window.dispatchEvent(new Event("ownercars:auth-changed"));
+  window.location.replace("/auth/sign-out");
 }
