@@ -1,5 +1,6 @@
 export const protectedPathPrefixes = [
   "/account",
+  "/create-advert",
   "/dashboard",
   "/edit-advert",
   "/messages",
