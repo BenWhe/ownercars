@@ -11,11 +11,24 @@ export default function DashboardPage() {
 
   async function markAsSold(advertId: string) {
     const supabase = createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
 
-    await supabase
+    if (!user) {
+      setMessage("You must be logged in to manage adverts.");
+      return;
+    }
+
+    const { error } = await supabase
       .from("adverts")
       .update({ status: "sold" })
-      .eq("id", advertId);
+      .eq("id", advertId)
+      .eq("seller_id", user.id);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
 
     window.location.reload();
   }
