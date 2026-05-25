@@ -14,6 +14,7 @@ function capitaliseWords(str: string) {
 
 const SAVED_ADVERT_DRAFT_KEY = "ownercars:create-advert-draft";
 const PENDING_ADVERT_SUBMIT_KEY = "ownercars_pending_advert_submit";
+const LOG_PREFIX = "[OC-01 create-advert debug]";
 
 type AdvertDraft = {
   make: string;
@@ -122,33 +123,50 @@ export default function CreateAdvertPage() {
     }
   }
 
+  function advertInsertPayload(sellerId: string, draft: AdvertDraft) {
+    return {
+      seller_id: sellerId,
+      title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
+      make: draft.make,
+      model: draft.model,
+      year: Number(draft.year),
+      mileage: Number(draft.mileage),
+      fuel_type: draft.fuelType,
+      gearbox: draft.gearbox,
+      price: Number(draft.price),
+      body_type: draft.bodyType,
+      colour: draft.colour,
+      doors: Number(draft.doors),
+      seats: Number(draft.seats),
+      previously_written_off: draft.previouslyWrittenOff,
+      description: draft.description,
+      status: "draft",
+      paid: false,
+      promo_code: null,
+    };
+  }
+
   async function createAdvertForUser(sellerId: string, draft: AdvertDraft) {
     const supabase = createClient();
+    const payload = advertInsertPayload(sellerId, draft);
 
-    return supabase
-      .from("adverts")
-      .insert({
-        seller_id: sellerId,
-        title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
-        make: draft.make,
-        model: draft.model,
-        year: Number(draft.year),
-        mileage: Number(draft.mileage),
-        fuel_type: draft.fuelType,
-        gearbox: draft.gearbox,
-        price: Number(draft.price),
-        body_type: draft.bodyType,
-        colour: draft.colour,
-        doors: Number(draft.doors),
-        seats: Number(draft.seats),
-        previously_written_off: draft.previouslyWrittenOff,
-        description: draft.description,
-        status: "draft",
-        paid: false,
-        promo_code: null,
-      })
-      .select()
-      .single();
+    console.log(`${LOG_PREFIX} Supabase insert call`, {
+      table: "adverts",
+      method: "insert(...).select().single()",
+      sellerId,
+      payload,
+    });
+
+    const response = await supabase.from("adverts").insert(payload).select().single();
+
+    console.log(`${LOG_PREFIX} Supabase insert response`, {
+      data: response.data,
+      error: response.error,
+      status: response.status,
+      statusText: response.statusText,
+    });
+
+    return response;
   }
 
   useEffect(() => {
@@ -270,8 +288,27 @@ export default function CreateAdvertPage() {
 
     const supabase = createClient();
 
+    console.log(`${LOG_PREFIX} create advert submit started`);
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    console.log(`${LOG_PREFIX} getSession result before insert`, {
+      hasSession: Boolean(session),
+      sessionUserId: session?.user?.id ?? null,
+      error: sessionError?.message ?? null,
+    });
+
     const { data: userData, error: userError } = await supabase.auth.getUser();
     const user = userData.user;
+
+    console.log(`${LOG_PREFIX} getUser result before insert`, {
+      hasUser: Boolean(user),
+      userId: user?.id ?? null,
+      error: userError?.message ?? null,
+    });
 
     if (userError || !user) {
       saveDraftToLocalStorage();
