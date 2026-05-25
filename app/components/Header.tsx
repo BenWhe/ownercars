@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import Link from "next/link";
+import { signOutAndClearSession } from "@/lib/auth/client";
 import { createClient } from "@/lib/supabase/client";
 
 export default function Header() {
@@ -12,8 +14,9 @@ export default function Header() {
   async function fetchUnreadCount() {
     const supabase = createClient();
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const user = sessionData.session?.user;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       setUnreadCount(0);
@@ -25,7 +28,8 @@ export default function Header() {
       .select("id")
       .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`);
 
-    const conversationIds = conversations?.map((c: any) => c.id) || [];
+    const conversationIds =
+      conversations?.map((conversation: { id: string }) => conversation.id) || [];
 
     if (conversationIds.length === 0) {
       setUnreadCount(0);
@@ -46,10 +50,12 @@ export default function Header() {
     const supabase = createClient();
 
     async function checkSession() {
-      const { data } = await supabase.auth.getSession();
-      setLoggedIn(!!data.session);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setLoggedIn(!!user);
 
-      if (data.session) {
+      if (user) {
         await fetchUnreadCount();
       } else {
         setUnreadCount(0);
@@ -63,11 +69,12 @@ export default function Header() {
     checkSession();
 
     window.addEventListener("ownercars:messages-read", handleMessagesRead);
-    window.addEventListener("focus", handleMessagesRead);
+    window.addEventListener("ownercars:auth-changed", checkSession);
+    window.addEventListener("focus", checkSession);
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
+    } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
       setLoggedIn(!!session);
 
       if (session) {
@@ -90,7 +97,8 @@ export default function Header() {
 
     return () => {
       window.removeEventListener("ownercars:messages-read", handleMessagesRead);
-      window.removeEventListener("focus", handleMessagesRead);
+      window.removeEventListener("ownercars:auth-changed", checkSession);
+      window.removeEventListener("focus", checkSession);
       subscription.unsubscribe();
       supabase.removeChannel(channel);
     };
@@ -105,26 +113,11 @@ export default function Header() {
     }
   }
 
-  function clearSupabaseAuthStorage() {
-    [window.localStorage, window.sessionStorage].forEach((storage) => {
-      Object.keys(storage).forEach((key) => {
-        if (key.startsWith("sb-") && key.includes("auth-token")) {
-          storage.removeItem(key);
-        }
-      });
-    });
-  }
-
   async function handleLogout() {
-    const supabase = createClient();
-
-    await supabase.auth.signOut({ scope: "local" });
-    await supabase.auth.signOut();
-    clearSupabaseAuthStorage();
     setLoggedIn(false);
     setUnreadCount(0);
     setMenuOpen(false);
-    window.location.replace("/");
+    await signOutAndClearSession();
   }
 
   return (
