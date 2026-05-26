@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
 function capitaliseWords(str: string) {
   return str
@@ -169,6 +170,50 @@ export default function CreateAdvertPage() {
     return response;
   }
 
+  async function waitForAuthenticatedUser(): Promise<User | null> {
+    const supabase = createClient();
+
+    console.log(`${LOG_PREFIX} waiting for auth state before insert`);
+
+    return new Promise((resolve) => {
+      let isResolved = false;
+      let subscription: { unsubscribe: () => void } | null = null;
+
+      const finish = (user: User | null) => {
+        if (isResolved) return;
+        isResolved = true;
+        window.clearTimeout(timeout);
+        subscription?.unsubscribe();
+        resolve(user);
+      };
+
+      const timeout = window.setTimeout(() => {
+        console.log(`${LOG_PREFIX} auth state wait timed out before insert`, {
+          waitedMs: 10_000,
+        });
+        finish(null);
+      }, 10_000);
+
+      const authListener = supabase.auth.onAuthStateChange(
+        (event: AuthChangeEvent, nextSession: Session | null) => {
+          console.log(`${LOG_PREFIX} auth state before insert`, {
+            event,
+            hasSession: Boolean(nextSession),
+            userId: nextSession?.user?.id ?? null,
+          });
+
+          if (event !== "SIGNED_IN" && event !== "INITIAL_SESSION") return;
+          if (!nextSession?.user) return;
+
+          finish(nextSession.user);
+        }
+      );
+
+      subscription = authListener.data.subscription;
+      if (isResolved) subscription?.unsubscribe();
+    });
+  }
+
   useEffect(() => {
     const savedDraft = readSavedDraft();
     const draftRestoreTimer = window.setTimeout(() => {
@@ -176,21 +221,9 @@ export default function CreateAdvertPage() {
       setHasLoadedSavedDraft(true);
     }, 0);
 
-    const supabase = createClient();
-
-    async function checkAuth() {
-      try {
-        await supabase.auth.getUser();
-      } finally {
-        setIsCheckingAuth(false);
-      }
-    }
-
-    checkAuth();
-
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
+    } = createClient().auth.onAuthStateChange(() => {
       setIsCheckingAuth(false);
     });
 
@@ -275,42 +308,32 @@ export default function CreateAdvertPage() {
     return errors;
   }
 
-  async function handleCreateAdvertClick() {
+  async function handleCreateAdvertSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    console.log(`${LOG_PREFIX} create draft advert submitted`);
+
     setMessage("");
 
     const validationErrors = validateDraft();
     setFieldErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
+      console.log(`${LOG_PREFIX} validation blocked submit`, validationErrors);
       setMessage("Please fix the highlighted fields. Your progress is still saved on this device.");
       return;
     }
 
-    const supabase = createClient();
+    console.log(`${LOG_PREFIX} validation passed`);
 
-    console.log(`${LOG_PREFIX} create advert submit started`);
+    const user = await waitForAuthenticatedUser();
 
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
-
-    console.log(`${LOG_PREFIX} getSession result before insert`, {
-      hasSession: Boolean(session),
-      sessionUserId: session?.user?.id ?? null,
-      error: sessionError?.message ?? null,
-    });
-
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    const user = userData.user;
-
-    console.log(`${LOG_PREFIX} getUser result before insert`, {
+    console.log(`${LOG_PREFIX} auth result before insert`, {
       hasUser: Boolean(user),
       userId: user?.id ?? null,
-      error: userError?.message ?? null,
     });
 
-    if (userError || !user) {
+    if (!user) {
       saveDraftToLocalStorage();
       window.localStorage.setItem(PENDING_ADVERT_SUBMIT_KEY, "true");
       setShowSaveAdvertPrompt(true);
@@ -371,7 +394,7 @@ export default function CreateAdvertPage() {
           </p>
         </div>
 
-        <div className="advert-form">
+        <form className="advert-form" onSubmit={handleCreateAdvertSubmit} noValidate>
           <label>
             Make
             <input
@@ -586,7 +609,7 @@ export default function CreateAdvertPage() {
             We’ll save your advert to your account before you publish.
           </p>
 
-          <button type="button" onClick={handleCreateAdvertClick}>
+          <button type="submit">
             Create draft advert
           </button>
 
@@ -595,7 +618,7 @@ export default function CreateAdvertPage() {
               {message}
             </p>
           )}
-        </div>
+        </form>
 
         {showSaveAdvertPrompt && (
           <div
