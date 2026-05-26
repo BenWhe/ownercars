@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
 function capitaliseWords(str: string) {
   return str
@@ -170,50 +169,6 @@ export default function CreateAdvertPage() {
     return response;
   }
 
-  async function waitForAuthenticatedUser(): Promise<User | null> {
-    const supabase = createClient();
-
-    console.log(`${LOG_PREFIX} waiting for auth state before insert`);
-
-    return new Promise((resolve) => {
-      let isResolved = false;
-      let subscription: { unsubscribe: () => void } | null = null;
-
-      const finish = (user: User | null) => {
-        if (isResolved) return;
-        isResolved = true;
-        window.clearTimeout(timeout);
-        subscription?.unsubscribe();
-        resolve(user);
-      };
-
-      const timeout = window.setTimeout(() => {
-        console.log(`${LOG_PREFIX} auth state wait timed out before insert`, {
-          waitedMs: 10_000,
-        });
-        finish(null);
-      }, 10_000);
-
-      const authListener = supabase.auth.onAuthStateChange(
-        (event: AuthChangeEvent, nextSession: Session | null) => {
-          console.log(`${LOG_PREFIX} auth state before insert`, {
-            event,
-            hasSession: Boolean(nextSession),
-            userId: nextSession?.user?.id ?? null,
-          });
-
-          if (event !== "SIGNED_IN" && event !== "INITIAL_SESSION") return;
-          if (!nextSession?.user) return;
-
-          finish(nextSession.user);
-        }
-      );
-
-      subscription = authListener.data.subscription;
-      if (isResolved) subscription?.unsubscribe();
-    });
-  }
-
   useEffect(() => {
     const savedDraft = readSavedDraft();
     const draftRestoreTimer = window.setTimeout(() => {
@@ -326,14 +281,19 @@ export default function CreateAdvertPage() {
 
     console.log(`${LOG_PREFIX} validation passed`);
 
-    const user = await waitForAuthenticatedUser();
+    const supabase = createClient();
+    console.log(`${LOG_PREFIX} checking user with getUser before insert`);
 
-    console.log(`${LOG_PREFIX} auth result before insert`, {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const user = userData.user;
+
+    console.log(`${LOG_PREFIX} getUser result before insert`, {
       hasUser: Boolean(user),
       userId: user?.id ?? null,
+      error: userError?.message ?? null,
     });
 
-    if (!user) {
+    if (userError || !user) {
       saveDraftToLocalStorage();
       window.localStorage.setItem(PENDING_ADVERT_SUBMIT_KEY, "true");
       setShowSaveAdvertPrompt(true);
