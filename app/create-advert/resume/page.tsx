@@ -116,7 +116,7 @@ async function waitForAuthenticatedUser(): Promise<User | null> {
     });
 
     subscription = authListener.data.subscription;
-    if (isResolved) subscription.unsubscribe();
+    if (isResolved) subscription?.unsubscribe();
   });
 }
 
