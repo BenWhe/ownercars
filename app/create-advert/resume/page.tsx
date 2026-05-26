@@ -81,49 +81,42 @@ function readSavedDraft() {
 async function waitForAuthenticatedUser(): Promise<User | null> {
   const supabase = createClient();
 
-  console.log(`${LOG_PREFIX} checking Supabase session with getSession()`);
-
-  const {
-    data: { session },
-    error: sessionError,
-  } = await supabase.auth.getSession();
-
-  console.log(`${LOG_PREFIX} getSession result`, {
-    hasSession: Boolean(session),
-    userId: session?.user?.id ?? null,
-    error: sessionError?.message ?? null,
-  });
-
-  if (session?.user) {
-    return session.user;
-  }
-
-  console.log(`${LOG_PREFIX} no session yet; waiting for auth state change`);
+  console.log(`${LOG_PREFIX} waiting for Supabase auth state change`);
 
   return new Promise((resolve) => {
+    let isResolved = false;
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    const finish = (user: User | null) => {
+      if (isResolved) return;
+      isResolved = true;
+      window.clearTimeout(timeout);
+      subscription?.unsubscribe();
+      resolve(user);
+    };
+
     const timeout = window.setTimeout(() => {
       console.log(`${LOG_PREFIX} auth state wait timed out`, {
         waitedMs: TIMEOUT_MS,
       });
-      subscription.unsubscribe();
-      resolve(null);
+      finish(null);
     }, TIMEOUT_MS);
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, nextSession: Session | null) => {
+    const authListener = supabase.auth.onAuthStateChange((event: AuthChangeEvent, nextSession: Session | null) => {
       console.log(`${LOG_PREFIX} auth state change`, {
         event,
         hasSession: Boolean(nextSession),
         userId: nextSession?.user?.id ?? null,
       });
 
+      if (event !== "SIGNED_IN" && event !== "INITIAL_SESSION") return;
       if (!nextSession?.user) return;
 
-      window.clearTimeout(timeout);
-      subscription.unsubscribe();
-      resolve(nextSession.user);
+      finish(nextSession.user);
     });
+
+    subscription = authListener.data.subscription;
+    if (isResolved) subscription.unsubscribe();
   });
 }
 
@@ -186,7 +179,7 @@ export default function CreateAdvertResumePage() {
     try {
       console.log(`${LOG_PREFIX} resumeAdvert started`);
       logResumeDiagnostic("checking auth");
-      const user = await withTimeout(waitForAuthenticatedUser(), "Checking your account");
+      const user = await waitForAuthenticatedUser();
 
       logResumeDiagnostic(user ? "auth result: user" : "auth result: null", {
         user: user
