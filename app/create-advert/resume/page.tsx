@@ -39,6 +39,18 @@ type ResumeState =
 
 const TIMEOUT_MS = 10_000;
 
+function logResumeDiagnostic(message: string, details?: unknown) {
+  const timestamp = new Date().toISOString();
+  const prefix = `[create-advert/resume ${timestamp}] ${message}`;
+
+  if (details === undefined) {
+    console.log(prefix);
+    return;
+  }
+
+  console.log(prefix, details);
+}
+
 function withTimeout<T>(promise: PromiseLike<T>, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeout = window.setTimeout(() => {
@@ -106,10 +118,28 @@ export default function CreateAdvertResumePage() {
 
     try {
       const supabase = createClient();
+      logResumeDiagnostic("checking auth");
       const { data: userData, error: userError } = await withTimeout<
         Awaited<ReturnType<typeof supabase.auth.getUser>>
       >(supabase.auth.getUser(), "Checking your account");
       const user = userData.user;
+
+      logResumeDiagnostic(user ? "auth result: user" : "auth result: null", {
+        user: user
+          ? {
+              id: user.id,
+              email: user.email,
+              role: user.role,
+            }
+          : null,
+        error: userError
+          ? {
+              name: userError.name,
+              message: userError.message,
+              status: userError.status,
+            }
+          : null,
+      });
 
       if (userError || !user) {
         setError(userError?.message || "Please sign in or create an account to continue.");
@@ -127,9 +157,22 @@ export default function CreateAdvertResumePage() {
       }
 
       setState("creating-advert");
+      logResumeDiagnostic("attempting insert", { userId: user.id });
       const { data, error: insertError } = await withTimeout<
         Awaited<ReturnType<typeof createAdvertForUser>>
       >(createAdvertForUser(user.id, savedDraft), "Creating your advert");
+
+      logResumeDiagnostic(insertError ? "insert result: error" : "insert result: data", {
+        data,
+        error: insertError
+          ? {
+              message: insertError.message,
+              code: insertError.code,
+              details: insertError.details,
+              hint: insertError.hint,
+            }
+          : null,
+      });
 
       if (insertError || !data?.id) {
         setError(insertError?.message || "We couldn’t save your advert. Please try again.");
@@ -142,12 +185,16 @@ export default function CreateAdvertResumePage() {
       setState("redirecting");
       router.replace(`/publish-advert/${data.id}`);
     } catch (err) {
+      logResumeDiagnostic("resume error", {
+        error: err instanceof Error ? { name: err.name, message: err.message } : err,
+      });
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       setState("error");
     }
   }
 
   useEffect(() => {
+    logResumeDiagnostic("resume page mounted");
     if (hasTriedResume.current) return;
     hasTriedResume.current = true;
     resumeAdvert();
