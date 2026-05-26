@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
 function capitaliseWords(str: string) {
   return str
@@ -39,6 +40,7 @@ type FieldErrors = Partial<Record<AdvertDraftField, string>>;
 export default function CreateAdvertPage() {
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [hasLoadedSavedDraft, setHasLoadedSavedDraft] = useState(false);
   const [showSaveAdvertPrompt, setShowSaveAdvertPrompt] = useState(false);
 
@@ -178,8 +180,14 @@ export default function CreateAdvertPage() {
 
     const {
       data: { subscription },
-    } = createClient().auth.onAuthStateChange(() => {
+    } = createClient().auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      console.log(`${LOG_PREFIX} auth state changed`, {
+        event,
+        hasSession: Boolean(session),
+        userId: session?.user?.id ?? null,
+      });
       setIsCheckingAuth(false);
+      setCurrentUser(session?.user ?? null);
     });
 
     return () => {
@@ -281,19 +289,12 @@ export default function CreateAdvertPage() {
 
     console.log(`${LOG_PREFIX} validation passed`);
 
-    const supabase = createClient();
-    console.log(`${LOG_PREFIX} checking user with getUser before insert`);
-
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    const user = userData.user;
-
-    console.log(`${LOG_PREFIX} getUser result before insert`, {
-      hasUser: Boolean(user),
-      userId: user?.id ?? null,
-      error: userError?.message ?? null,
+    console.log(`${LOG_PREFIX} using auth state user before insert`, {
+      hasUser: Boolean(currentUser),
+      userId: currentUser?.id ?? null,
     });
 
-    if (userError || !user) {
+    if (!currentUser) {
       saveDraftToLocalStorage();
       window.localStorage.setItem(PENDING_ADVERT_SUBMIT_KEY, "true");
       setShowSaveAdvertPrompt(true);
@@ -302,7 +303,7 @@ export default function CreateAdvertPage() {
 
     setShowSaveAdvertPrompt(false);
 
-    const { data, error } = await createAdvertForUser(user.id, currentDraft());
+    const { data, error } = await createAdvertForUser(currentUser.id, currentDraft());
 
     if (error) {
       setMessage(error.message);
