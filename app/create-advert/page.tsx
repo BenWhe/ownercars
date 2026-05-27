@@ -289,30 +289,35 @@ export default function CreateAdvertPage() {
 
     console.log(`${LOG_PREFIX} validation passed`);
 
-    console.log(`${LOG_PREFIX} using auth state user before insert`, {
-      hasUser: Boolean(currentUser),
-      userId: currentUser?.id ?? null,
-    });
+    saveDraftToLocalStorage();
 
-    if (!currentUser) {
-      saveDraftToLocalStorage();
-      window.localStorage.setItem(PENDING_ADVERT_SUBMIT_KEY, "true");
-      setShowSaveAdvertPrompt(true);
-      return;
+    try {
+      const res = await fetch("/api/create-draft-advert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentDraft()),
+      });
+
+      const result = await res.json();
+
+      if (res.status === 401) {
+        window.localStorage.setItem(PENDING_ADVERT_SUBMIT_KEY, "true");
+        setShowSaveAdvertPrompt(true);
+        return;
+      }
+
+      if (!res.ok) {
+        setMessage(result.error || "Something went wrong saving your advert.");
+        return;
+      }
+
+      window.localStorage.removeItem(SAVED_ADVERT_DRAFT_KEY);
+      window.localStorage.removeItem(PENDING_ADVERT_SUBMIT_KEY);
+      setShowSaveAdvertPrompt(false);
+      router.push(`/publish-advert/${result.id}`);
+    } catch (err) {
+      setMessage("Something went wrong. Please try again.");
     }
-
-    setShowSaveAdvertPrompt(false);
-
-    const { data, error } = await createAdvertForUser(currentUser.id, currentDraft());
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    window.localStorage.removeItem(SAVED_ADVERT_DRAFT_KEY);
-    window.localStorage.removeItem(PENDING_ADVERT_SUBMIT_KEY);
-    router.push(`/publish-advert/${data.id}`);
   }
 
   return (

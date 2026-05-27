@@ -177,37 +177,7 @@ export default function CreateAdvertResumePage() {
     setError("");
 
     try {
-      console.log(`${LOG_PREFIX} resumeAdvert started`);
-      logResumeDiagnostic("checking auth");
-      const user = await waitForAuthenticatedUser();
-
-      logResumeDiagnostic(user ? "auth result: user" : "auth result: null", {
-        user: user
-          ? {
-              id: user.id,
-              email: user.email,
-              role: user.role,
-            }
-          : null,
-      });
-      console.log(`${LOG_PREFIX} authenticated user result`, {
-        hasUser: Boolean(user),
-        userId: user?.id ?? null,
-      });
-
-      if (!user) {
-        setError("Please sign in or create an account to continue.");
-        setState("needs-auth");
-        return;
-      }
-
-      setState("loading-draft");
       const savedDraft = readSavedDraft();
-
-      console.log(`${LOG_PREFIX} saved draft result`, {
-        hasDraft: Boolean(savedDraft),
-        draft: savedDraft,
-      });
 
       if (!savedDraft) {
         window.localStorage.removeItem(PENDING_ADVERT_SUBMIT_KEY);
@@ -216,25 +186,23 @@ export default function CreateAdvertResumePage() {
       }
 
       setState("creating-advert");
-      logResumeDiagnostic("attempting insert", { userId: user.id });
-      const { data, error: insertError } = await withTimeout<
-        Awaited<ReturnType<typeof createAdvertForUser>>
-      >(createAdvertForUser(user.id, savedDraft), "Creating your advert");
 
-      logResumeDiagnostic(insertError ? "insert result: error" : "insert result: data", {
-        data,
-        error: insertError
-          ? {
-              message: insertError.message,
-              code: insertError.code,
-              details: insertError.details,
-              hint: insertError.hint,
-            }
-          : null,
+      const res = await fetch("/api/create-draft-advert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(savedDraft),
       });
 
-      if (insertError || !data?.id) {
-        setError(insertError?.message || "We couldn’t save your advert. Please try again.");
+      const result = await res.json();
+
+      if (res.status === 401) {
+        setError("Please sign in or create an account to continue.");
+        setState("needs-auth");
+        return;
+      }
+
+      if (!res.ok) {
+        setError(result.error || "We couldn’t save your advert. Please try again.");
         setState("error");
         return;
       }
@@ -242,12 +210,8 @@ export default function CreateAdvertResumePage() {
       window.localStorage.removeItem(SAVED_ADVERT_DRAFT_KEY);
       window.localStorage.removeItem(PENDING_ADVERT_SUBMIT_KEY);
       setState("redirecting");
-      router.replace(`/publish-advert/${data.id}`);
+      router.replace(`/publish-advert/${result.id}`);
     } catch (err) {
-      logResumeDiagnostic("resume error", {
-        error: err instanceof Error ? { name: err.name, message: err.message } : err,
-      });
-      console.error(`${LOG_PREFIX} resumeAdvert failed`, err);
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       setState("error");
     }
