@@ -180,11 +180,11 @@ export default function EditAdvertPage() {
       <section className="form-section">
         {message && <p>{message}</p>}
 
-        {!message && status === "draft" && (
+        {!message && (status === "draft" || status === "pending_payment") && (
           <div className="draft-warning">
             <h3>This advert is not live yet</h3>
             <p>
-              Your advert is saved as a draft. Add photos, then continue to publish
+              Your advert is not published yet. Add photos, then continue to publish
               using a promo code or by paying £9.99.
             </p>
             <Link href={`/publish-advert/${params.id}`}>

@@ -27,7 +27,7 @@ export default function HomePage() {
       const { data } = await supabase
         .from("adverts")
         .select("*, advert_photos(*)")
-        .eq("status", "live")
+        .eq("status", "published")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();

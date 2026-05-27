@@ -80,7 +80,7 @@ function BrowseContent() {
       const { data, error } = await supabase
         .from("adverts")
         .select("*, advert_photos(*)")
-        .eq("status", "live")
+        .eq("status", "published")
         .order("created_at", { ascending: false });
 
       if (error) {

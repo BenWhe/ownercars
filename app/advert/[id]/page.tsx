@@ -40,7 +40,7 @@ export default function AdvertPage() {
         .from("adverts")
         .select("*, advert_photos(*)")
         .eq("id", params.id)
-        .eq("status", "live")
+        .eq("status", "published")
         .maybeSingle();
 
       if (error) {

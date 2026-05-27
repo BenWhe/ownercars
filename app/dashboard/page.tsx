@@ -3,30 +3,35 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
+import { ADVERT_STATUS, sellerStatusLabel } from "@/lib/adverts/lifecycle";
 import { createClient } from "@/lib/supabase/client";
 
+type DashboardAdvert = {
+  id: string;
+  title: string | null;
+  price: number | string | null;
+  mileage: number | string | null;
+  status: string | null;
+  advert_photos?: Array<{ image_url: string | null }>;
+};
+
 export default function DashboardPage() {
-  const [adverts, setAdverts] = useState<any[]>([]);
+  const [adverts, setAdverts] = useState<DashboardAdvert[]>([]);
   const [message, setMessage] = useState("Loading your adverts...");
 
-  async function markAsSold(advertId: string) {
-    const supabase = createClient();
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
+  async function updateLifecycle(advertId: string, action: "pause" | "reactivate" | "sold") {
+    setMessage("Updating advert...");
 
-    if (!user) {
-      setMessage("You must be logged in to manage adverts.");
-      return;
-    }
+    const res = await fetch(`/api/adverts/${advertId}/lifecycle`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
 
-    const { error } = await supabase
-      .from("adverts")
-      .update({ status: "sold" })
-      .eq("id", advertId)
-      .eq("seller_id", user.id);
+    const result = await res.json();
 
-    if (error) {
-      setMessage(error.message);
+    if (!res.ok) {
+      setMessage(result.error || "Could not update advert.");
       return;
     }
 
@@ -91,13 +96,13 @@ export default function DashboardPage() {
         )}
 
         <div className="dashboard-grid">
-          {adverts.map((ad: any) => (
+          {adverts.map((ad) => (
             <article className="dashboard-card" key={ad.id}>
               {ad.advert_photos?.[0]?.image_url ? (
                 <img
                   className="dashboard-photo-img"
                   src={ad.advert_photos[0].image_url}
-                  alt={ad.title}
+                  alt={ad.title || "OwnerCars advert"}
                 />
               ) : (
                 <div className="dashboard-photo"></div>
@@ -106,7 +111,7 @@ export default function DashboardPage() {
               <div className="dashboard-card-body">
                 <div style={{ display: "flex", gap: "8px" }}>
                   <span className="seller-badge">Private seller</span>
-                  <span className="status-badge">{ad.status}</span>
+                  <span className="status-badge">{sellerStatusLabel(ad.status)}</span>
                 </div>
 
                 <h2>{ad.title}</h2>
@@ -120,17 +125,31 @@ export default function DashboardPage() {
                 </p>
 
                 <div className="dashboard-actions">
-                  {ad.status === "live" ? (
+                  {ad.status === ADVERT_STATUS.PUBLISHED ? (
                     <Link href={`/advert/${ad.id}`}>View advert</Link>
-                  ) : (
+                  ) : ad.status === ADVERT_STATUS.DRAFT || ad.status === ADVERT_STATUS.PENDING_PAYMENT ? (
                     <Link href={`/publish-advert/${ad.id}`}>Publish advert</Link>
-                  )}
+                  ) : null}
 
                   <Link href={`/edit-advert/${ad.id}`}>Edit</Link>
 
-                  <button onClick={() => markAsSold(ad.id)}>
-                    Mark as sold
-                  </button>
+                  {ad.status === ADVERT_STATUS.PUBLISHED && (
+                    <button onClick={() => updateLifecycle(ad.id, "pause")}>
+                      Pause
+                    </button>
+                  )}
+
+                  {ad.status === ADVERT_STATUS.PAUSED && (
+                    <button onClick={() => updateLifecycle(ad.id, "reactivate")}>
+                      Reactivate
+                    </button>
+                  )}
+
+                  {ad.status !== ADVERT_STATUS.SOLD && (
+                    <button onClick={() => updateLifecycle(ad.id, "sold")}>
+                      Mark as sold
+                    </button>
+                  )}
                 </div>
 
                 <PromoteAdvertTools

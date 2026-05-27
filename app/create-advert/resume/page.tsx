@@ -120,9 +120,10 @@ async function waitForAuthenticatedUser(): Promise<User | null> {
   });
 }
 
-function advertInsertPayload(sellerId: string, draft: AdvertDraft) {
+function advertInsertPayload(sellerId: string, sellerEmail: string | undefined, draft: AdvertDraft) {
   return {
     seller_id: sellerId,
+    seller_email: sellerEmail,
     title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
     make: draft.make,
     model: draft.model,
@@ -143,9 +144,9 @@ function advertInsertPayload(sellerId: string, draft: AdvertDraft) {
   };
 }
 
-async function createAdvertForUser(sellerId: string, draft: AdvertDraft) {
+async function createAdvertForUser(sellerId: string, sellerEmail: string | undefined, draft: AdvertDraft) {
   const supabase = createClient();
-  const payload = advertInsertPayload(sellerId, draft);
+  const payload = advertInsertPayload(sellerId, sellerEmail, draft);
 
   console.log(`${LOG_PREFIX} Supabase insert call`, {
     table: "adverts",
