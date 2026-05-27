@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -14,6 +14,15 @@ export default function CreateAccountPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [nextPath, setNextPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setNextPath(safeNextPath(new URLSearchParams(window.location.search).get("next")));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   async function handleCreateAccount(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -95,7 +104,10 @@ export default function CreateAccountPage() {
           <span>Already have an account?</span>
         </div>
 
-        <a className="auth-secondary-link" href="/login">
+        <a
+          className="auth-secondary-link"
+          href={nextPath ? `/login?next=${encodeURIComponent(nextPath)}` : "/login"}
+        >
           Sign in
         </a>
       </section>

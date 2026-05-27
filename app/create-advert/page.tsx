@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
 function capitaliseWords(str: string) {
   return str
@@ -14,6 +15,7 @@ function capitaliseWords(str: string) {
 
 const SAVED_ADVERT_DRAFT_KEY = "ownercars:create-advert-draft";
 const PENDING_ADVERT_SUBMIT_KEY = "ownercars_pending_advert_submit";
+const LOG_PREFIX = "[OC-01 create-advert debug]";
 
 type AdvertDraft = {
   make: string;
@@ -32,15 +34,21 @@ type AdvertDraft = {
   description: string;
 };
 
+type AdvertDraftField = keyof AdvertDraft;
+type FieldErrors = Partial<Record<AdvertDraftField, string>>;
+
 export default function CreateAdvertPage() {
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [hasLoadedSavedDraft, setHasLoadedSavedDraft] = useState(false);
   const [showSaveAdvertPrompt, setShowSaveAdvertPrompt] = useState(false);
 
   const [price, setPrice] = useState("");
   const [mileage, setMileage] = useState("");
   const [description, setDescription] = useState("");
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
@@ -54,7 +62,7 @@ export default function CreateAdvertPage() {
   const [previouslyWrittenOff, setPreviouslyWrittenOff] = useState("");
   const [confirmedPrivateSeller, setConfirmedPrivateSeller] = useState(false);
 
-  function currentDraft(): AdvertDraft {
+  const currentDraft = useCallback((): AdvertDraft => {
     return {
       make,
       model,
@@ -71,7 +79,22 @@ export default function CreateAdvertPage() {
       confirmedPrivateSeller,
       description,
     };
-  }
+  }, [
+    make,
+    model,
+    year,
+    mileage,
+    fuelType,
+    gearbox,
+    price,
+    bodyType,
+    colour,
+    doors,
+    seats,
+    previouslyWrittenOff,
+    confirmedPrivateSeller,
+    description,
+  ]);
 
   function applyDraft(draft: Partial<AdvertDraft>) {
     setMake(draft.make || "");
@@ -102,130 +125,199 @@ export default function CreateAdvertPage() {
     }
   }
 
+  function advertInsertPayload(sellerId: string, draft: AdvertDraft) {
+    return {
+      seller_id: sellerId,
+      title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
+      make: draft.make,
+      model: draft.model,
+      year: Number(draft.year),
+      mileage: Number(draft.mileage),
+      fuel_type: draft.fuelType,
+      gearbox: draft.gearbox,
+      price: Number(draft.price),
+      body_type: draft.bodyType,
+      colour: draft.colour,
+      doors: Number(draft.doors),
+      seats: Number(draft.seats),
+      previously_written_off: draft.previouslyWrittenOff,
+      description: draft.description,
+      status: "draft",
+      paid: false,
+      promo_code: null,
+    };
+  }
+
   async function createAdvertForUser(sellerId: string, draft: AdvertDraft) {
     const supabase = createClient();
+    const payload = advertInsertPayload(sellerId, draft);
 
-    return supabase
-      .from("adverts")
-      .insert({
-        seller_id: sellerId,
-        title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
-        make: draft.make,
-        model: draft.model,
-        year: Number(draft.year),
-        mileage: Number(draft.mileage),
-        fuel_type: draft.fuelType,
-        gearbox: draft.gearbox,
-        price: Number(draft.price),
-        body_type: draft.bodyType,
-        colour: draft.colour,
-        doors: Number(draft.doors),
-        seats: Number(draft.seats),
-        previously_written_off: draft.previouslyWrittenOff,
-        description: draft.description,
-        status: "draft",
-        paid: false,
-        promo_code: null,
-      })
-      .select()
-      .single();
+    console.log(`${LOG_PREFIX} Supabase insert call`, {
+      table: "adverts",
+      method: "insert(...).select().single()",
+      sellerId,
+      payload,
+    });
+
+    const response = await supabase.from("adverts").insert(payload).select().single();
+
+    console.log(`${LOG_PREFIX} Supabase insert response`, {
+      data: response.data,
+      error: response.error,
+      status: response.status,
+      statusText: response.statusText,
+    });
+
+    return response;
   }
 
   useEffect(() => {
     const savedDraft = readSavedDraft();
-    if (savedDraft) applyDraft(savedDraft);
-
-    const supabase = createClient();
-
-    async function checkAuth() {
-      try {
-        await supabase.auth.getUser();
-      } finally {
-        setIsCheckingAuth(false);
-      }
-    }
-
-    checkAuth();
+    const draftRestoreTimer = window.setTimeout(() => {
+      if (savedDraft) applyDraft(savedDraft);
+      setHasLoadedSavedDraft(true);
+    }, 0);
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
+    } = createClient().auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      console.log(`${LOG_PREFIX} auth state changed`, {
+        event,
+        hasSession: Boolean(session),
+        userId: session?.user?.id ?? null,
+      });
       setIsCheckingAuth(false);
+      setCurrentUser(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      window.clearTimeout(draftRestoreTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
-  function saveDraftToLocalStorage() {
+  const saveDraftToLocalStorage = useCallback(() => {
     window.localStorage.setItem(
       SAVED_ADVERT_DRAFT_KEY,
       JSON.stringify(currentDraft())
     );
+  }, [currentDraft]);
+
+  useEffect(() => {
+    if (!hasLoadedSavedDraft) return;
+    saveDraftToLocalStorage();
+  }, [hasLoadedSavedDraft, saveDraftToLocalStorage]);
+
+  function clearFieldError(field: AdvertDraftField) {
+    setMessage("");
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function fieldError(field: AdvertDraftField) {
+    if (!fieldErrors[field]) return null;
+
+    return (
+      <p className="field-error" role="alert">
+        {fieldErrors[field]}
+      </p>
+    );
   }
 
   function validateDraft() {
-    const missingFields = [
-      ["make", make],
-      ["model", model],
-      ["year", year],
-      ["mileage", mileage],
-      ["fuel type", fuelType],
-      ["gearbox", gearbox],
-      ["price", price],
-      ["body type", bodyType],
-      ["colour", colour],
-      ["doors", doors],
-      ["seats", seats],
-      ["write-off status", previouslyWrittenOff],
-      ["seller note", description.trim()],
-    ]
-      .filter(([, value]) => !value)
-      .map(([label]) => label);
+    const errors: FieldErrors = {};
 
-    if (missingFields.length > 0) {
-      return `Please complete: ${missingFields.join(", ")}.`;
-    }
+    const requiredFields: Array<[AdvertDraftField, string, string]> = [
+      ["make", make, "Enter the make."],
+      ["model", model, "Enter the model."],
+      ["year", year, "Enter the year."],
+      ["mileage", mileage, "Enter the mileage."],
+      ["fuelType", fuelType, "Select the fuel type."],
+      ["gearbox", gearbox, "Select the gearbox."],
+      ["price", price, "Enter the price."],
+      ["bodyType", bodyType, "Select the body type."],
+      ["colour", colour, "Enter the colour."],
+      ["doors", doors, "Enter the number of doors."],
+      ["seats", seats, "Enter the number of seats."],
+      ["previouslyWrittenOff", previouslyWrittenOff, "Select the write-off status."],
+      ["description", description.trim(), "Add a seller note."],
+    ];
+
+    requiredFields.forEach(([field, value, error]) => {
+      if (!value) errors[field] = error;
+    });
+
+    const numericFields: Array<[AdvertDraftField, string, string]> = [
+      ["year", year, "Enter a valid year."],
+      ["mileage", mileage, "Enter a valid mileage."],
+      ["price", price, "Enter a valid price."],
+      ["doors", doors, "Enter a valid number of doors."],
+      ["seats", seats, "Enter a valid number of seats."],
+    ];
+
+    numericFields.forEach(([field, value, error]) => {
+      if (value && Number(value) <= 0) errors[field] = error;
+    });
 
     if (!confirmedPrivateSeller) {
-      return "Please confirm you are a private seller before creating your draft advert.";
+      errors.confirmedPrivateSeller =
+        "Confirm you are a private seller before creating your draft advert.";
     }
 
-    return "";
+    return errors;
   }
 
-  async function handleCreateAdvertClick() {
+  async function handleCreateAdvertSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    console.log(`${LOG_PREFIX} create draft advert submitted`);
+
     setMessage("");
 
-    const validationError = validateDraft();
-    if (validationError) {
-      setMessage(validationError);
+    const validationErrors = validateDraft();
+    setFieldErrors(validationErrors);
+
+    if (Object.keys(validationErrors).length > 0) {
+      console.log(`${LOG_PREFIX} validation blocked submit`, validationErrors);
+      setMessage("Please fix the highlighted fields. Your progress is still saved on this device.");
       return;
     }
 
-    const supabase = createClient();
+    console.log(`${LOG_PREFIX} validation passed`);
 
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    const user = userData.user;
+    saveDraftToLocalStorage();
 
-    if (userError || !user) {
-      saveDraftToLocalStorage();
-      window.localStorage.setItem(PENDING_ADVERT_SUBMIT_KEY, "true");
-      setShowSaveAdvertPrompt(true);
-      return;
+    try {
+      const res = await fetch("/api/create-draft-advert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentDraft()),
+      });
+
+      const result = await res.json();
+
+      if (res.status === 401) {
+        window.localStorage.setItem(PENDING_ADVERT_SUBMIT_KEY, "true");
+        setShowSaveAdvertPrompt(true);
+        return;
+      }
+
+      if (!res.ok) {
+        setMessage(result.error || "Something went wrong saving your advert.");
+        return;
+      }
+
+      window.localStorage.removeItem(SAVED_ADVERT_DRAFT_KEY);
+      window.localStorage.removeItem(PENDING_ADVERT_SUBMIT_KEY);
+      setShowSaveAdvertPrompt(false);
+      router.push(`/publish-advert/${result.id}`);
+    } catch (err) {
+      setMessage("Something went wrong. Please try again.");
     }
-
-    setShowSaveAdvertPrompt(false);
-
-    const { data, error } = await createAdvertForUser(user.id, currentDraft());
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    window.localStorage.removeItem(SAVED_ADVERT_DRAFT_KEY);
-    window.localStorage.removeItem(PENDING_ADVERT_SUBMIT_KEY);
-    router.push(`/publish-advert/${data.id}`);
   }
 
   return (
@@ -268,23 +360,25 @@ export default function CreateAdvertPage() {
           </p>
         </div>
 
-        <div className="advert-form">
+        <form className="advert-form" onSubmit={handleCreateAdvertSubmit} noValidate>
           <label>
             Make
             <input
               value={make}
-              onChange={(e) => setMake(e.target.value)}
+              onChange={(e) => { clearFieldError("make"); setMake(e.target.value); }}
               placeholder="BMW"
             />
+            {fieldError("make")}
           </label>
 
           <label>
             Model
             <input
               value={model}
-              onChange={(e) => setModel(e.target.value)}
+              onChange={(e) => { clearFieldError("model"); setModel(e.target.value); }}
               placeholder="3 Series"
             />
+            {fieldError("model")}
           </label>
 
           <label>
@@ -292,9 +386,10 @@ export default function CreateAdvertPage() {
             <input
               type="number"
               value={year}
-              onChange={(e) => setYear(e.target.value)}
+              onChange={(e) => { clearFieldError("year"); setYear(e.target.value); }}
               placeholder="2019"
             />
+            {fieldError("year")}
           </label>
 
           <label>
@@ -304,15 +399,16 @@ export default function CreateAdvertPage() {
               type="number"
               placeholder="24500"
               value={mileage}
-              onChange={(e) => setMileage(e.target.value)}
+              onChange={(e) => { clearFieldError("mileage"); setMileage(e.target.value); }}
             />
+            {fieldError("mileage")}
           </label>
 
           <label>
             Fuel type
             <select
               value={fuelType}
-              onChange={(e) => setFuelType(e.target.value)}
+              onChange={(e) => { clearFieldError("fuelType"); setFuelType(e.target.value); }}
               className={!fuelType ? "select-placeholder" : ""}
             >
               <option value="" disabled>
@@ -323,13 +419,14 @@ export default function CreateAdvertPage() {
               <option value="Electric">Electric</option>
               <option value="Hybrid">Hybrid</option>
             </select>
+            {fieldError("fuelType")}
           </label>
 
           <label>
             Gearbox
             <select
               value={gearbox}
-              onChange={(e) => setGearbox(e.target.value)}
+              onChange={(e) => { clearFieldError("gearbox"); setGearbox(e.target.value); }}
               className={!gearbox ? "select-placeholder" : ""}
             >
               <option value="" disabled>
@@ -339,6 +436,7 @@ export default function CreateAdvertPage() {
               <option value="Automatic">Automatic</option>
               <option value="Semi-automatic">Semi-automatic</option>
             </select>
+            {fieldError("gearbox")}
           </label>
 
           <label>
@@ -348,15 +446,16 @@ export default function CreateAdvertPage() {
               type="number"
               placeholder="39995"
               value={price}
-              onChange={(e) => setPrice(e.target.value)}
+              onChange={(e) => { clearFieldError("price"); setPrice(e.target.value); }}
             />
+            {fieldError("price")}
           </label>
 
           <label>
             Body type
             <select
               value={bodyType}
-              onChange={(e) => setBodyType(e.target.value)}
+              onChange={(e) => { clearFieldError("bodyType"); setBodyType(e.target.value); }}
               className={!bodyType ? "select-placeholder" : ""}
             >
               <option value="" disabled>
@@ -373,15 +472,17 @@ export default function CreateAdvertPage() {
               <option value="Van">Van</option>
               <option value="Other">Other</option>
             </select>
+            {fieldError("bodyType")}
           </label>
 
           <label>
             Colour
             <input
               value={colour}
-              onChange={(e) => setColour(e.target.value)}
+              onChange={(e) => { clearFieldError("colour"); setColour(e.target.value); }}
               placeholder="Blue"
             />
+            {fieldError("colour")}
           </label>
 
           <label>
@@ -389,9 +490,10 @@ export default function CreateAdvertPage() {
             <input
               type="number"
               value={doors}
-              onChange={(e) => setDoors(e.target.value)}
+              onChange={(e) => { clearFieldError("doors"); setDoors(e.target.value); }}
               placeholder="5"
             />
+            {fieldError("doors")}
           </label>
 
           <label>
@@ -399,16 +501,17 @@ export default function CreateAdvertPage() {
             <input
               type="number"
               value={seats}
-              onChange={(e) => setSeats(e.target.value)}
+              onChange={(e) => { clearFieldError("seats"); setSeats(e.target.value); }}
               placeholder="5"
             />
+            {fieldError("seats")}
           </label>
 
           <label>
             Previously written off?
             <select
               value={previouslyWrittenOff}
-              onChange={(e) => setPreviouslyWrittenOff(e.target.value)}
+              onChange={(e) => { clearFieldError("previouslyWrittenOff"); setPreviouslyWrittenOff(e.target.value); }}
               className={!previouslyWrittenOff ? "select-placeholder" : ""}
             >
               <option value="" disabled>
@@ -417,6 +520,7 @@ export default function CreateAdvertPage() {
               <option value="No">No</option>
               <option value="Yes">Yes</option>
             </select>
+            {fieldError("previouslyWrittenOff")}
           </label>
 
           <label>
@@ -427,6 +531,7 @@ export default function CreateAdvertPage() {
               placeholder="Tell buyers what makes your car a great choice; condition, history, extras or anything worth highlighting."
               value={description}
               onChange={(e) => {
+                clearFieldError("description");
                 const cleaned = e.target.value.replace(/\n{3,}/g, "\n\n");
                 setDescription(cleaned);
               }}
@@ -449,6 +554,7 @@ export default function CreateAdvertPage() {
                 {description.length}/800
               </p>
             </div>
+            {fieldError("description")}
           </label>
 
           <label className="checkbox-row">
@@ -456,19 +562,20 @@ export default function CreateAdvertPage() {
               required
               type="checkbox"
               checked={confirmedPrivateSeller}
-              onChange={(e) => setConfirmedPrivateSeller(e.target.checked)}
+              onChange={(e) => { clearFieldError("confirmedPrivateSeller"); setConfirmedPrivateSeller(e.target.checked); }}
             />
             <span>
               I confirm I am a private seller and the information in this advert
               is accurate.
             </span>
+            {fieldError("confirmedPrivateSeller")}
           </label>
 
           <p className="submit-reassurance">
             We’ll save your advert to your account before you publish.
           </p>
 
-          <button type="button" onClick={handleCreateAdvertClick}>
+          <button type="submit">
             Create draft advert
           </button>
 
@@ -477,7 +584,7 @@ export default function CreateAdvertPage() {
               {message}
             </p>
           )}
-        </div>
+        </form>
 
         {showSaveAdvertPrompt && (
           <div

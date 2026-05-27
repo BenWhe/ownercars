@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
 const SAVED_ADVERT_DRAFT_KEY = "ownercars:create-advert-draft";
 const PENDING_ADVERT_SUBMIT_KEY = "ownercars_pending_advert_submit";
@@ -38,6 +39,19 @@ type ResumeState =
   | "error";
 
 const TIMEOUT_MS = 10_000;
+const LOG_PREFIX = "[OC-01 resume debug]";
+
+function logResumeDiagnostic(message: string, details?: unknown) {
+  const timestamp = new Date().toISOString();
+  const prefix = `[create-advert/resume ${timestamp}] ${message}`;
+
+  if (details === undefined) {
+    console.log(prefix);
+    return;
+  }
+
+  console.log(prefix, details);
+}
 
 function withTimeout<T>(promise: PromiseLike<T>, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -64,33 +78,91 @@ function readSavedDraft() {
   }
 }
 
-async function createAdvertForUser(sellerId: string, draft: AdvertDraft) {
+async function waitForAuthenticatedUser(): Promise<User | null> {
   const supabase = createClient();
 
-  return supabase
-    .from("adverts")
-    .insert({
-      seller_id: sellerId,
-      title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
-      make: draft.make,
-      model: draft.model,
-      year: Number(draft.year),
-      mileage: Number(draft.mileage),
-      fuel_type: draft.fuelType,
-      gearbox: draft.gearbox,
-      price: Number(draft.price),
-      body_type: draft.bodyType,
-      colour: draft.colour,
-      doors: Number(draft.doors),
-      seats: Number(draft.seats),
-      previously_written_off: draft.previouslyWrittenOff,
-      description: draft.description,
-      status: "draft",
-      paid: false,
-      promo_code: null,
-    })
-    .select()
-    .single();
+  console.log(`${LOG_PREFIX} waiting for Supabase auth state change`);
+
+  return new Promise((resolve) => {
+    let isResolved = false;
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    const finish = (user: User | null) => {
+      if (isResolved) return;
+      isResolved = true;
+      window.clearTimeout(timeout);
+      subscription?.unsubscribe();
+      resolve(user);
+    };
+
+    const timeout = window.setTimeout(() => {
+      console.log(`${LOG_PREFIX} auth state wait timed out`, {
+        waitedMs: TIMEOUT_MS,
+      });
+      finish(null);
+    }, TIMEOUT_MS);
+
+    const authListener = supabase.auth.onAuthStateChange((event: AuthChangeEvent, nextSession: Session | null) => {
+      console.log(`${LOG_PREFIX} auth state change`, {
+        event,
+        hasSession: Boolean(nextSession),
+        userId: nextSession?.user?.id ?? null,
+      });
+
+      if (event !== "SIGNED_IN" && event !== "INITIAL_SESSION") return;
+      if (!nextSession?.user) return;
+
+      finish(nextSession.user);
+    });
+
+    subscription = authListener.data.subscription;
+    if (isResolved) subscription?.unsubscribe();
+  });
+}
+
+function advertInsertPayload(sellerId: string, draft: AdvertDraft) {
+  return {
+    seller_id: sellerId,
+    title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
+    make: draft.make,
+    model: draft.model,
+    year: Number(draft.year),
+    mileage: Number(draft.mileage),
+    fuel_type: draft.fuelType,
+    gearbox: draft.gearbox,
+    price: Number(draft.price),
+    body_type: draft.bodyType,
+    colour: draft.colour,
+    doors: Number(draft.doors),
+    seats: Number(draft.seats),
+    previously_written_off: draft.previouslyWrittenOff,
+    description: draft.description,
+    status: "draft",
+    paid: false,
+    promo_code: null,
+  };
+}
+
+async function createAdvertForUser(sellerId: string, draft: AdvertDraft) {
+  const supabase = createClient();
+  const payload = advertInsertPayload(sellerId, draft);
+
+  console.log(`${LOG_PREFIX} Supabase insert call`, {
+    table: "adverts",
+    method: "insert(...).select().single()",
+    payload,
+  });
+
+  const response = await supabase.from("adverts").insert(payload).select().single();
+
+  console.log(`${LOG_PREFIX} Supabase insert response`, {
+    data: response.data,
+    error: response.error,
+    status: response.status,
+    statusText: response.statusText,
+  });
+
+  return response;
 }
 
 export default function CreateAdvertResumePage() {
@@ -105,19 +177,6 @@ export default function CreateAdvertResumePage() {
     setError("");
 
     try {
-      const supabase = createClient();
-      const { data: userData, error: userError } = await withTimeout<
-        Awaited<ReturnType<typeof supabase.auth.getUser>>
-      >(supabase.auth.getUser(), "Checking your account");
-      const user = userData.user;
-
-      if (userError || !user) {
-        setError(userError?.message || "Please sign in or create an account to continue.");
-        setState("needs-auth");
-        return;
-      }
-
-      setState("loading-draft");
       const savedDraft = readSavedDraft();
 
       if (!savedDraft) {
@@ -127,12 +186,23 @@ export default function CreateAdvertResumePage() {
       }
 
       setState("creating-advert");
-      const { data, error: insertError } = await withTimeout<
-        Awaited<ReturnType<typeof createAdvertForUser>>
-      >(createAdvertForUser(user.id, savedDraft), "Creating your advert");
 
-      if (insertError || !data?.id) {
-        setError(insertError?.message || "We couldn’t save your advert. Please try again.");
+      const res = await fetch("/api/create-draft-advert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(savedDraft),
+      });
+
+      const result = await res.json();
+
+      if (res.status === 401) {
+        setError("Please sign in or create an account to continue.");
+        setState("needs-auth");
+        return;
+      }
+
+      if (!res.ok) {
+        setError(result.error || "We couldn’t save your advert. Please try again.");
         setState("error");
         return;
       }
@@ -140,7 +210,7 @@ export default function CreateAdvertResumePage() {
       window.localStorage.removeItem(SAVED_ADVERT_DRAFT_KEY);
       window.localStorage.removeItem(PENDING_ADVERT_SUBMIT_KEY);
       setState("redirecting");
-      router.replace(`/publish-advert/${data.id}`);
+      router.replace(`/publish-advert/${result.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       setState("error");
@@ -148,6 +218,7 @@ export default function CreateAdvertResumePage() {
   }
 
   useEffect(() => {
+    logResumeDiagnostic("resume page mounted");
     if (hasTriedResume.current) return;
     hasTriedResume.current = true;
     resumeAdvert();
