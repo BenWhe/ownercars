@@ -1,23 +1,28 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
 // POST /api/upload-photo
 // Body: FormData with fields: file (File), advertId (string), sortOrder (number)
-// Uploads the file to Supabase Storage, inserts an advert_photos record, returns { photo }.
+// Auth is verified via cookie session; data operations use the service-role key
+// so that RLS policies (which check auth.uid() via a join) don't interfere with
+// server-side inserts. Ownership is enforced in code.
 export async function POST(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !anonKey) {
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     return NextResponse.json(
       { error: "Missing Supabase server environment variables" },
       { status: 500 }
     );
   }
 
+  // Step 1: identify the caller via cookie session (read-only auth check).
   const cookieStore = await cookies();
-  const supabase = createServerClient(supabaseUrl, anonKey, {
+  const supabaseAuth = createServerClient(supabaseUrl, anonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -28,12 +33,13 @@ export async function POST(request: NextRequest) {
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await supabaseAuth.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
+  // Step 2: parse the multipart upload.
   let formData: FormData;
   try {
     formData = await request.formData();
@@ -53,24 +59,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Only image files are allowed" }, { status: 400 });
   }
 
-  // Verify the authenticated user owns this advert before accepting the upload.
+  // Step 3: all data operations use the service-role key (bypasses RLS).
+  // Ownership is verified manually in code before any write.
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
   const { data: advert } = await supabase
     .from("adverts")
-    .select("id")
+    .select("id, seller_id")
     .eq("id", advertId)
-    .eq("seller_id", user.id)
     .maybeSingle();
 
-  if (!advert) {
+  if (!advert || advert.seller_id !== user.id) {
     return NextResponse.json(
       { error: "Not authorised to upload photos to this advert" },
       { status: 403 }
     );
   }
 
+  // Step 4: upload the file bytes to Supabase Storage.
   const fileExt = file.name.split(".").pop() ?? "jpg";
   const filePath = `${advertId}/${Date.now()}.${fileExt}`;
-
   const arrayBuffer = await file.arrayBuffer();
 
   const { error: uploadError } = await supabase.storage
@@ -85,6 +93,8 @@ export async function POST(request: NextRequest) {
     .from("advert-photos")
     .getPublicUrl(filePath);
 
+  // Step 5: insert the advert_photos record (service role bypasses the RLS
+  // insert policy that joins back to adverts.seller_id = auth.uid()).
   const { data: photoRecord, error: dbError } = await supabase
     .from("advert_photos")
     .insert({
@@ -104,20 +114,22 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/upload-photo
 // Body: JSON { photoId: string }
-// Verifies the caller owns the advert the photo belongs to, then deletes the record.
+// Verifies ownership via the parent advert in code, then deletes the record.
 export async function DELETE(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !anonKey) {
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     return NextResponse.json(
       { error: "Missing Supabase server environment variables" },
       { status: 500 }
     );
   }
 
+  // Step 1: identify the caller.
   const cookieStore = await cookies();
-  const supabase = createServerClient(supabaseUrl, anonKey, {
+  const supabaseAuth = createServerClient(supabaseUrl, anonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -128,7 +140,7 @@ export async function DELETE(request: NextRequest) {
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await supabaseAuth.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -146,7 +158,10 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Missing photoId" }, { status: 400 });
   }
 
-  // Look up the photo and verify ownership via the parent advert.
+  // Step 2: service-role client for data operations.
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  // Fetch the photo to get its parent advert_id.
   const { data: photo } = await supabase
     .from("advert_photos")
     .select("id, advert_id")
@@ -157,14 +172,14 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Photo not found" }, { status: 404 });
   }
 
-  const { data: ownerAdvert } = await supabase
+  // Fetch the parent advert to verify ownership in code.
+  const { data: advert } = await supabase
     .from("adverts")
-    .select("id")
+    .select("id, seller_id")
     .eq("id", photo.advert_id)
-    .eq("seller_id", user.id)
     .maybeSingle();
 
-  if (!ownerAdvert) {
+  if (!advert || advert.seller_id !== user.id) {
     return NextResponse.json(
       { error: "Not authorised to delete this photo" },
       { status: 403 }
