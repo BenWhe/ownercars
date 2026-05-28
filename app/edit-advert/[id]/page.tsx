@@ -21,35 +21,34 @@ export default function EditAdvertPage() {
 
   useEffect(() => {
     async function fetchAdvert() {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
+      const res = await fetch(`/api/adverts/${params.id}`);
 
-      if (!user) {
+      if (res.status === 401) {
         setMessage("You must be logged in to edit this advert.");
         return;
       }
 
-      const { data, error } = await supabase
-        .from("adverts")
-        .select("*")
-        .eq("id", params.id)
-        .eq("seller_id", user.id)
-        .maybeSingle();
-
-      if (error) {
-        setMessage(error.message);
-      } else if (!data) {
+      if (res.status === 403) {
         setMessage("Not authorised to manage this advert.");
-      } else {
-        setTitle(data.title || "");
-        setPrice(String(data.price || ""));
-        setMileage(String(data.mileage || ""));
-        setDescription(data.description || "");
-        setStatus(data.status || "draft");
-        setPaid(Boolean(data.paid));
-        setMessage("");
-        await fetchPhotos();
+        return;
       }
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setMessage(result.error || "Could not load advert.");
+        return;
+      }
+
+      const data = result.advert;
+      setTitle(data.title || "");
+      setPrice(String(data.price || ""));
+      setMileage(String(data.mileage || ""));
+      setDescription(data.description || "");
+      setStatus(data.status || "draft");
+      setPaid(Boolean(data.paid));
+      setMessage("");
+      await fetchPhotos();
     }
 
     if (params.id) fetchAdvert();
@@ -143,30 +142,25 @@ export default function EditAdvertPage() {
   async function handleUpdate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
-
-    if (!user) {
-      setMessage("You must be logged in.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("adverts")
-      .update({
+    const res = await fetch(`/api/adverts/${params.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         title,
         price: Number(price),
         mileage: Number(mileage),
         description,
-      })
-      .eq("id", params.id)
-      .eq("seller_id", user.id);
+      }),
+    });
 
-    if (error) {
-      setMessage(error.message);
-    } else {
-      router.push("/dashboard");
+    const result = await res.json();
+
+    if (!res.ok) {
+      setMessage(result.error || "Could not save changes.");
+      return;
     }
+
+    router.push("/dashboard");
   }
 
   return (
@@ -180,11 +174,11 @@ export default function EditAdvertPage() {
       <section className="form-section">
         {message && <p>{message}</p>}
 
-        {!message && status === "draft" && (
+        {!message && (status === "draft" || status === "pending_payment") && (
           <div className="draft-warning">
             <h3>This advert is not live yet</h3>
             <p>
-              Your advert is saved as a draft. Add photos, then continue to publish
+              Your advert is not published yet. Add photos, then continue to publish
               using a promo code or by paying £9.99.
             </p>
             <Link href={`/publish-advert/${params.id}`}>

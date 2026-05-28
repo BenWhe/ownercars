@@ -40,7 +40,7 @@ export default function AdvertPage() {
         .from("adverts")
         .select("*, advert_photos(*)")
         .eq("id", params.id)
-        .eq("status", "live")
+        .eq("status", "published")
         .maybeSingle();
 
       if (error) {
@@ -48,10 +48,11 @@ export default function AdvertPage() {
       } else if (!data) {
         setMessage("This advert isn’t live yet.");
       } else {
-        const { data: userData } = await supabase.auth.getUser();
+        const accountRes = await fetch("/api/account");
+        const accountResult = await accountRes.json();
 
         setAdvert(data);
-        setCurrentUserId(userData.user?.id ?? null);
+        setCurrentUserId(accountResult.user?.id ?? null);
         setMessage("");
       }
     }
@@ -84,8 +85,9 @@ export default function AdvertPage() {
   }, [activeIndex, advert]);
 
   async function handleMessageSeller() {
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
+    const accountRes = await fetch("/api/account");
+    const accountResult = await accountRes.json();
+    const user = accountResult.user;
 
     if (!user) {
       router.push("/login");

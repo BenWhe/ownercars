@@ -35,9 +35,9 @@ export default function AuthSessionSync() {
     async function verifyProtectedPage() {
       if (!isProtectedPath(window.location.pathname)) return;
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const res = await fetch("/api/account");
+      const result = await res.json();
+      const user = result.user;
 
       if (!cancelled && !user) {
         clearSupabaseAuthStorage();

@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
 
 export async function POST(req: Request) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -90,11 +91,16 @@ export async function POST(req: Request) {
     );
   }
 
+  const publishedAt = new Date();
+
   const { error } = await supabaseAdmin
     .from("adverts")
     .update({
       paid: true,
-      status: "live",
+      status: ADVERT_STATUS.PUBLISHED,
+      published_at: publishedAt.toISOString(),
+      last_availability_confirmed_at: publishedAt.toISOString(),
+      next_availability_check_at: nextConfirmationDueDate(publishedAt),
     })
     .eq("id", advertId)
     .eq("seller_id", user.id);

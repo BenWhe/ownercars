@@ -40,6 +40,7 @@ export async function POST(request: Request) {
 
   const payload = {
     seller_id: user.id,
+    seller_email: user.email,
     title: `${draft.year || ""} ${draft.make || ""} ${draft.model || ""}`.trim(),
     make: draft.make,
     model: draft.model,

@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
 
 export async function POST(req: Request) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -118,9 +119,12 @@ export async function POST(req: Request) {
     const { error } = await supabase
       .from("adverts")
       .update({
-        status: "live",
+        status: ADVERT_STATUS.PUBLISHED,
         paid: false,
         promo_code: promoCode || null,
+        published_at: new Date().toISOString(),
+        last_availability_confirmed_at: new Date().toISOString(),
+        next_availability_check_at: nextConfirmationDueDate(),
       })
       .eq("id", advertId)
       .eq("seller_id", user.id);
@@ -133,6 +137,19 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ url: "/dashboard" });
+  }
+
+  const { error: pendingPaymentError } = await supabase
+    .from("adverts")
+    .update({ status: ADVERT_STATUS.PENDING_PAYMENT })
+    .eq("id", advertId)
+    .eq("seller_id", user.id);
+
+  if (pendingPaymentError) {
+    return NextResponse.json(
+      { error: "Could not prepare advert for checkout" },
+      { status: 500 }
+    );
   }
 
   if (!stripeSecretKey) {

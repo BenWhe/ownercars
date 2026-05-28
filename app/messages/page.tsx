@@ -39,44 +39,22 @@ export default function MessagesPage() {
   const [message, setMessage] = useState("Loading messages...");
 
   async function fetchConversations() {
-    const supabase = createClient();
+    const res = await fetch("/api/messages");
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const user = sessionData.session?.user;
-
-    if (!user) {
+    if (res.status === 401) {
       setMessage("Please log in to view messages.");
       return;
     }
 
-    setUserId(user.id);
+    const result = await res.json();
 
-    const { data, error } = await supabase
-      .from("conversations")
-      .select(`
-        *,
-        adverts (
-          id,
-          year,
-          make,
-          model,
-          price
-        ),
-        messages (
-          id,
-          sender_id,
-          message,
-          read_at,
-          created_at
-        )
-      `)
-      .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
-      .order("updated_at", { ascending: false });
-
-    if (error) {
-      setMessage(error.message);
+    if (!res.ok) {
+      setMessage(result.error || "Could not load messages.");
       return;
     }
+
+    const { conversations: data, userId: uid } = result;
+    setUserId(uid);
 
     const conversationsWithMessages = (data || [])
       .filter((conversation: any) => conversation.messages?.length > 0)
@@ -89,7 +67,7 @@ export default function MessagesPage() {
         const lastMessage = sortedMessages[sortedMessages.length - 1];
 
         const unreadCount = sortedMessages.filter(
-          (msg: any) => msg.sender_id !== user.id && !msg.read_at
+          (msg: any) => msg.sender_id !== uid && !msg.read_at
         ).length;
 
         return {

@@ -128,6 +128,7 @@ export default function CreateAdvertPage() {
   function advertInsertPayload(sellerId: string, draft: AdvertDraft) {
     return {
       seller_id: sellerId,
+      seller_email: currentUser?.email,
       title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
       make: draft.make,
       model: draft.model,

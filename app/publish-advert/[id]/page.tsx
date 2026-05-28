@@ -26,30 +26,28 @@ export default function PublishAdvertPage() {
 
   useEffect(() => {
     async function fetchAdvert() {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
+      const res = await fetch(`/api/adverts/${advertId}`);
 
-      if (!user) {
+      if (res.status === 401) {
         setMessage("You must be logged in.");
         return;
       }
 
-      const { data, error } = await supabase
-        .from("adverts")
-        .select("*")
-        .eq("id", advertId)
-        .eq("seller_id", user.id)
-        .maybeSingle();
-
-      if (error) {
-        setMessage(error.message);
-      } else if (!data) {
+      if (res.status === 403) {
         setMessage("Not authorised to manage this advert.");
-      } else {
-        setAdvert(data);
-        setMessage("");
-        await fetchPhotos();
+        return;
       }
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setMessage(result.error || "Could not load advert.");
+        return;
+      }
+
+      setAdvert(result.advert);
+      setMessage("");
+      await fetchPhotos();
     }
 
     if (advertId) fetchAdvert();

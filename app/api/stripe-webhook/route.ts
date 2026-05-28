@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
 
 export async function POST(req: Request) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -46,9 +47,10 @@ export async function POST(req: Request) {
 
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-  } catch (err: any) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown Stripe webhook error";
     return NextResponse.json(
-      { error: `Webhook signature verification failed: ${err.message}` },
+      { error: `Webhook signature verification failed: ${message}` },
       { status: 400 }
     );
   }
@@ -60,11 +62,16 @@ export async function POST(req: Request) {
       const advertId = session.metadata?.advertId;
 
       if (advertId) {
+        const publishedAt = new Date();
+
         const { error } = await supabaseAdmin
           .from("adverts")
           .update({
             paid: true,
-            status: "live",
+            status: ADVERT_STATUS.PUBLISHED,
+            published_at: publishedAt.toISOString(),
+            last_availability_confirmed_at: publishedAt.toISOString(),
+            next_availability_check_at: nextConfirmationDueDate(publishedAt),
           })
           .eq("id", advertId);
 
