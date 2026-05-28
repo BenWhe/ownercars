@@ -68,44 +68,57 @@ export default function EditAdvertPage() {
   async function uploadPhotos(files: FileList | null) {
     if (!files || !params.id) return;
 
-    if (photos.length + files.length > 10) {
+    const imageFiles = Array.from(files).filter((f) =>
+      f.type.startsWith("image/")
+    );
+
+    if (imageFiles.length === 0) return;
+
+    if (photos.length + imageFiles.length > 10) {
       setMessage("You can upload up to 10 photos per advert.");
       return;
     }
 
     setMessage("Uploading photos...");
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const fileExt = file.name.split(".").pop();
-      const filePath = `${params.id}/${Date.now()}-${i}.${fileExt}`;
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i];
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("advertId", params.id as string);
+      formData.append("sortOrder", String(photos.length + i));
 
-      const { error: uploadError } = await supabase.storage
-        .from("advert-photos")
-        .upload(filePath, file);
-
-      if (uploadError) {
-        setMessage(uploadError.message);
-        return;
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from("advert-photos")
-        .getPublicUrl(filePath);
-
-      const { error: dbError } = await supabase.from("advert_photos").insert({
-        advert_id: params.id,
-        image_url: publicUrlData.publicUrl,
-        sort_order: photos.length + i,
+      const res = await fetch("/api/upload-photo", {
+        method: "POST",
+        body: formData,
       });
 
-      if (dbError) {
-        setMessage(dbError.message);
+      const result = await res.json();
+
+      if (!res.ok) {
+        setMessage(result.error || "Photo upload failed. Please try again.");
         return;
       }
     }
 
     setMessage("");
+    await fetchPhotos();
+  }
+
+  async function deletePhoto(photoId: string) {
+    const res = await fetch("/api/upload-photo", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photoId }),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      setMessage(result.error || "Could not delete photo. Please try again.");
+      return;
+    }
+
     await fetchPhotos();
   }
 
@@ -262,18 +275,7 @@ export default function EditAdvertPage() {
                       <button
                         type="button"
                         className="remove-photo-button"
-                        onClick={async () => {
-                          const { error } = await supabase
-                            .from("advert_photos")
-                            .delete()
-                            .eq("id", photo.id);
-
-                          if (error) {
-                            setMessage(error.message);
-                          } else {
-                            await fetchPhotos();
-                          }
-                        }}
+                        onClick={() => deletePhoto(photo.id)}
                       >
                         Remove
                       </button>

@@ -84,35 +84,42 @@ export default function PublishAdvertPage() {
 
     for (let i = 0; i < imageFiles.length; i++) {
       const file = imageFiles[i];
-      const fileExt = file.name.split(".").pop();
-      const filePath = `${advertId}/${Date.now()}-${i}.${fileExt}`;
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("advertId", advertId);
+      formData.append("sortOrder", String(photos.length + i));
 
-      const { error: uploadError } = await supabase.storage
-        .from("advert-photos")
-        .upload(filePath, file);
-
-      if (uploadError) {
-        setMessage(uploadError.message);
-        return;
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from("advert-photos")
-        .getPublicUrl(filePath);
-
-      const { error: dbError } = await supabase.from("advert_photos").insert({
-        advert_id: advertId,
-        image_url: publicUrlData.publicUrl,
-        sort_order: photos.length + i,
+      const res = await fetch("/api/upload-photo", {
+        method: "POST",
+        body: formData,
       });
 
-      if (dbError) {
-        setMessage(dbError.message);
+      const result = await res.json();
+
+      if (!res.ok) {
+        setMessage(result.error || "Photo upload failed. Please try again.");
         return;
       }
     }
 
     setMessage("");
+    await fetchPhotos();
+  }
+
+  async function deletePhoto(photoId: string) {
+    const res = await fetch("/api/upload-photo", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photoId }),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      setMessage(result.error || "Could not delete photo. Please try again.");
+      return;
+    }
+
     await fetchPhotos();
   }
 
@@ -302,18 +309,7 @@ export default function PublishAdvertPage() {
                     <img src={photo.image_url} alt="Advert photo" />
                     <button
                       type="button"
-                      onClick={async () => {
-                        const { error } = await supabase
-                          .from("advert_photos")
-                          .delete()
-                          .eq("id", photo.id);
-
-                        if (error) {
-                          setMessage(error.message);
-                        } else {
-                          await fetchPhotos();
-                        }
-                      }}
+                      onClick={() => deletePhoto(photo.id)}
                     >
                       Delete
                     </button>
