@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import Link from "next/link";
 import { signOutAndClearSession } from "@/lib/auth/client";
@@ -10,23 +10,21 @@ export default function Header() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const userIdRef = useRef("");
 
   async function fetchUnreadCount() {
-    const supabase = createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const uid = userIdRef.current;
+    if (!uid) {
       setUnreadCount(0);
       return;
     }
 
+    const supabase = createClient();
+
     const { data: conversations } = await supabase
       .from("conversations")
       .select("id")
-      .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`);
+      .or(`buyer_id.eq.${uid},seller_id.eq.${uid}`);
 
     const conversationIds =
       conversations?.map((conversation: { id: string }) => conversation.id) || [];
@@ -40,7 +38,7 @@ export default function Header() {
       .from("messages")
       .select("*", { count: "exact", head: true })
       .in("conversation_id", conversationIds)
-      .neq("sender_id", user.id)
+      .neq("sender_id", uid)
       .is("read_at", null);
 
     setUnreadCount(count || 0);
@@ -50,9 +48,10 @@ export default function Header() {
     const supabase = createClient();
 
     async function checkSession() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const res = await fetch("/api/account");
+      const result = await res.json();
+      const user = result.user;
+      userIdRef.current = user?.id ?? "";
       setLoggedIn(!!user);
 
       if (user) {
@@ -75,6 +74,7 @@ export default function Header() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
+      userIdRef.current = session?.user?.id ?? "";
       setLoggedIn(!!session);
 
       if (session) {

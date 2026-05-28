@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
 import { ADVERT_STATUS, sellerStatusLabel } from "@/lib/adverts/lifecycle";
-import { createClient } from "@/lib/supabase/client";
 
 type DashboardAdvert = {
   id: string;
@@ -40,28 +39,22 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function fetchAdverts() {
-      const supabase = createClient();
+      const res = await fetch("/api/dashboard");
 
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
-
-      if (!user) {
+      if (res.status === 401) {
         setMessage("You must be logged in to view your dashboard.");
         return;
       }
 
-      const { data, error } = await supabase
-        .from("adverts")
-        .select("*, advert_photos(*)")
-        .eq("seller_id", user.id)
-        .order("created_at", { ascending: false });
+      const result = await res.json();
 
-      if (error) {
-        setMessage(error.message);
-      } else {
-        setAdverts(data || []);
-        setMessage("");
+      if (!res.ok) {
+        setMessage(result.error || "Could not load adverts.");
+        return;
       }
+
+      setAdverts(result.adverts || []);
+      setMessage("");
     }
 
     fetchAdverts();

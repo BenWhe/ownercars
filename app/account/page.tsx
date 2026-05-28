@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { signOutAndClearSession } from "@/lib/auth/client";
-import { createClient } from "@/lib/supabase/client";
 
 export default function AccountPage() {
   const [email, setEmail] = useState<string | null>(null);
@@ -11,10 +10,9 @@ export default function AccountPage() {
 
   useEffect(() => {
     async function loadUser() {
-      const supabase = createClient();
-
-      const { data } = await supabase.auth.getUser();
-      setEmail(data.user?.email ?? null);
+      const res = await fetch("/api/account");
+      const result = await res.json();
+      setEmail(result.user?.email ?? null);
       setLoading(false);
     }
 

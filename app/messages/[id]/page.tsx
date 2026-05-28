@@ -70,53 +70,31 @@ export default function MessageThreadPage() {
   }
 
   async function fetchThread() {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const user = sessionData.session?.user;
+    const res = await fetch(`/api/messages/${conversationId}`);
 
-    if (!user) {
+    if (res.status === 401) {
       setNotice("Please log in to view this conversation.");
       return;
     }
 
-    setUserId(user.id);
-
-    const { data: convo, error: convoError } = await supabase
-      .from("conversations")
-      .select(`
-        *,
-        adverts (
-          id,
-          year,
-          make,
-          model,
-          price
-        )
-      `)
-      .eq("id", conversationId)
-      .single();
-
-    if (convoError) {
-      setNotice(convoError.message);
+    if (res.status === 403) {
+      setNotice("Not authorised to view this conversation.");
       return;
     }
 
-    setConversation(convo);
+    const result = await res.json();
 
-    const { data: messageData, error: messagesError } = await supabase
-      .from("messages")
-      .select("*")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true });
-
-    if (messagesError) {
-      setNotice(messagesError.message);
+    if (!res.ok) {
+      setNotice(result.error || "Could not load conversation.");
       return;
     }
 
-    setMessages(messageData || []);
+    setUserId(result.userId);
+    setConversation(result.conversation);
+    setMessages(result.messages || []);
     setNotice("");
 
-    await markIncomingAsRead(user.id);
+    await markIncomingAsRead(result.userId);
   }
 
   useEffect(() => {
