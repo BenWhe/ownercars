@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
+import { LISTING_PRICE_AMOUNT_PENCE } from "@/lib/payments/config";
+import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
 
 export async function POST(req: Request) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -83,7 +85,7 @@ export async function POST(req: Request) {
     );
   }
 
-  let finalAmount = 999;
+  let finalAmount = LISTING_PRICE_AMOUNT_PENCE;
 
   if (promoCode) {
     const { data, error } = await supabase
@@ -162,9 +164,22 @@ export async function POST(req: Request) {
   const stripe = new Stripe(stripeSecretKey);
 
   try {
+    assertStripeKeyMatchesExpectedMode(stripeSecretKey);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid Stripe mode";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  try {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
+      customer_email: user.email,
+      payment_intent_data: user.email
+        ? {
+            receipt_email: user.email,
+          }
+        : undefined,
       line_items: [
         {
           price_data: {
@@ -182,6 +197,8 @@ export async function POST(req: Request) {
         advertId,
         sellerId: user.id,
         promoCode,
+        expectedAmount: String(finalAmount),
+        priceVersion: finalAmount === LISTING_PRICE_AMOUNT_PENCE ? "launch-250" : "promo",
       },
       success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/dashboard`,

@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
+import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
 
 export async function POST(req: Request) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -45,6 +46,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "You must be logged in." }, { status: 401 });
   }
 
+  try {
+    assertStripeKeyMatchesExpectedMode(stripeSecretKey);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid Stripe mode";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
   const stripe = new Stripe(stripeSecretKey);
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
@@ -58,6 +66,15 @@ export async function POST(req: Request) {
 
   if (session.payment_status !== "paid") {
     return NextResponse.json({ error: "Payment not complete" }, { status: 400 });
+  }
+
+  const expectedAmount = Number(session.metadata?.expectedAmount || NaN);
+
+  if (!Number.isFinite(expectedAmount) || session.amount_total !== expectedAmount) {
+    return NextResponse.json(
+      { error: "Paid checkout amount did not match the expected listing price" },
+      { status: 400 }
+    );
   }
 
   const advertId = session.metadata?.advertId;

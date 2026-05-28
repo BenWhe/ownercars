@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { LISTING_PRICE_GBP, STANDARD_LISTING_PRICE_GBP } from "@/lib/payments/config";
 
 export default function PublishAdvertPage() {
   const supabase = createClient();
   const params = useParams();
-  const router = useRouter();
   const advertId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const [advert, setAdvert] = useState<any>(null);
@@ -16,7 +16,7 @@ export default function PublishAdvertPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [promoCode, setPromoCode] = useState("");
-  const [discountedPrice, setDiscountedPrice] = useState(9.99);
+  const [discountedPrice, setDiscountedPrice] = useState(LISTING_PRICE_GBP);
   const [promoMessage, setPromoMessage] = useState("");
   const [paymentMessage, setPaymentMessage] = useState("");
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
@@ -145,13 +145,13 @@ export default function PublishAdvertPage() {
     }
 
     if (!data) {
-      setDiscountedPrice(9.99);
+      setDiscountedPrice(LISTING_PRICE_GBP);
       setPromoMessage("That promo code wasn't recognised.");
       return;
     }
 
     if (data.max_uses && data.uses >= data.max_uses) {
-      setDiscountedPrice(9.99);
+      setDiscountedPrice(LISTING_PRICE_GBP);
       setPromoMessage("This code has expired.");
       return;
     }
@@ -161,7 +161,7 @@ export default function PublishAdvertPage() {
     }
 
     if (data.discount_type === "fixed") {
-      setDiscountedPrice(Math.max(0, 9.99 - data.discount_value));
+      setDiscountedPrice(Math.max(0, LISTING_PRICE_GBP - data.discount_value));
     }
 
     setPromoCode(code);
@@ -324,10 +324,10 @@ export default function PublishAdvertPage() {
 
             <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
 
-            <h3>Apply launch offer</h3>
+            <h3>Launch offer</h3>
             <p style={{ color: "var(--muted)" }}>
-              Enter launch code LAUNCH250 to advertise until sold for £2.50.
-              Standard price is £9.99
+              The launch price is £{LISTING_PRICE_GBP.toFixed(2)} to advertise until sold.
+              Standard price is £{STANDARD_LISTING_PRICE_GBP.toFixed(2)}. If you have a separate promo code, you can apply it here.
             </p>
 
             <input

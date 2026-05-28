@@ -4,6 +4,7 @@ import { useEffect, useState, FormEvent } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { LISTING_PRICE_GBP } from "@/lib/payments/config";
 
 export default function EditAdvertPage() {
   const supabase = createClient();
@@ -179,7 +180,7 @@ export default function EditAdvertPage() {
             <h3>This advert is not live yet</h3>
             <p>
               Your advert is not published yet. Add photos, then continue to publish
-              using a promo code or by paying £9.99.
+              for the £{LISTING_PRICE_GBP.toFixed(2)} launch price.
             </p>
             <Link href={`/publish-advert/${params.id}`}>
               Continue to publish
