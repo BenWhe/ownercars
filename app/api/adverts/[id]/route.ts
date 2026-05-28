@@ -30,7 +30,7 @@ export async function GET(req: NextRequest, context: Context) {
 
   const { data, error } = await supabase
     .from("adverts")
-    .select("*")
+    .select("*, advert_photos(*)")
     .eq("id", id)
     .eq("seller_id", user.id)
     .maybeSingle();

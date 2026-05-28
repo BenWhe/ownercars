@@ -46,22 +46,13 @@ export default function PublishAdvertPage() {
       }
 
       setAdvert(result.advert);
+      // Photos are included in the advert response — no separate browser-client call.
+      setPhotos(result.advert?.advert_photos || []);
       setMessage("");
-      await fetchPhotos();
     }
 
     if (advertId) fetchAdvert();
   }, [advertId]);
-
-  async function fetchPhotos() {
-    const { data } = await supabase
-      .from("advert_photos")
-      .select("*")
-      .eq("advert_id", advertId)
-      .order("sort_order", { ascending: true });
-
-    setPhotos(data || []);
-  }
 
   async function uploadPhotos(files: FileList | File[] | null) {
     if (!files || !advertId) return;
@@ -82,6 +73,8 @@ export default function PublishAdvertPage() {
 
     setMessage("Uploading photos...");
 
+    let updatedPhotos: any[] = [...photos];
+
     for (let i = 0; i < imageFiles.length; i++) {
       const file = imageFiles[i];
       const formData = new FormData();
@@ -100,10 +93,14 @@ export default function PublishAdvertPage() {
         setMessage(result.error || "Photo upload failed. Please try again.");
         return;
       }
+
+      // Use the server-returned photos list to keep state in sync without
+      // a separate browser-client fetchPhotos() call.
+      updatedPhotos = result.photos ?? updatedPhotos;
     }
 
+    setPhotos(updatedPhotos);
     setMessage("");
-    await fetchPhotos();
   }
 
   async function deletePhoto(photoId: string) {
@@ -120,7 +117,8 @@ export default function PublishAdvertPage() {
       return;
     }
 
-    await fetchPhotos();
+    // Server returns the remaining photos list.
+    setPhotos(result.photos ?? []);
   }
 
   async function applyPromo() {

@@ -48,22 +48,13 @@ export default function EditAdvertPage() {
       setDescription(data.description || "");
       setStatus(data.status || "draft");
       setPaid(Boolean(data.paid));
+      // Photos are included in the advert response — no separate browser-client call.
+      setPhotos(data.advert_photos || []);
       setMessage("");
-      await fetchPhotos();
     }
 
     if (params.id) fetchAdvert();
   }, [params.id]);
-
-  async function fetchPhotos() {
-    const { data } = await supabase
-      .from("advert_photos")
-      .select("*")
-      .eq("advert_id", params.id)
-      .order("sort_order", { ascending: true });
-
-    setPhotos(data || []);
-  }
 
   async function uploadPhotos(files: FileList | null) {
     if (!files || !params.id) return;
@@ -80,6 +71,8 @@ export default function EditAdvertPage() {
     }
 
     setMessage("Uploading photos...");
+
+    let updatedPhotos: any[] = [...photos];
 
     for (let i = 0; i < imageFiles.length; i++) {
       const file = imageFiles[i];
@@ -99,10 +92,12 @@ export default function EditAdvertPage() {
         setMessage(result.error || "Photo upload failed. Please try again.");
         return;
       }
+
+      updatedPhotos = result.photos ?? updatedPhotos;
     }
 
+    setPhotos(updatedPhotos);
     setMessage("");
-    await fetchPhotos();
   }
 
   async function deletePhoto(photoId: string) {
@@ -119,7 +114,7 @@ export default function EditAdvertPage() {
       return;
     }
 
-    await fetchPhotos();
+    setPhotos(result.photos ?? []);
   }
 
   async function movePhoto(index: number, direction: "left" | "right") {
@@ -150,7 +145,13 @@ export default function EditAdvertPage() {
       return;
     }
 
-    await fetchPhotos();
+    // Update local state directly — avoids a browser-client SELECT call.
+    const swapped = photos.map((p) => {
+      if (p.id === currentPhoto.id) return { ...p, sort_order: targetPhoto.sort_order };
+      if (p.id === targetPhoto.id) return { ...p, sort_order: currentPhoto.sort_order };
+      return p;
+    });
+    setPhotos(swapped.sort((a, b) => a.sort_order - b.sort_order));
   }
 
   async function handleUpdate(e: FormEvent<HTMLFormElement>) {
