@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { LISTING_PRICE_GBP, STANDARD_LISTING_PRICE_GBP } from "@/lib/payments/config";
 
 export default function PublishAdvertPage() {
   const supabase = createClient();
   const params = useParams();
-  const router = useRouter();
   const advertId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const [advert, setAdvert] = useState<any>(null);
@@ -16,7 +16,7 @@ export default function PublishAdvertPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [promoCode, setPromoCode] = useState("");
-  const [discountedPrice, setDiscountedPrice] = useState(9.99);
+  const [discountedPrice, setDiscountedPrice] = useState(LISTING_PRICE_GBP);
   const [promoMessage, setPromoMessage] = useState("");
   const [paymentMessage, setPaymentMessage] = useState("");
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
@@ -46,22 +46,13 @@ export default function PublishAdvertPage() {
       }
 
       setAdvert(result.advert);
+      // Photos are included in the advert response — no separate browser-client call.
+      setPhotos(result.advert?.advert_photos || []);
       setMessage("");
-      await fetchPhotos();
     }
 
     if (advertId) fetchAdvert();
   }, [advertId]);
-
-  async function fetchPhotos() {
-    const { data } = await supabase
-      .from("advert_photos")
-      .select("*")
-      .eq("advert_id", advertId)
-      .order("sort_order", { ascending: true });
-
-    setPhotos(data || []);
-  }
 
   async function uploadPhotos(files: FileList | File[] | null) {
     if (!files || !advertId) return;
@@ -82,38 +73,52 @@ export default function PublishAdvertPage() {
 
     setMessage("Uploading photos...");
 
+    let updatedPhotos: any[] = [...photos];
+
     for (let i = 0; i < imageFiles.length; i++) {
       const file = imageFiles[i];
-      const fileExt = file.name.split(".").pop();
-      const filePath = `${advertId}/${Date.now()}-${i}.${fileExt}`;
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("advertId", advertId);
+      formData.append("sortOrder", String(photos.length + i));
 
-      const { error: uploadError } = await supabase.storage
-        .from("advert-photos")
-        .upload(filePath, file);
-
-      if (uploadError) {
-        setMessage(uploadError.message);
-        return;
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from("advert-photos")
-        .getPublicUrl(filePath);
-
-      const { error: dbError } = await supabase.from("advert_photos").insert({
-        advert_id: advertId,
-        image_url: publicUrlData.publicUrl,
-        sort_order: photos.length + i,
+      const res = await fetch("/api/upload-photo", {
+        method: "POST",
+        body: formData,
       });
 
-      if (dbError) {
-        setMessage(dbError.message);
+      const result = await res.json();
+
+      if (!res.ok) {
+        setMessage(result.error || "Photo upload failed. Please try again.");
         return;
       }
+
+      // Use the server-returned photos list to keep state in sync without
+      // a separate browser-client fetchPhotos() call.
+      updatedPhotos = result.photos ?? updatedPhotos;
     }
 
+    setPhotos(updatedPhotos);
     setMessage("");
-    await fetchPhotos();
+  }
+
+  async function deletePhoto(photoId: string) {
+    const res = await fetch("/api/upload-photo", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photoId }),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      setMessage(result.error || "Could not delete photo. Please try again.");
+      return;
+    }
+
+    // Server returns the remaining photos list.
+    setPhotos(result.photos ?? []);
   }
 
   async function applyPromo() {
@@ -145,13 +150,13 @@ export default function PublishAdvertPage() {
     }
 
     if (!data) {
-      setDiscountedPrice(9.99);
+      setDiscountedPrice(LISTING_PRICE_GBP);
       setPromoMessage("That promo code wasn't recognised.");
       return;
     }
 
     if (data.max_uses && data.uses >= data.max_uses) {
-      setDiscountedPrice(9.99);
+      setDiscountedPrice(LISTING_PRICE_GBP);
       setPromoMessage("This code has expired.");
       return;
     }
@@ -161,7 +166,7 @@ export default function PublishAdvertPage() {
     }
 
     if (data.discount_type === "fixed") {
-      setDiscountedPrice(Math.max(0, 9.99 - data.discount_value));
+      setDiscountedPrice(Math.max(0, LISTING_PRICE_GBP - data.discount_value));
     }
 
     setPromoCode(code);
@@ -302,18 +307,7 @@ export default function PublishAdvertPage() {
                     <img src={photo.image_url} alt="Advert photo" />
                     <button
                       type="button"
-                      onClick={async () => {
-                        const { error } = await supabase
-                          .from("advert_photos")
-                          .delete()
-                          .eq("id", photo.id);
-
-                        if (error) {
-                          setMessage(error.message);
-                        } else {
-                          await fetchPhotos();
-                        }
-                      }}
+                      onClick={() => deletePhoto(photo.id)}
                     >
                       Delete
                     </button>
@@ -324,10 +318,10 @@ export default function PublishAdvertPage() {
 
             <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
 
-            <h3>Apply launch offer</h3>
+            <h3>Launch offer</h3>
             <p style={{ color: "var(--muted)" }}>
-              Enter launch code LAUNCH250 to advertise until sold for £2.50.
-              Standard price is £9.99
+              The launch price is £{LISTING_PRICE_GBP.toFixed(2)} to advertise until sold.
+              Standard price is £{STANDARD_LISTING_PRICE_GBP.toFixed(2)}. If you have a separate promo code, you can apply it here.
             </p>
 
             <input

@@ -4,6 +4,7 @@ import { useEffect, useState, FormEvent } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { LISTING_PRICE_GBP } from "@/lib/payments/config";
 
 export default function EditAdvertPage() {
   const supabase = createClient();
@@ -47,65 +48,73 @@ export default function EditAdvertPage() {
       setDescription(data.description || "");
       setStatus(data.status || "draft");
       setPaid(Boolean(data.paid));
+      // Photos are included in the advert response — no separate browser-client call.
+      setPhotos(data.advert_photos || []);
       setMessage("");
-      await fetchPhotos();
     }
 
     if (params.id) fetchAdvert();
   }, [params.id]);
 
-  async function fetchPhotos() {
-    const { data } = await supabase
-      .from("advert_photos")
-      .select("*")
-      .eq("advert_id", params.id)
-      .order("sort_order", { ascending: true });
-
-    setPhotos(data || []);
-  }
-
   async function uploadPhotos(files: FileList | null) {
     if (!files || !params.id) return;
 
-    if (photos.length + files.length > 10) {
+    const imageFiles = Array.from(files).filter((f) =>
+      f.type.startsWith("image/")
+    );
+
+    if (imageFiles.length === 0) return;
+
+    if (photos.length + imageFiles.length > 10) {
       setMessage("You can upload up to 10 photos per advert.");
       return;
     }
 
     setMessage("Uploading photos...");
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const fileExt = file.name.split(".").pop();
-      const filePath = `${params.id}/${Date.now()}-${i}.${fileExt}`;
+    let updatedPhotos: any[] = [...photos];
 
-      const { error: uploadError } = await supabase.storage
-        .from("advert-photos")
-        .upload(filePath, file);
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i];
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("advertId", params.id as string);
+      formData.append("sortOrder", String(photos.length + i));
 
-      if (uploadError) {
-        setMessage(uploadError.message);
-        return;
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from("advert-photos")
-        .getPublicUrl(filePath);
-
-      const { error: dbError } = await supabase.from("advert_photos").insert({
-        advert_id: params.id,
-        image_url: publicUrlData.publicUrl,
-        sort_order: photos.length + i,
+      const res = await fetch("/api/upload-photo", {
+        method: "POST",
+        body: formData,
       });
 
-      if (dbError) {
-        setMessage(dbError.message);
+      const result = await res.json();
+
+      if (!res.ok) {
+        setMessage(result.error || "Photo upload failed. Please try again.");
         return;
       }
+
+      updatedPhotos = result.photos ?? updatedPhotos;
     }
 
+    setPhotos(updatedPhotos);
     setMessage("");
-    await fetchPhotos();
+  }
+
+  async function deletePhoto(photoId: string) {
+    const res = await fetch("/api/upload-photo", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photoId }),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      setMessage(result.error || "Could not delete photo. Please try again.");
+      return;
+    }
+
+    setPhotos(result.photos ?? []);
   }
 
   async function movePhoto(index: number, direction: "left" | "right") {
@@ -136,7 +145,13 @@ export default function EditAdvertPage() {
       return;
     }
 
-    await fetchPhotos();
+    // Update local state directly — avoids a browser-client SELECT call.
+    const swapped = photos.map((p) => {
+      if (p.id === currentPhoto.id) return { ...p, sort_order: targetPhoto.sort_order };
+      if (p.id === targetPhoto.id) return { ...p, sort_order: currentPhoto.sort_order };
+      return p;
+    });
+    setPhotos(swapped.sort((a, b) => a.sort_order - b.sort_order));
   }
 
   async function handleUpdate(e: FormEvent<HTMLFormElement>) {
@@ -179,7 +194,7 @@ export default function EditAdvertPage() {
             <h3>This advert is not live yet</h3>
             <p>
               Your advert is not published yet. Add photos, then continue to publish
-              using a promo code or by paying £9.99.
+              for the £{LISTING_PRICE_GBP.toFixed(2)} launch price.
             </p>
             <Link href={`/publish-advert/${params.id}`}>
               Continue to publish
@@ -261,18 +276,7 @@ export default function EditAdvertPage() {
                       <button
                         type="button"
                         className="remove-photo-button"
-                        onClick={async () => {
-                          const { error } = await supabase
-                            .from("advert_photos")
-                            .delete()
-                            .eq("id", photo.id);
-
-                          if (error) {
-                            setMessage(error.message);
-                          } else {
-                            await fetchPhotos();
-                          }
-                        }}
+                        onClick={() => deletePhoto(photo.id)}
                       >
                         Remove
                       </button>
