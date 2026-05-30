@@ -47,6 +47,20 @@ export default function PublishAdvertPage() {
       setAdvert(result.advert);
       // Photos are included in the advert response — no separate browser-client call.
       setPhotos(result.advert?.advert_photos || []);
+      if (result.advert?.payment_status === "failed") {
+        setPaymentMessage(
+          result.advert.payment_failure_reason ||
+            "Payment failed. Your advert is still saved — please try again or use another card."
+        );
+      } else if (result.advert?.payment_status === "expired") {
+        setPaymentMessage(
+          "That checkout session expired. Your advert is still saved — please start checkout again."
+        );
+      } else if (result.advert?.payment_status === "cancelled") {
+        setPaymentMessage(
+          "Checkout was cancelled. Your advert is still saved — you can retry payment below."
+        );
+      }
       setMessage("");
     }
 

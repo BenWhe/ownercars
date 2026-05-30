@@ -206,15 +206,15 @@ Expiry rule (link-based, no email-reply parsing):
 - [ ] The final amount charged always matches the price shown to the seller after the promo is applied.
 
 ### OC-06 — Stripe failed & declined payment handling
-**Status:** READY · **Depends on:** OC-05 · **Priority:** P0
+**Status:** DONE · **Depends on:** OC-05 · **Priority:** P0
 **Why:** declined cards are routine; a failure must never strand a seller or publish an unpaid advert.
 **In scope:** declined, failed, abandoned and duplicate payment cases.
 **Task:** handle all non-success payment paths cleanly.
 **Acceptance criteria:**
-- [ ] Declined/failed payments show a clear, recoverable error and allow retry.
-- [ ] A failed payment never moves the advert to Published.
-- [ ] An abandoned payment (window closed) leaves the advert in a clean, resumable state.
-- [ ] Duplicate submissions do not double-charge.
+- [x] Declined/failed payments show a clear, recoverable error and allow retry.
+- [x] A failed payment never moves the advert to Published.
+- [x] An abandoned payment (window closed) leaves the advert in a clean, resumable state.
+- [x] Duplicate submissions do not double-charge.
 
 ### OC-07 — Payment ↔ advert state reconciliation
 **Status:** READY · **Depends on:** OC-06 · **Priority:** P1

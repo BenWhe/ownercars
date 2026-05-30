@@ -6,7 +6,6 @@ import { createClient } from "@supabase/supabase-js";
 import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
 import { LISTING_PRICE_AMOUNT_PENCE } from "@/lib/payments/config";
 import {
-  calculatePromoAmountPence,
   escapePostgrestLikePattern,
   normalizePromoCode,
   PromoCodeRecord,
@@ -35,6 +34,20 @@ export async function POST(req: Request) {
     );
   }
 
+  if (!stripeSecretKey) {
+    return NextResponse.json(
+      { error: "Missing STRIPE_SECRET_KEY" },
+      { status: 500 }
+    );
+  }
+
+  try {
+    assertStripeKeyMatchesExpectedMode(stripeSecretKey);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid Stripe mode";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
   const cookieStore = await cookies();
   const supabaseAuth = createServerClient(supabaseUrl, anonKey, {
     cookies: {
@@ -56,6 +69,7 @@ export async function POST(req: Request) {
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const stripe = new Stripe(stripeSecretKey);
 
   let advertId: string | undefined;
   let promoCode = "";
@@ -74,7 +88,9 @@ export async function POST(req: Request) {
 
   const { data: advert, error: advertError } = await supabase
     .from("adverts")
-    .select("id, seller_id")
+    .select(
+      "id, seller_id, status, paid, stripe_checkout_session_id, payment_status"
+    )
     .eq("id", advertId)
     .maybeSingle();
 
@@ -92,8 +108,48 @@ export async function POST(req: Request) {
     );
   }
 
+  if (advert.paid || advert.status === ADVERT_STATUS.PUBLISHED) {
+    return NextResponse.json(
+      { error: "This advert is already published." },
+      { status: 409 }
+    );
+  }
+
   let finalAmount = LISTING_PRICE_AMOUNT_PENCE;
   let promo: PromoCodeRecord | null = null;
+
+  async function consumePromoForCheckout() {
+    if (!promo) return null;
+
+    const { data: consumedPromo, error: consumePromoError } = await supabase
+      .from("promo_codes")
+      .update({ uses: (promo.uses ?? 0) + 1 })
+      .eq("id", promo.id)
+      .eq("uses", promo.uses ?? 0)
+      .select("id")
+      .maybeSingle();
+
+    if (!consumePromoError && consumedPromo) return null;
+
+    const { data: latestPromo } = await supabase
+      .from("promo_codes")
+      .select("*")
+      .eq("id", promo.id)
+      .maybeSingle();
+
+    const retryable = latestPromo
+      ? validatePromoRecord(latestPromo as PromoCodeRecord, promoCode)
+      : { ok: false, message: "That promo code wasn't recognised." };
+
+    return NextResponse.json(
+      {
+        error: retryable.ok
+          ? "Promo code was updated by another checkout. Please try again."
+          : retryable.message,
+      },
+      { status: retryable.ok ? 409 : 400 }
+    );
+  }
 
   if (promoCode) {
     const { data, error } = await supabase
@@ -120,60 +176,29 @@ export async function POST(req: Request) {
     finalAmount = validation.finalAmountPence;
   }
 
-  if (promo) {
-    const { data: consumedPromo, error: consumePromoError } = await supabase
-      .from("promo_codes")
-      .update({ uses: (promo.uses ?? 0) + 1 })
-      .eq("id", promo.id)
-      .eq("uses", promo.uses ?? 0)
-      .select("id")
-      .maybeSingle();
-
-    if (consumePromoError || !consumedPromo) {
-      const { data: latestPromo } = await supabase
-        .from("promo_codes")
-        .select("*")
-        .eq("id", promo.id)
-        .maybeSingle();
-
-      const latestFinalAmount = latestPromo
-        ? calculatePromoAmountPence(latestPromo as PromoCodeRecord)
-        : LISTING_PRICE_AMOUNT_PENCE;
-      const retryable = latestPromo
-        ? validatePromoRecord(latestPromo as PromoCodeRecord, promoCode)
-        : { ok: false, message: "That promo code wasn't recognised." };
-
-      if (!retryable.ok) {
-        return NextResponse.json({ error: retryable.message }, { status: 400 });
-      }
-
-      if (latestFinalAmount !== finalAmount) {
-        return NextResponse.json(
-          { error: "Promo pricing changed. Please re-apply the code and try again." },
-          { status: 409 }
-        );
-      }
-
-      return NextResponse.json(
-        { error: "Promo code was updated by another checkout. Please try again." },
-        { status: 409 }
-      );
-    }
-  }
-
   if (finalAmount === 0) {
+    const promoError = await consumePromoForCheckout();
+    if (promoError) return promoError;
+
+    const publishedAt = new Date();
     const { error } = await supabase
       .from("adverts")
       .update({
         status: ADVERT_STATUS.PUBLISHED,
         paid: false,
+        payment_status: "paid",
+        payment_failure_reason: null,
+        stripe_checkout_session_id: null,
+        stripe_payment_intent_id: null,
         promo_code: promoCode || null,
-        published_at: new Date().toISOString(),
-        last_availability_confirmed_at: new Date().toISOString(),
-        next_availability_check_at: nextConfirmationDueDate(),
+        published_at: publishedAt.toISOString(),
+        checkout_completed_at: publishedAt.toISOString(),
+        last_availability_confirmed_at: publishedAt.toISOString(),
+        next_availability_check_at: nextConfirmationDueDate(publishedAt),
       })
       .eq("id", advertId)
-      .eq("seller_id", user.id);
+      .eq("seller_id", user.id)
+      .neq("status", ADVERT_STATUS.PUBLISHED);
 
     if (error) {
       return NextResponse.json(
@@ -185,68 +210,93 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: "/dashboard" });
   }
 
-  const { error: pendingPaymentError } = await supabase
-    .from("adverts")
-    .update({ status: ADVERT_STATUS.PENDING_PAYMENT })
-    .eq("id", advertId)
-    .eq("seller_id", user.id);
-
-  if (pendingPaymentError) {
-    return NextResponse.json(
-      { error: "Could not prepare advert for checkout" },
-      { status: 500 }
-    );
-  }
-
-  if (!stripeSecretKey) {
-    return NextResponse.json(
-      { error: "Missing STRIPE_SECRET_KEY" },
-      { status: 500 }
-    );
-  }
-
-  const stripe = new Stripe(stripeSecretKey);
-
   try {
-    assertStripeKeyMatchesExpectedMode(stripeSecretKey);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Invalid Stripe mode";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+    if (advert.stripe_checkout_session_id) {
+      const existingSession = await stripe.checkout.sessions.retrieve(
+        advert.stripe_checkout_session_id
+      );
 
-  try {
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["card"],
-      customer_email: user.email,
-      payment_intent_data: user.email
-        ? {
-            receipt_email: user.email,
-          }
-        : undefined,
-      line_items: [
-        {
-          price_data: {
-            currency: "gbp",
-            product_data: {
-              name: "OwnerCars advert",
-              description: "Advertise until sold",
-            },
-            unit_amount: finalAmount,
-          },
-          quantity: 1,
+      if (
+        existingSession.status === "open" &&
+        existingSession.payment_status === "unpaid" &&
+        existingSession.amount_total === finalAmount &&
+        existingSession.url
+      ) {
+        return NextResponse.json({ url: existingSession.url });
+      }
+    }
+
+    const promoError = await consumePromoForCheckout();
+    if (promoError) return promoError;
+
+    const paymentMetadata = {
+      advertId,
+      sellerId: user.id,
+      promoCode,
+      expectedAmount: String(finalAmount),
+    };
+
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: "payment",
+        payment_method_types: ["card"],
+        customer_email: user.email,
+        payment_intent_data: {
+          receipt_email: user.email || undefined,
+          metadata: paymentMetadata,
         },
-      ],
-      metadata: {
-        advertId,
-        sellerId: user.id,
-        promoCode,
-        expectedAmount: String(finalAmount),
-        priceVersion: finalAmount === LISTING_PRICE_AMOUNT_PENCE ? "launch-250" : "promo",
+        line_items: [
+          {
+            price_data: {
+              currency: "gbp",
+              product_data: {
+                name: "OwnerCars advert",
+                description: "Advertise until sold",
+              },
+              unit_amount: finalAmount,
+            },
+            quantity: 1,
+          },
+        ],
+        metadata: {
+          ...paymentMetadata,
+          priceVersion:
+            finalAmount === LISTING_PRICE_AMOUNT_PENCE ? "launch-250" : "promo",
+          promoId: promo?.id || "",
+        },
+        success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${siteUrl}/payment-cancelled?advert_id=${encodeURIComponent(
+          advertId
+        )}`,
       },
-      success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}/dashboard`,
-    });
+      {
+        idempotencyKey: `advert:${advertId}:amount:${finalAmount}:promo:${
+          promoCode || "none"
+        }`,
+      }
+    );
+
+    const { error: pendingPaymentError } = await supabase
+      .from("adverts")
+      .update({
+        status: ADVERT_STATUS.PENDING_PAYMENT,
+        stripe_checkout_session_id: session.id,
+        stripe_payment_intent_id:
+          typeof session.payment_intent === "string" ? session.payment_intent : null,
+        payment_status: "pending",
+        payment_failure_reason: null,
+        checkout_started_at: new Date().toISOString(),
+      })
+      .eq("id", advertId)
+      .eq("seller_id", user.id)
+      .neq("status", ADVERT_STATUS.PUBLISHED);
+
+    if (pendingPaymentError) {
+      return NextResponse.json(
+        { error: "Could not prepare advert for checkout" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
