@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
-import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
+import { ADVERT_STATUS } from "@/lib/adverts/lifecycle";
 import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
 
 export async function POST(req: Request) {
@@ -71,13 +71,6 @@ export async function POST(req: Request) {
     );
   }
 
-  if (session.payment_status !== "paid") {
-    return NextResponse.json(
-      { error: "Payment was not completed. Please retry checkout from your advert." },
-      { status: 402 }
-    );
-  }
-
   const expectedAmount = Number(session.metadata?.expectedAmount || NaN);
 
   if (!Number.isFinite(expectedAmount) || session.amount_total !== expectedAmount) {
@@ -89,7 +82,6 @@ export async function POST(req: Request) {
 
   const advertId = session.metadata?.advertId;
   const sellerId = session.metadata?.sellerId;
-  const promoCode = session.metadata?.promoCode || null;
 
   if (!advertId) {
     return NextResponse.json({ error: "Missing advertId" }, { status: 400 });
@@ -104,7 +96,7 @@ export async function POST(req: Request) {
 
   const { data: advert, error: advertLookupError } = await supabaseAdmin
     .from("adverts")
-    .select("seller_id, payment_status, status")
+    .select("seller_id, paid, payment_status, status, published_at")
     .eq("id", advertId)
     .maybeSingle();
 
@@ -119,30 +111,36 @@ export async function POST(req: Request) {
     );
   }
 
-  const publishedAt = new Date();
-
-  const { error } = await supabaseAdmin
-    .from("adverts")
-    .update({
-      paid: true,
-      status: ADVERT_STATUS.PUBLISHED,
-      payment_status: "paid",
-      payment_failure_reason: null,
-      stripe_checkout_session_id: session.id,
-      stripe_payment_intent_id:
-        typeof session.payment_intent === "string" ? session.payment_intent : null,
-      promo_code: promoCode,
-      published_at: publishedAt.toISOString(),
-      checkout_completed_at: publishedAt.toISOString(),
-      last_availability_confirmed_at: publishedAt.toISOString(),
-      next_availability_check_at: nextConfirmationDueDate(publishedAt),
-    })
-    .eq("id", advertId)
-    .eq("seller_id", user.id);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (advert.status === ADVERT_STATUS.PUBLISHED) {
+    return NextResponse.json({
+      success: true,
+      status: "published",
+      advertStatus: advert.status,
+      publishedAt: advert.published_at,
+    });
   }
 
-  return NextResponse.json({ success: true });
+  if (session.payment_status !== "paid") {
+    return NextResponse.json(
+      {
+        error: "Payment was not completed. Please retry checkout from your advert.",
+        status: "not_paid",
+        advertStatus: advert.status,
+      },
+      { status: 402 }
+    );
+  }
+
+  // OC-07: do not publish from the browser return path. A verified Stripe
+  // webhook is the single writer that moves paid adverts to Published.
+  return NextResponse.json(
+    {
+      success: true,
+      status: "awaiting_webhook",
+      advertStatus: advert.status,
+      message:
+        "Payment is complete in Stripe. Your advert will publish as soon as the verified Stripe webhook is processed.",
+    },
+    { status: 202 }
+  );
 }

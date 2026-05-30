@@ -217,14 +217,14 @@ Expiry rule (link-based, no email-reply parsing):
 - [x] Duplicate submissions do not double-charge.
 
 ### OC-07 — Payment ↔ advert state reconciliation
-**Status:** READY · **Depends on:** OC-06 · **Priority:** P1
+**Status:** DONE · **Depends on:** OC-06 · **Priority:** P1
 **Why:** prevents paid-but-not-published and published-but-not-paid.
 **Task:** drive publication from a confirmed Stripe event, not the browser return.
 **Acceptance criteria:**
-- [ ] Advert publication is triggered by a verified Stripe webhook event, not solely by the browser returning from checkout.
-- [ ] A paid advert always reaches Published even if the user closed the browser after paying.
-- [ ] An unpaid advert can never become Published.
-- [ ] There is an admin query or documented operational check to detect mismatches.
+- [x] Advert publication is triggered by a verified Stripe webhook event, not solely by the browser returning from checkout.
+- [x] A paid advert always reaches Published even if the user closed the browser after paying.
+- [x] An unpaid advert can never become Published.
+- [x] There is an admin query or documented operational check to detect mismatches.
 
 ### OC-08 — On-platform messaging (minimal)
 **Status:** READY · **Depends on:** OC-04 · **Priority:** P0

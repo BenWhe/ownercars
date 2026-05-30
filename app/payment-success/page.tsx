@@ -7,7 +7,7 @@ function PaymentSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [message, setMessage] = useState(
-    "Confirming your payment and publishing your advert..."
+    "Confirming your payment with Stripe..."
   );
 
   useEffect(() => {
@@ -15,7 +15,7 @@ function PaymentSuccessContent() {
     let isActive = true;
     let timer: ReturnType<typeof setTimeout>;
 
-    async function confirmPayment() {
+    async function confirmPayment(attempt = 1) {
       if (!sessionId) {
         setMessage("Payment received. Returning you to your dashboard...");
         timer = setTimeout(() => router.push("/dashboard"), 2000);
@@ -28,17 +28,27 @@ function PaymentSuccessContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId }),
         });
+        const result = await res.json();
 
         if (!isActive) return;
 
-        if (res.ok) {
+        if (res.ok && result.status === "published") {
           setMessage("Your advert is live now. Returning you to your dashboard...");
           timer = setTimeout(() => router.push("/dashboard"), 2000);
           return;
         }
 
+        if (res.ok && result.status === "awaiting_webhook" && attempt < 5) {
+          setMessage(
+            "Payment confirmed. Waiting for Stripe's secure webhook to publish your advert..."
+          );
+          timer = setTimeout(() => confirmPayment(attempt + 1), 2000);
+          return;
+        }
+
         setMessage(
-          "Stripe has received your payment. Your advert will go live as soon as confirmation finishes."
+          result.message ||
+            "Stripe has received your payment. Your advert will go live as soon as confirmation finishes."
         );
         timer = setTimeout(() => router.push("/dashboard"), 4000);
       } catch {
@@ -77,7 +87,7 @@ export default function PaymentSuccessPage() {
           <section className="dashboard-hero">
             <p className="eyebrow">Payment complete</p>
             <h1>Thanks — your payment has been received.</h1>
-            <p>Confirming your payment and publishing your advert...</p>
+            <p>Confirming your payment with Stripe...</p>
           </section>
         </main>
       }
