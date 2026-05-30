@@ -92,6 +92,13 @@ export async function POST(req: Request) {
     );
   }
 
+  // ── Promo code validation ────────────────────────────────────────────────────
+  // Validate on every checkout request regardless of what the client showed.
+  // NOTE: uses is NOT incremented here. For free codes it is incremented at
+  // publication (below). For paid codes it is incremented by the Stripe webhook
+  // on checkout.session.completed, so that abandoning the checkout does not
+  // permanently consume a use.
+
   let finalAmount = LISTING_PRICE_AMOUNT_PENCE;
   let promo: PromoCodeRecord | null = null;
 
@@ -120,48 +127,16 @@ export async function POST(req: Request) {
     finalAmount = validation.finalAmountPence;
   }
 
-  if (promo) {
-    const { data: consumedPromo, error: consumePromoError } = await supabase
-      .from("promo_codes")
-      .update({ uses: (promo.uses ?? 0) + 1 })
-      .eq("id", promo.id)
-      .eq("uses", promo.uses ?? 0)
-      .select("id")
-      .maybeSingle();
-
-    if (consumePromoError || !consumedPromo) {
-      const { data: latestPromo } = await supabase
-        .from("promo_codes")
-        .select("*")
-        .eq("id", promo.id)
-        .maybeSingle();
-
-      const latestFinalAmount = latestPromo
-        ? calculatePromoAmountPence(latestPromo as PromoCodeRecord)
-        : LISTING_PRICE_AMOUNT_PENCE;
-      const retryable = latestPromo
-        ? validatePromoRecord(latestPromo as PromoCodeRecord, promoCode)
-        : { ok: false, message: "That promo code wasn't recognised." };
-
-      if (!retryable.ok) {
-        return NextResponse.json({ error: retryable.message }, { status: 400 });
-      }
-
-      if (latestFinalAmount !== finalAmount) {
-        return NextResponse.json(
-          { error: "Promo pricing changed. Please re-apply the code and try again." },
-          { status: 409 }
-        );
-      }
-
-      return NextResponse.json(
-        { error: "Promo code was updated by another checkout. Please try again." },
-        { status: 409 }
-      );
-    }
-  }
-
+  // ── Free / fully-discounted path ─────────────────────────────────────────────
+  // No Stripe session needed. Increment uses immediately (no webhook will fire).
   if (finalAmount === 0) {
+    if (promo) {
+      await supabase
+        .from("promo_codes")
+        .update({ uses: (promo.uses ?? 0) + 1 })
+        .eq("id", promo.id);
+    }
+
     const { error } = await supabase
       .from("adverts")
       .update({
@@ -185,6 +160,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: "/dashboard" });
   }
 
+  // ── Paid path ─────────────────────────────────────────────────────────────────
+  // Move advert to PENDING_PAYMENT before sending the user to Stripe.
   const { error: pendingPaymentError } = await supabase
     .from("adverts")
     .update({ status: ADVERT_STATUS.PENDING_PAYMENT })
@@ -220,9 +197,7 @@ export async function POST(req: Request) {
       payment_method_types: ["card"],
       customer_email: user.email,
       payment_intent_data: user.email
-        ? {
-            receipt_email: user.email,
-          }
+        ? { receipt_email: user.email }
         : undefined,
       line_items: [
         {
@@ -240,12 +215,15 @@ export async function POST(req: Request) {
       metadata: {
         advertId,
         sellerId: user.id,
+        // promoCode stored so webhook can increment uses on confirmed payment.
         promoCode,
         expectedAmount: String(finalAmount),
         priceVersion: finalAmount === LISTING_PRICE_AMOUNT_PENCE ? "launch-250" : "promo",
       },
       success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}/dashboard`,
+      // On cancel, reset the advert back to draft so it is not stranded in
+      // PENDING_PAYMENT. The redirect route handles the DB update.
+      cancel_url: `${siteUrl}/api/cancel-checkout?advertId=${advertId}&sellerId=${user.id}&next=${encodeURIComponent(`/publish-advert/${advertId}`)}`,
     });
 
     return NextResponse.json({ url: session.url });
