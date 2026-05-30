@@ -94,6 +94,25 @@ export async function POST(req: Request) {
         if (error) {
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
+
+        // Increment promo code uses now that payment is confirmed.
+        // Kept here (not at checkout session creation) so abandoned checkouts
+        // don't permanently consume a use.
+        const promoCode = session.metadata?.promoCode;
+        if (promoCode) {
+          const { data: promoData } = await supabaseAdmin
+            .from("promo_codes")
+            .select("id, uses")
+            .eq("code", promoCode)
+            .maybeSingle();
+
+          if (promoData) {
+            await supabaseAdmin
+              .from("promo_codes")
+              .update({ uses: promoData.uses + 1 })
+              .eq("id", promoData.id);
+          }
+        }
       }
     }
   }

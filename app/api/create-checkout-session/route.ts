@@ -5,6 +5,13 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
 import { LISTING_PRICE_AMOUNT_PENCE } from "@/lib/payments/config";
+import {
+  calculatePromoAmountPence,
+  escapePostgrestLikePattern,
+  normalizePromoCode,
+  PromoCodeRecord,
+  validatePromoRecord,
+} from "@/lib/payments/promos";
 import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
 
 export async function POST(req: Request) {
@@ -56,7 +63,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     advertId = body.advertId;
-    promoCode = String(body.promoCode || "").trim().toUpperCase();
+    promoCode = normalizePromoCode(body.promoCode);
   } catch {
     return NextResponse.json({ error: "Invalid checkout request" }, { status: 400 });
   }
@@ -85,39 +92,51 @@ export async function POST(req: Request) {
     );
   }
 
+  // ── Promo code validation ────────────────────────────────────────────────────
+  // Validate on every checkout request regardless of what the client showed.
+  // NOTE: uses is NOT incremented here. For free codes it is incremented at
+  // publication (below). For paid codes it is incremented by the Stripe webhook
+  // on checkout.session.completed, so that abandoning the checkout does not
+  // permanently consume a use.
+
   let finalAmount = LISTING_PRICE_AMOUNT_PENCE;
+  let promo: PromoCodeRecord | null = null;
 
   if (promoCode) {
     const { data, error } = await supabase
       .from("promo_codes")
       .select("*")
-      .eq("code", promoCode)
+      .ilike("code", escapePostgrestLikePattern(promoCode))
       .eq("active", true)
       .maybeSingle();
 
-    if (error || !data) {
-      return NextResponse.json({ error: "Invalid promo code" }, { status: 400 });
+    if (error) {
+      return NextResponse.json(
+        { error: "We couldn't check that promo code. Please try again." },
+        { status: 500 }
+      );
     }
 
-    if (data.max_uses && data.uses >= data.max_uses) {
-      return NextResponse.json({ error: "Promo code expired" }, { status: 400 });
+    const validation = validatePromoRecord(data as PromoCodeRecord | null, promoCode);
+
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.message }, { status: 400 });
     }
 
-    if (data.discount_type === "free") {
-      finalAmount = 0;
-    }
-
-    if (data.discount_type === "fixed" && data.discount_value) {
-      finalAmount = Math.max(0, finalAmount - Math.round(data.discount_value * 100));
-    }
-
-    await supabase
-      .from("promo_codes")
-      .update({ uses: data.uses + 1 })
-      .eq("id", data.id);
+    promo = validation.promo;
+    finalAmount = validation.finalAmountPence;
   }
 
+  // ── Free / fully-discounted path ─────────────────────────────────────────────
+  // No Stripe session needed. Increment uses immediately (no webhook will fire).
   if (finalAmount === 0) {
+    if (promo) {
+      await supabase
+        .from("promo_codes")
+        .update({ uses: (promo.uses ?? 0) + 1 })
+        .eq("id", promo.id);
+    }
+
     const { error } = await supabase
       .from("adverts")
       .update({
@@ -141,6 +160,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: "/dashboard" });
   }
 
+  // ── Paid path ─────────────────────────────────────────────────────────────────
+  // Move advert to PENDING_PAYMENT before sending the user to Stripe.
   const { error: pendingPaymentError } = await supabase
     .from("adverts")
     .update({ status: ADVERT_STATUS.PENDING_PAYMENT })
@@ -176,9 +197,7 @@ export async function POST(req: Request) {
       payment_method_types: ["card"],
       customer_email: user.email,
       payment_intent_data: user.email
-        ? {
-            receipt_email: user.email,
-          }
+        ? { receipt_email: user.email }
         : undefined,
       line_items: [
         {
@@ -196,12 +215,15 @@ export async function POST(req: Request) {
       metadata: {
         advertId,
         sellerId: user.id,
+        // promoCode stored so webhook can increment uses on confirmed payment.
         promoCode,
         expectedAmount: String(finalAmount),
         priceVersion: finalAmount === LISTING_PRICE_AMOUNT_PENCE ? "launch-250" : "promo",
       },
       success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}/dashboard`,
+      // On cancel, reset the advert back to draft so it is not stranded in
+      // PENDING_PAYMENT. The redirect route handles the DB update.
+      cancel_url: `${siteUrl}/api/cancel-checkout?advertId=${advertId}&sellerId=${user.id}&next=${encodeURIComponent(`/publish-advert/${advertId}`)}`,
     });
 
     return NextResponse.json({ url: session.url });
