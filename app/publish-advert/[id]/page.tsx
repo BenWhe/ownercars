@@ -154,7 +154,6 @@ export default function PublishAdvertPage() {
       });
 
       const result = await res.json();
-      setIsApplyingPromo(false);
 
       if (!res.ok) {
         setDiscountedPrice(LISTING_PRICE_GBP);
@@ -168,10 +167,11 @@ export default function PublishAdvertPage() {
       setDiscountedPrice(result.finalAmountGbp);
       setPromoMessage(result.message || "Promo applied.");
     } catch {
-      setIsApplyingPromo(false);
       setDiscountedPrice(LISTING_PRICE_GBP);
       setAppliedPromoCode("");
       setPromoMessage("We couldn't check that promo code. Please try again.");
+    } finally {
+      setIsApplyingPromo(false);
     }
   }
 
@@ -180,6 +180,15 @@ export default function PublishAdvertPage() {
 
     if (!advertId) {
       setPaymentMessage("We couldn't find this advert. Please refresh and try again.");
+      return;
+    }
+
+    // If the user has typed a promo code but hasn't applied it, block checkout.
+    // This prevents a mismatch between the displayed price and the charged amount.
+    if (promoCode.trim() && !appliedPromoCode) {
+      setPaymentMessage(
+        "Please apply your promo code first, or clear the field to pay without a code."
+      );
       return;
     }
 

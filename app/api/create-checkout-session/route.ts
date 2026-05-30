@@ -34,6 +34,8 @@ export async function POST(req: Request) {
     );
   }
 
+  // Validate Stripe key before doing any async work — fails fast and keeps the
+  // error path away from auth/DB code.
   if (!stripeSecretKey) {
     return NextResponse.json(
       { error: "Missing STRIPE_SECRET_KEY" },
@@ -115,9 +117,18 @@ export async function POST(req: Request) {
     );
   }
 
+  // ── Promo code validation ────────────────────────────────────────────────────
+  // Validate on every checkout request regardless of what the client showed.
+  // NOTE: uses is NOT incremented here for paid codes. For free codes it is
+  // incremented at publication (below). For paid codes it is incremented by the
+  // Stripe webhook on checkout.session.completed, so that abandoning the checkout
+  // does not permanently consume a use.
+
   let finalAmount = LISTING_PRICE_AMOUNT_PENCE;
   let promo: PromoCodeRecord | null = null;
 
+  // Optimistic-locking helper used only by the free path (paid path defers
+  // to the webhook so abandoned checkouts don't burn a use).
   async function consumePromoForCheckout() {
     if (!promo) return null;
 
@@ -176,6 +187,8 @@ export async function POST(req: Request) {
     finalAmount = validation.finalAmountPence;
   }
 
+  // ── Free / fully-discounted path ─────────────────────────────────────────────
+  // No Stripe session needed. Increment uses immediately (no webhook will fire).
   if (finalAmount === 0) {
     const promoError = await consumePromoForCheckout();
     if (promoError) return promoError;
@@ -210,6 +223,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: "/dashboard" });
   }
 
+  // ── Paid path ─────────────────────────────────────────────────────────────────
+  // Create (or reuse) a Stripe Checkout session, then mark the advert as
+  // PENDING_PAYMENT. Promo uses are incremented by the webhook on confirmed
+  // payment — NOT here — so abandoned checkouts don't burn a use.
+
   try {
     if (advert.stripe_checkout_session_id) {
       const existingSession = await stripe.checkout.sessions.retrieve(
@@ -225,9 +243,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ url: existingSession.url });
       }
     }
-
-    const promoError = await consumePromoForCheckout();
-    if (promoError) return promoError;
 
     const paymentMetadata = {
       advertId,
