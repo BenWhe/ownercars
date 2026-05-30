@@ -5,6 +5,13 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
 import { LISTING_PRICE_AMOUNT_PENCE } from "@/lib/payments/config";
+import {
+  calculatePromoAmountPence,
+  escapePostgrestLikePattern,
+  normalizePromoCode,
+  PromoCodeRecord,
+  validatePromoRecord,
+} from "@/lib/payments/promos";
 import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
 
 export async function POST(req: Request) {
@@ -56,7 +63,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     advertId = body.advertId;
-    promoCode = String(body.promoCode || "").trim().toUpperCase();
+    promoCode = normalizePromoCode(body.promoCode);
   } catch {
     return NextResponse.json({ error: "Invalid checkout request" }, { status: 400 });
   }
@@ -86,35 +93,72 @@ export async function POST(req: Request) {
   }
 
   let finalAmount = LISTING_PRICE_AMOUNT_PENCE;
+  let promo: PromoCodeRecord | null = null;
 
   if (promoCode) {
     const { data, error } = await supabase
       .from("promo_codes")
       .select("*")
-      .eq("code", promoCode)
+      .ilike("code", escapePostgrestLikePattern(promoCode))
       .eq("active", true)
       .maybeSingle();
 
-    if (error || !data) {
-      return NextResponse.json({ error: "Invalid promo code" }, { status: 400 });
+    if (error) {
+      return NextResponse.json(
+        { error: "We couldn't check that promo code. Please try again." },
+        { status: 500 }
+      );
     }
 
-    if (data.max_uses && data.uses >= data.max_uses) {
-      return NextResponse.json({ error: "Promo code expired" }, { status: 400 });
+    const validation = validatePromoRecord(data as PromoCodeRecord | null, promoCode);
+
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.message }, { status: 400 });
     }
 
-    if (data.discount_type === "free") {
-      finalAmount = 0;
-    }
+    promo = validation.promo;
+    finalAmount = validation.finalAmountPence;
+  }
 
-    if (data.discount_type === "fixed" && data.discount_value) {
-      finalAmount = Math.max(0, finalAmount - Math.round(data.discount_value * 100));
-    }
-
-    await supabase
+  if (promo) {
+    const { data: consumedPromo, error: consumePromoError } = await supabase
       .from("promo_codes")
-      .update({ uses: data.uses + 1 })
-      .eq("id", data.id);
+      .update({ uses: (promo.uses ?? 0) + 1 })
+      .eq("id", promo.id)
+      .eq("uses", promo.uses ?? 0)
+      .select("id")
+      .maybeSingle();
+
+    if (consumePromoError || !consumedPromo) {
+      const { data: latestPromo } = await supabase
+        .from("promo_codes")
+        .select("*")
+        .eq("id", promo.id)
+        .maybeSingle();
+
+      const latestFinalAmount = latestPromo
+        ? calculatePromoAmountPence(latestPromo as PromoCodeRecord)
+        : LISTING_PRICE_AMOUNT_PENCE;
+      const retryable = latestPromo
+        ? validatePromoRecord(latestPromo as PromoCodeRecord, promoCode)
+        : { ok: false, message: "That promo code wasn't recognised." };
+
+      if (!retryable.ok) {
+        return NextResponse.json({ error: retryable.message }, { status: 400 });
+      }
+
+      if (latestFinalAmount !== finalAmount) {
+        return NextResponse.json(
+          { error: "Promo pricing changed. Please re-apply the code and try again." },
+          { status: 409 }
+        );
+      }
+
+      return NextResponse.json(
+        { error: "Promo code was updated by another checkout. Please try again." },
+        { status: 409 }
+      );
+    }
   }
 
   if (finalAmount === 0) {

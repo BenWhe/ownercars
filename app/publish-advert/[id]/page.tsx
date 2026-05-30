@@ -2,11 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { LISTING_PRICE_GBP, STANDARD_LISTING_PRICE_GBP } from "@/lib/payments/config";
 
 export default function PublishAdvertPage() {
-  const supabase = createClient();
   const params = useParams();
   const advertId = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -16,6 +14,7 @@ export default function PublishAdvertPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [promoCode, setPromoCode] = useState("");
+  const [appliedPromoCode, setAppliedPromoCode] = useState("");
   const [discountedPrice, setDiscountedPrice] = useState(LISTING_PRICE_GBP);
   const [promoMessage, setPromoMessage] = useState("");
   const [paymentMessage, setPaymentMessage] = useState("");
@@ -133,48 +132,37 @@ export default function PublishAdvertPage() {
     setPromoMessage("Checking code...");
     setPaymentMessage("");
 
-    const { data, error } = await supabase
-      .from("promo_codes")
-      .select("*")
-      .eq("code", code)
-      .eq("active", true)
-      .maybeSingle();
+    try {
+      const res = await fetch("/api/promo-codes/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ promoCode: code }),
+      });
 
-    setIsApplyingPromo(false);
+      const result = await res.json();
+      setIsApplyingPromo(false);
 
-    if (error) {
-      setPromoMessage(
-        "We couldn't check that code in the browser. You can still continue — it will be validated securely at payment."
-      );
-      return;
-    }
+      if (!res.ok) {
+        setDiscountedPrice(LISTING_PRICE_GBP);
+        setAppliedPromoCode("");
+        setPromoMessage(result.error || "That promo code couldn't be applied.");
+        return;
+      }
 
-    if (!data) {
+      setPromoCode(result.code);
+      setAppliedPromoCode(result.code);
+      setDiscountedPrice(result.finalAmountGbp);
+      setPromoMessage(result.message || "Promo applied.");
+    } catch {
+      setIsApplyingPromo(false);
       setDiscountedPrice(LISTING_PRICE_GBP);
-      setPromoMessage("That promo code wasn't recognised.");
-      return;
+      setAppliedPromoCode("");
+      setPromoMessage("We couldn't check that promo code. Please try again.");
     }
-
-    if (data.max_uses && data.uses >= data.max_uses) {
-      setDiscountedPrice(LISTING_PRICE_GBP);
-      setPromoMessage("This code has expired.");
-      return;
-    }
-
-    if (data.discount_type === "free") {
-      setDiscountedPrice(0);
-    }
-
-    if (data.discount_type === "fixed") {
-      setDiscountedPrice(Math.max(0, LISTING_PRICE_GBP - data.discount_value));
-    }
-
-    setPromoCode(code);
-    setPromoMessage("Promo applied. Final validation happens securely when you publish.");
   }
 
   async function startPayment() {
-    const code = promoCode.trim().toUpperCase();
+    const code = appliedPromoCode;
 
     if (!advertId) {
       setPaymentMessage("We couldn't find this advert. Please refresh and try again.");
@@ -328,6 +316,8 @@ export default function PublishAdvertPage() {
               value={promoCode}
               onChange={(e) => {
                 setPromoCode(e.target.value);
+                setAppliedPromoCode("");
+                setDiscountedPrice(LISTING_PRICE_GBP);
                 setPromoMessage("");
                 setPaymentMessage("");
               }}
