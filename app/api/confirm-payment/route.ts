@@ -64,8 +64,18 @@ export async function POST(req: Request) {
 
   const session = await stripe.checkout.sessions.retrieve(sessionId);
 
+  if (session.status === "expired") {
+    return NextResponse.json(
+      { error: "This checkout session expired. Please start payment again." },
+      { status: 409 }
+    );
+  }
+
   if (session.payment_status !== "paid") {
-    return NextResponse.json({ error: "Payment not complete" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Payment was not completed. Please retry checkout from your advert." },
+      { status: 402 }
+    );
   }
 
   const expectedAmount = Number(session.metadata?.expectedAmount || NaN);
@@ -79,6 +89,7 @@ export async function POST(req: Request) {
 
   const advertId = session.metadata?.advertId;
   const sellerId = session.metadata?.sellerId;
+  const promoCode = session.metadata?.promoCode || null;
 
   if (!advertId) {
     return NextResponse.json({ error: "Missing advertId" }, { status: 400 });
@@ -93,7 +104,7 @@ export async function POST(req: Request) {
 
   const { data: advert, error: advertLookupError } = await supabaseAdmin
     .from("adverts")
-    .select("seller_id")
+    .select("seller_id, payment_status, status")
     .eq("id", advertId)
     .maybeSingle();
 
@@ -115,7 +126,14 @@ export async function POST(req: Request) {
     .update({
       paid: true,
       status: ADVERT_STATUS.PUBLISHED,
+      payment_status: "paid",
+      payment_failure_reason: null,
+      stripe_checkout_session_id: session.id,
+      stripe_payment_intent_id:
+        typeof session.payment_intent === "string" ? session.payment_intent : null,
+      promo_code: promoCode,
       published_at: publishedAt.toISOString(),
+      checkout_completed_at: publishedAt.toISOString(),
       last_availability_confirmed_at: publishedAt.toISOString(),
       next_availability_check_at: nextConfirmationDueDate(publishedAt),
     })

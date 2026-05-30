@@ -1,8 +1,120 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
 import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
+
+async function publishPaidAdvert(
+  supabaseAdmin: SupabaseClient,
+  session: Stripe.Checkout.Session
+) {
+  const advertId = session.metadata?.advertId;
+  const expectedAmount = Number(session.metadata?.expectedAmount || NaN);
+
+  if (!Number.isFinite(expectedAmount) || session.amount_total !== expectedAmount) {
+    return "Paid checkout amount did not match the expected listing price";
+  }
+
+  if (!advertId) return null;
+
+  const publishedAt = new Date();
+  const { error } = await supabaseAdmin
+    .from("adverts")
+    .update({
+      paid: true,
+      status: ADVERT_STATUS.PUBLISHED,
+      payment_status: "paid",
+      payment_failure_reason: null,
+      stripe_checkout_session_id: session.id,
+      stripe_payment_intent_id:
+        typeof session.payment_intent === "string" ? session.payment_intent : null,
+      promo_code: session.metadata?.promoCode || null,
+      published_at: publishedAt.toISOString(),
+      checkout_completed_at: publishedAt.toISOString(),
+      last_availability_confirmed_at: publishedAt.toISOString(),
+      next_availability_check_at: nextConfirmationDueDate(publishedAt),
+    })
+    .eq("id", advertId)
+    .neq("status", ADVERT_STATUS.PUBLISHED);
+
+  if (error) return error.message;
+
+  // Increment promo code uses now that payment is confirmed.
+  // Kept here (not at checkout session creation) so abandoned checkouts
+  // don't permanently consume a use.
+  const promoCode = session.metadata?.promoCode;
+  if (promoCode) {
+    const { data: promoData } = await supabaseAdmin
+      .from("promo_codes")
+      .select("id, uses")
+      .eq("code", promoCode)
+      .maybeSingle();
+
+    if (promoData) {
+      await supabaseAdmin
+        .from("promo_codes")
+        .update({ uses: promoData.uses + 1 })
+        .eq("id", promoData.id);
+    }
+  }
+
+  return null;
+}
+
+async function markCheckoutNotPaid(
+  supabaseAdmin: SupabaseClient,
+  session: Stripe.Checkout.Session,
+  paymentStatus: "cancelled" | "failed" | "expired",
+  reason: string
+) {
+  const advertId = session.metadata?.advertId;
+
+  if (!advertId) return null;
+
+  const { error } = await supabaseAdmin
+    .from("adverts")
+    .update({
+      status: ADVERT_STATUS.PENDING_PAYMENT,
+      paid: false,
+      payment_status: paymentStatus,
+      payment_failure_reason: reason,
+      stripe_checkout_session_id: session.id,
+      stripe_payment_intent_id:
+        typeof session.payment_intent === "string" ? session.payment_intent : null,
+    })
+    .eq("id", advertId)
+    .neq("status", ADVERT_STATUS.PUBLISHED);
+
+  return error?.message || null;
+}
+
+async function markPaymentIntentFailed(
+  supabaseAdmin: SupabaseClient,
+  paymentIntent: Stripe.PaymentIntent
+) {
+  const advertId = paymentIntent.metadata?.advertId;
+
+  if (!advertId) return null;
+
+  const reason =
+    paymentIntent.last_payment_error?.message ||
+    paymentIntent.last_payment_error?.decline_code ||
+    "Payment failed. Please try another card or payment method.";
+
+  const { error } = await supabaseAdmin
+    .from("adverts")
+    .update({
+      status: ADVERT_STATUS.PENDING_PAYMENT,
+      paid: false,
+      payment_status: "failed",
+      payment_failure_reason: reason,
+      stripe_payment_intent_id: paymentIntent.id,
+    })
+    .eq("id", advertId)
+    .neq("status", ADVERT_STATUS.PUBLISHED);
+
+  return error?.message || null;
+}
 
 export async function POST(req: Request) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -63,58 +175,43 @@ export async function POST(req: Request) {
     );
   }
 
+  let processingError: string | null = null;
+
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
 
     if (session.payment_status === "paid") {
-      const advertId = session.metadata?.advertId;
-      const expectedAmount = Number(session.metadata?.expectedAmount || NaN);
-
-      if (!Number.isFinite(expectedAmount) || session.amount_total !== expectedAmount) {
-        return NextResponse.json(
-          { error: "Paid checkout amount did not match the expected listing price" },
-          { status: 400 }
-        );
-      }
-
-      if (advertId) {
-        const publishedAt = new Date();
-
-        const { error } = await supabaseAdmin
-          .from("adverts")
-          .update({
-            paid: true,
-            status: ADVERT_STATUS.PUBLISHED,
-            published_at: publishedAt.toISOString(),
-            last_availability_confirmed_at: publishedAt.toISOString(),
-            next_availability_check_at: nextConfirmationDueDate(publishedAt),
-          })
-          .eq("id", advertId);
-
-        if (error) {
-          return NextResponse.json({ error: error.message }, { status: 500 });
-        }
-
-        // Increment promo code uses now that payment is confirmed.
-        // Kept here (not at checkout session creation) so abandoned checkouts
-        // don't permanently consume a use.
-        const promoCode = session.metadata?.promoCode;
-        if (promoCode) {
-          const { data: promoData } = await supabaseAdmin
-            .from("promo_codes")
-            .select("id, uses")
-            .eq("code", promoCode)
-            .maybeSingle();
-
-          if (promoData) {
-            await supabaseAdmin
-              .from("promo_codes")
-              .update({ uses: promoData.uses + 1 })
-              .eq("id", promoData.id);
-          }
-        }
-      }
+      processingError = await publishPaidAdvert(supabaseAdmin, session);
     }
+  }
+
+  if (event.type === "checkout.session.async_payment_failed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    processingError = await markCheckoutNotPaid(
+      supabaseAdmin,
+      session,
+      "failed",
+      "Stripe could not complete this payment. Please try again."
+    );
+  }
+
+  if (event.type === "checkout.session.expired") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    processingError = await markCheckoutNotPaid(
+      supabaseAdmin,
+      session,
+      "expired",
+      "Checkout expired before payment was completed."
+    );
+  }
+
+  if (event.type === "payment_intent.payment_failed") {
+    const paymentIntent = event.data.object as Stripe.PaymentIntent;
+    processingError = await markPaymentIntentFailed(supabaseAdmin, paymentIntent);
+  }
+
+  if (processingError) {
+    return NextResponse.json({ error: processingError }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });
