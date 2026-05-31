@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { DownloadForSaleCardButton } from "@/app/components/ForSaleCard";
 import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
 import { ADVERT_STATUS, sellerStatusLabel } from "@/lib/adverts/lifecycle";
 
@@ -10,6 +11,12 @@ type DashboardAdvert = {
   title: string | null;
   price: number | string | null;
   mileage: number | string | null;
+  make: string | null;
+  model: string | null;
+  year: number | string | null;
+  fuel_type: string | null;
+  gearbox: string | null;
+  colour: string | null;
   status: string | null;
   advert_photos?: Array<{ image_url: string | null }>;
 };
@@ -127,9 +134,12 @@ export default function DashboardPage() {
                   <Link href={`/edit-advert/${ad.id}`}>Edit</Link>
 
                   {ad.status === ADVERT_STATUS.PUBLISHED && (
-                    <button onClick={() => updateLifecycle(ad.id, "pause")}>
-                      Pause
-                    </button>
+                    <>
+                      <DownloadForSaleCardButton advert={ad} />
+                      <button onClick={() => updateLifecycle(ad.id, "pause")}>
+                        Pause
+                      </button>
+                    </>
                   )}
 
                   {ad.status === ADVERT_STATUS.PAUSED && (
