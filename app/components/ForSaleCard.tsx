@@ -70,7 +70,7 @@ export function ForSaleCard({ advert }: ForSaleCardProps) {
     <div
       style={{
         width: 360,
-        height: 560,
+        height: 640,
         overflow: "hidden",
         background: "#ffffff",
         color: BLACK,
@@ -80,9 +80,10 @@ export function ForSaleCard({ advert }: ForSaleCardProps) {
         flexDirection: "column",
       }}
     >
-      {/* 16:9 photo area — flexShrink:0 prevents flex from squashing it;
-          img is absolutely positioned so html2canvas renders cover reliably */}
-      <div style={{ position: "relative", height: 202, width: "100%", overflow: "hidden", background: "#E5E7EB", flexShrink: 0 }}>
+      {/* 16:9 photo area — hard min/max/height locks the container so flex
+          cannot expand or compress it; img is absolutely positioned so
+          html2canvas renders object-fit cover reliably */}
+      <div style={{ position: "relative", height: 202, minHeight: 202, maxHeight: 202, width: "100%", overflow: "hidden", background: "#E5E7EB", flexShrink: 0 }}>
         {photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -193,6 +194,7 @@ export function ForSaleCard({ advert }: ForSaleCardProps) {
         style={{
           height: 62,
           flexShrink: 0,
+          marginTop: "auto",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -228,7 +230,7 @@ export function DownloadForSaleCardButton({ advert }: ForSaleCardProps) {
         scale: 2,
         useCORS: true,
         width: 360,
-        height: 560,
+        height: 640,
       });
       const link = document.createElement("a");
       link.href = canvas.toDataURL("image/png");
@@ -252,7 +254,7 @@ export function DownloadForSaleCardButton({ advert }: ForSaleCardProps) {
           left: -10000,
           top: 0,
           width: 360,
-          height: 560,
+          height: 640,
           pointerEvents: "none",
         }}
       >
