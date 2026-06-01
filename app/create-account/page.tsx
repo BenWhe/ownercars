@@ -3,6 +3,7 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import GoogleSignInButton from "@/app/components/GoogleSignInButton";
 
 function safeNextPath(next: string | null) {
   return next?.startsWith("/") && !next.startsWith("//") ? next : null;
@@ -73,6 +74,11 @@ export default function CreateAccountPage() {
           Create your OwnerCars account to list your car, manage your advert and
           keep your seller details protected.
         </p>
+
+        <GoogleSignInButton nextPath={nextPath} />
+        <div className="auth-divider">
+          <span>or</span>
+        </div>
 
         <form onSubmit={handleCreateAccount} className="auth-form">
           <label>

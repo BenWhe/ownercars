@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { safeNextPath } from "@/lib/auth/routes";
+import GoogleSignInButton from "@/app/components/GoogleSignInButton";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -157,6 +158,15 @@ export default function LoginPage() {
             verified buyers can contact them — please sign in or create a free
             account to send your message.
           </p>
+        )}
+
+        {!isRecoverySession && (
+          <>
+            <GoogleSignInButton nextPath={nextPath} />
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
+          </>
         )}
 
         {isRecoverySession ? (
