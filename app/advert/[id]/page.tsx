@@ -81,7 +81,13 @@ export default function AdvertPage() {
     e.preventDefault();
 
     const cleanBody = sellerMessageBody.trim();
-    if (!cleanBody || !advert?.id) return;
+
+    if (!cleanBody) {
+      setSellerMessageStatus("Please enter a message before sending.");
+      return;
+    }
+
+    if (!advert?.id) return;
 
     setSellerMessageStatus("Sending message...");
 
@@ -186,11 +192,25 @@ export default function AdvertPage() {
                 <textarea
                   id="seller-message"
                   value={sellerMessageBody}
-                  onChange={(e) => setSellerMessageBody(e.target.value)}
+                  onChange={(e) => {
+                    setSellerMessageBody(e.target.value);
+                    if (sellerMessageStatus) setSellerMessageStatus("");
+                  }}
                   placeholder="Ask about the car, viewing availability, or history..."
                 />
-                {sellerMessageStatus && <p className="message-notice">{sellerMessageStatus}</p>}
-                <button className="secure-message-button" type="submit" disabled={!sellerMessageBody.trim()}>
+                {sellerMessageStatus && (
+                  <p className="message-notice">{sellerMessageStatus}</p>
+                )}
+                <button
+                  className="secure-message-button"
+                  type="submit"
+                  aria-disabled={!sellerMessageBody.trim()}
+                  style={
+                    !sellerMessageBody.trim()
+                      ? { opacity: 0.5, cursor: "not-allowed" }
+                      : undefined
+                  }
+                >
                   Send message
                 </button>
               </form>
