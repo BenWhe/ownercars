@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import html2canvas from "html2canvas";
+import { QRCodeCanvas } from "qrcode.react";
 
 type ForSaleCardAdvert = {
   id: string;
@@ -53,6 +54,7 @@ function downloadFileName(advert: ForSaleCardAdvert) {
 
 export function ForSaleCard({ advert }: ForSaleCardProps) {
   const photoUrl = advert.advert_photos?.[0]?.image_url;
+  const advertUrl = `https://www.ownercars.co.uk/advert/${advert.id}`;
   const title = `${advert.year || ""} ${formatWords(advert.make)} ${formatWords(advert.model)}`
     .replace(/—/g, "")
     .replace(/\s+/g, " ")
@@ -78,7 +80,7 @@ export function ForSaleCard({ advert }: ForSaleCardProps) {
         flexDirection: "column",
       }}
     >
-      <div style={{ position: "relative", height: 220, width: "100%", background: "#E5E7EB" }}>
+      <div style={{ position: "relative", height: 180, width: "100%", background: "#E5E7EB" }}>
         {photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -106,12 +108,12 @@ export function ForSaleCard({ advert }: ForSaleCardProps) {
         </div>
       </div>
 
-      <div style={{ padding: "22px 22px 18px", flex: "1 1 auto" }}>
+      <div style={{ padding: "18px 22px 14px", flex: "1 1 auto" }}>
         <h2
           style={{
             margin: 0,
             color: BLACK,
-            fontSize: 31,
+            fontSize: 28,
             lineHeight: 1.02,
             letterSpacing: "-0.05em",
             fontWeight: 900,
@@ -122,9 +124,9 @@ export function ForSaleCard({ advert }: ForSaleCardProps) {
 
         <p
           style={{
-            margin: "12px 0 16px",
+            margin: "10px 0 14px",
             color: BLUE,
-            fontSize: 34,
+            fontSize: 31,
             lineHeight: 1,
             fontWeight: 900,
             letterSpacing: "-0.04em",
@@ -159,18 +161,29 @@ export function ForSaleCard({ advert }: ForSaleCardProps) {
 
       <div
         style={{
-          height: 44,
+          height: 120,
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           background: BLUE,
           color: "#ffffff",
-          fontSize: 18,
+          gap: 7,
+          fontSize: 12,
           fontWeight: 900,
-          letterSpacing: "-0.02em",
+          letterSpacing: "0.02em",
         }}
       >
-        ownercars.co.uk/advert/{advert.id}
+        <QRCodeCanvas
+          value={advertUrl}
+          size={80}
+          bgColor="#ffffff"
+          fgColor={BLACK}
+          level="M"
+          includeMargin={false}
+          style={{ display: "block" }}
+        />
+        <div style={{ color: "#ffffff", lineHeight: 1, textAlign: "center" }}>Scan to view listing</div>
       </div>
 
       <div
