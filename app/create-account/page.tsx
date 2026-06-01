@@ -12,6 +12,7 @@ function safeNextPath(next: string | null) {
 export default function CreateAccountPage() {
   const router = useRouter();
 
+  const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -38,6 +39,9 @@ export default function CreateAccountPage() {
     if (error) {
       setMessage(error.message);
     } else {
+      // Save first name to user metadata immediately after sign-up.
+      await supabase.auth.updateUser({ data: { first_name: firstName.trim() } });
+
       const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
 
       setMessage(
@@ -81,6 +85,17 @@ export default function CreateAccountPage() {
         </div>
 
         <form onSubmit={handleCreateAccount} className="auth-form">
+          <label>
+            First name
+            <input
+              required
+              type="text"
+              placeholder="Your first name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+            />
+          </label>
+
           <label>
             Email address
             <input

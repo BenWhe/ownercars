@@ -105,23 +105,14 @@ export async function POST(request: NextRequest) {
   if (!user.user_metadata?.first_name?.trim()) {
     return NextResponse.json(
       {
-        error: "Please add your first name to your account before sending messages.",
+        error: "Please add your first name in your account settings before messaging sellers.",
         code: "first_name_required",
       },
       { status: 400 }
     );
   }
 
-  // 2. Account age — prevent immediate messaging after sign-up
-  const accountAgeMs = Date.now() - new Date(user.created_at).getTime();
-  if (accountAgeMs < 5 * 60 * 1000) {
-    return NextResponse.json(
-      { error: "Please wait a few minutes after creating your account before sending messages." },
-      { status: 400 }
-    );
-  }
-
-  // 3. Rate limit — no more than 10 messages per hour
+  // 2. Rate limit — no more than 10 messages per hour
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { count: recentCount, error: countError } = await supabase
     .from("messages")

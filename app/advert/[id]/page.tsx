@@ -33,8 +33,6 @@ export default function AdvertPage() {
   const [message, setMessage] = useState("Loading advert...");
   const [sellerMessageBody, setSellerMessageBody] = useState("");
   const [sellerMessageStatus, setSellerMessageStatus] = useState("");
-  const [firstNameRequired, setFirstNameRequired] = useState(false);
-  const [genuineBuyer, setGenuineBuyer] = useState(false);
   const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
@@ -96,18 +94,13 @@ export default function AdvertPage() {
   // Core send logic, called both from the form and from the auto-submit path
   // after returning from sign-in. genuineBuyerDeclared defaults to true for
   // the auto-submit path where the user already showed intent.
-  async function submitMessage(
-    body: string,
-    advertId: string,
-    genuineBuyerDeclared = true
-  ) {
+  async function submitMessage(body: string, advertId: string) {
     setSellerMessageStatus("Sending message...");
-    setFirstNameRequired(false);
 
     const res = await fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ advertId, body, genuineBuyerDeclared }),
+      body: JSON.stringify({ advertId, body, genuineBuyerDeclared: true }),
     });
 
     const result = await res.json();
@@ -120,7 +113,6 @@ export default function AdvertPage() {
     }
 
     if (!res.ok) {
-      if (result.code === "first_name_required") setFirstNameRequired(true);
       setSellerMessageStatus(result.error || "Could not send message.");
       return;
     }
@@ -128,7 +120,6 @@ export default function AdvertPage() {
     // Success — clean up draft and navigate to the conversation thread.
     localStorage.removeItem(`pending_message_${advertId}`);
     setSellerMessageBody("");
-    setGenuineBuyer(false);
     router.push(`/messages/${result.threadId}`);
   }
 
@@ -144,7 +135,7 @@ export default function AdvertPage() {
 
     if (!advert?.id) return;
 
-    await submitMessage(cleanBody, advert.id, genuineBuyer);
+    await submitMessage(cleanBody, advert.id);
   }
 
   if (message) {
@@ -233,30 +224,16 @@ export default function AdvertPage() {
                   placeholder="Ask about the car, viewing availability, or history..."
                 />
 
-                <label className="genuine-buyer-label">
-                  <input
-                    type="checkbox"
-                    checked={genuineBuyer}
-                    onChange={(e) => setGenuineBuyer(e.target.checked)}
-                  />
-                  I confirm I am a genuine buyer interested in this vehicle.
-                </label>
-
                 {sellerMessageStatus && (
-                  <p className="message-notice">
-                    {sellerMessageStatus}
-                    {firstNameRequired && (
-                      <> <a href="/account">Add your first name in account settings.</a></>
-                    )}
-                  </p>
+                  <p className="message-notice">{sellerMessageStatus}</p>
                 )}
 
                 <button
                   className="secure-message-button"
                   type="submit"
-                  aria-disabled={!sellerMessageBody.trim() || !genuineBuyer}
+                  aria-disabled={!sellerMessageBody.trim()}
                   style={
-                    !sellerMessageBody.trim() || !genuineBuyer
+                    !sellerMessageBody.trim()
                       ? { opacity: 0.5, cursor: "not-allowed" }
                       : undefined
                   }
