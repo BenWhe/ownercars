@@ -137,6 +137,8 @@ export default function LoginPage() {
     };
   }, []);
 
+  const fromAdvert = !!nextPath?.includes("/advert/");
+
   return (
     <main className="auth-page">
       <section className="auth-card">
@@ -148,6 +150,14 @@ export default function LoginPage() {
           OwnerCars protects sellers by keeping contact details hidden and allowing
           only verified buyers to message through the platform.
         </p>
+
+        {fromAdvert && !isRecoverySession && (
+          <p className="auth-context-banner">
+            Your message is saved and ready to send. To protect sellers, only
+            verified buyers can contact them — please sign in or create a free
+            account to send your message.
+          </p>
+        )}
 
         {isRecoverySession ? (
           <form onSubmit={handleUpdatePassword} className="auth-form">
