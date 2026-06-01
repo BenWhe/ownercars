@@ -238,7 +238,7 @@ export function DownloadForSaleCardButton({ advert }: ForSaleCardProps) {
   return (
     <>
       <button type="button" onClick={downloadCard} disabled={isDownloading}>
-        {isDownloading ? "Preparing card..." : "Download For Sale card"}
+        {isDownloading ? "Preparing..." : "For Sale card"}
       </button>
       <div
         aria-hidden="true"

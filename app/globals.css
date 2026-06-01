@@ -542,6 +542,7 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 }
 
 .dashboard-card {
+  border: 1px solid #ebebeb;
   border-radius: 16px;
   overflow: hidden;
   background: white;
@@ -731,7 +732,7 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   border: 1px solid #e0e0e0;
   color: #333;
   border-radius: 50px;
-  padding: 10px 16px;
+  padding: 8px 14px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;

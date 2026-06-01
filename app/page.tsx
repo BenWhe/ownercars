@@ -28,7 +28,7 @@ export default function HomePage() {
         .from("adverts")
         .select("*, advert_photos(*)")
         .eq("status", "published")
-        .order("created_at", { ascending: false })
+        .order("published_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -108,22 +108,6 @@ export default function HomePage() {
         </Link>
       </section>
 
-      <section className="protection-teaser">
-        <div>
-          <p className="eyebrow">Protected private selling</p>
-          <h2>Sell your car without exposing your details too early</h2>
-          <p>
-            OwnerCars helps protect your phone number, address, vehicle
-            registration and identity by keeping buyer communication on-platform
-            and releasing sensitive information only when you choose.
-          </p>
-        </div>
-
-        <Link className="button primary" href="/seller-protection">
-          See how seller protection works
-        </Link>
-      </section>
-
       <section className="search-panel">
         <div className="search-panel-inner">
           <div className="search-panel-copy">
@@ -165,10 +149,10 @@ export default function HomePage() {
 
         <div className="feature-grid">
           <article className="feature-card">
-            <h3>£9.99 fixed price</h3>
+            <h3>£2.50 launch price</h3>
             <p>
-              One simple advert price. No upgrade pressure or complicated package
-              choices.
+              Advertise until sold for £2.50. No upgrade pressure or complicated
+              package choices.
             </p>
           </article>
 
@@ -188,6 +172,22 @@ export default function HomePage() {
             </p>
           </article>
         </div>
+      </section>
+
+      <section className="protection-teaser">
+        <div>
+          <p className="eyebrow">Protected private selling</p>
+          <h2>Sell your car without exposing your details too early</h2>
+          <p>
+            OwnerCars helps protect your phone number, address, vehicle
+            registration and identity by keeping buyer communication on-platform
+            and releasing sensitive information only when you choose.
+          </p>
+        </div>
+
+        <Link className="button primary" href="/seller-protection">
+          See how seller protection works
+        </Link>
       </section>
 
       <section className="steps-section">
@@ -211,7 +211,7 @@ export default function HomePage() {
           </div>
           <div>
             <span>4</span>
-            <p>Pay £9.99 and submit for approval</p>
+            <p>Pay £2.50 and publish instantly</p>
           </div>
           <div>
             <span>5</span>
@@ -222,7 +222,7 @@ export default function HomePage() {
 
       <section className="cta-band">
         <h2>Ready to sell your car privately?</h2>
-        <p>Create your advert for £9.99 and keep your seller details protected.</p>
+        <p>Create your advert for £2.50 and keep your seller details protected.</p>
         <Link className="button light" href="/create-advert">
           Start your advert
         </Link>
