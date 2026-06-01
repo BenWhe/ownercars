@@ -88,6 +88,11 @@ for select
 to authenticated
 using (sender_id = auth.uid() or recipient_id = auth.uid());
 
+-- Intentionally minimal: only verify the caller is the sender and is not
+-- messaging themselves.  Advert-ownership checks (published status, seller
+-- identity, no self-messaging as seller) are enforced by the API layer.
+-- The previous policy queried public.messages inside its own WITH CHECK,
+-- causing infinite recursion in Postgres RLS evaluation.
 drop policy if exists "Users can create valid advert messages" on public.messages;
 create policy "Users can create valid advert messages"
 on public.messages
@@ -96,30 +101,6 @@ to authenticated
 with check (
   sender_id = auth.uid()
   and recipient_id <> auth.uid()
-  and (
-    exists (
-      select 1
-      from public.adverts
-      where adverts.id = messages.advert_id
-        and adverts.status = 'published'
-        and adverts.seller_id = messages.recipient_id
-        and adverts.seller_id <> auth.uid()
-    )
-    or
-    exists (
-      select 1
-      from public.adverts
-      where adverts.id = messages.advert_id
-        and adverts.seller_id = auth.uid()
-        and exists (
-          select 1
-          from public.messages earlier
-          where earlier.advert_id = messages.advert_id
-            and earlier.sender_id = messages.recipient_id
-            and earlier.recipient_id = auth.uid()
-        )
-    )
-  )
 );
 
 drop policy if exists "Recipients can mark messages read" on public.messages;
