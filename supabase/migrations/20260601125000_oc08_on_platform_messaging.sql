@@ -48,6 +48,10 @@ begin
   end if;
 end $$;
 
+-- Drop the old column so its not-null constraint cannot block inserts that
+-- only supply the renamed `body` column.
+alter table public.messages drop column if exists message;
+
 alter table public.messages
 alter column advert_id set not null,
 alter column sender_id set not null,
