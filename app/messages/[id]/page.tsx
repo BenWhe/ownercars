@@ -34,6 +34,15 @@ function formatMessageDate(value?: string) {
   }).format(new Date(value));
 }
 
+function formatMemberSince(value?: string | null) {
+  if (!value) return null;
+
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
 export default function MessageThreadPage() {
   const params = useParams();
   const conversationId = params.id as string;
@@ -112,12 +121,19 @@ export default function MessageThreadPage() {
 
   const advert = conversation?.adverts;
   const title = advertTitle(advert);
+  const isSeller = userId && advert?.seller_id && userId === advert.seller_id;
+  const memberSince = isSeller
+    ? formatMemberSince(conversation?.other_user_member_since)
+    : null;
 
   return (
     <main>
       <section className="dashboard-hero">
         <p className="eyebrow">Secure messaging</p>
         <h1>{title}</h1>
+        {memberSince && (
+          <p className="member-since-notice">Buyer account created {memberSince}</p>
+        )}
         <p>
           Keep messages on OwnerCars to protect contact details, vehicle
           registration information and viewing details.

@@ -1985,6 +1985,33 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   padding: 14px 16px;
   font-weight: 700;
 }
+
+.genuine-buyer-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: #444;
+  line-height: 1.4;
+  cursor: pointer;
+  margin: 4px 0;
+}
+
+.genuine-buyer-label input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #2563EB;
+}
+
+.member-since-notice {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 4px 0 0;
+}
+
 .messages-section,
 .message-thread-section {
   max-width: 900px;

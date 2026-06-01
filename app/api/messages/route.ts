@@ -99,7 +99,46 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  let payload: { advertId?: string; body?: string };
+  // ── Buyer trust checks ──────────────────────────────────────────────────────
+
+  // 1. First name required
+  if (!user.user_metadata?.first_name?.trim()) {
+    return NextResponse.json(
+      {
+        error: "Please add your first name to your account before sending messages.",
+        code: "first_name_required",
+      },
+      { status: 400 }
+    );
+  }
+
+  // 2. Account age — prevent immediate messaging after sign-up
+  const accountAgeMs = Date.now() - new Date(user.created_at).getTime();
+  if (accountAgeMs < 5 * 60 * 1000) {
+    return NextResponse.json(
+      { error: "Please wait a few minutes after creating your account before sending messages." },
+      { status: 400 }
+    );
+  }
+
+  // 3. Rate limit — no more than 10 messages per hour
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count: recentCount, error: countError } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("sender_id", user.id)
+    .gte("created_at", oneHourAgo);
+
+  if (!countError && (recentCount ?? 0) >= 10) {
+    return NextResponse.json(
+      { error: "You've sent a lot of messages recently. Please wait before sending more." },
+      { status: 400 }
+    );
+  }
+
+  // ── End trust checks ────────────────────────────────────────────────────────
+
+  let payload: { advertId?: string; body?: string; genuineBuyerDeclared?: boolean };
   try {
     payload = await request.json();
   } catch {
@@ -108,6 +147,7 @@ export async function POST(request: NextRequest) {
 
   const advertId = payload.advertId;
   const body = payload.body?.trim();
+  const genuineBuyerDeclared = payload.genuineBuyerDeclared === true;
 
   if (!advertId || !body) {
     return NextResponse.json({ error: "Advert and message body are required." }, { status: 400 });
@@ -149,6 +189,7 @@ export async function POST(request: NextRequest) {
       recipient_id: advert.seller_id,
       body: redactedBody.text,
       contact_details_redacted: redactedBody.redacted,
+      genuine_buyer_declared: genuineBuyerDeclared,
     })
     .select("id, advert_id, sender_id, recipient_id, body, contact_details_redacted, created_at")
     .single();
