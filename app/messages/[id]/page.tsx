@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { CONTACT_REDACTION_NOTICE, redactContactDetails } from "@/lib/content/redaction";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -135,13 +136,16 @@ export default function MessageThreadPage() {
 
           {messages.map((msg: any) => {
             const ownMessage = msg.sender_id === userId;
+            const safeBody = redactContactDetails(msg.body);
+            const wasRedacted = msg.contact_details_redacted || safeBody.redacted;
 
             return (
               <div
                 key={msg.id}
                 className={ownMessage ? "message-bubble own" : "message-bubble"}
               >
-                <p>{msg.body}</p>
+                <p>{safeBody.text}</p>
+                {wasRedacted && <p className="redaction-notice">{CONTACT_REDACTION_NOTICE}</p>}
                 <time>{formatMessageDate(msg.created_at)}</time>
               </div>
             );

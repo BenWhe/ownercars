@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
 import { ADVERT_STATUS } from "@/lib/adverts/lifecycle";
+import { redactContactDetails } from "@/lib/content/redaction";
 import { messageThreadId } from "@/lib/messages/thread";
 
 function createSupabase(cookieStore: Awaited<ReturnType<typeof cookies>>) {
@@ -41,6 +42,7 @@ export async function GET() {
       sender_id,
       recipient_id,
       body,
+      contact_details_redacted,
       read_at,
       created_at,
       adverts (
@@ -130,15 +132,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "You cannot message your own advert." }, { status: 400 });
   }
 
+  const redactedBody = redactContactDetails(body);
+
+  if (!redactedBody.text) {
+    return NextResponse.json(
+      { error: "Please include a message without phone numbers or email addresses." },
+      { status: 400 }
+    );
+  }
+
   const { data: message, error } = await supabase
     .from("messages")
     .insert({
       advert_id: advert.id,
       sender_id: user.id,
       recipient_id: advert.seller_id,
-      body,
+      body: redactedBody.text,
+      contact_details_redacted: redactedBody.redacted,
     })
-    .select("id, advert_id, sender_id, recipient_id, body, created_at")
+    .select("id, advert_id, sender_id, recipient_id, body, contact_details_redacted, created_at")
     .single();
 
   if (error) {

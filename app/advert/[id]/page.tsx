@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
+import { CONTACT_REDACTION_NOTICE } from "@/lib/content/redaction";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -253,6 +254,9 @@ export default function AdvertPage() {
           </div>
 
           <div className="advert-description">
+            {advert.description_contact_details_redacted && (
+              <p className="redaction-notice">{CONTACT_REDACTION_NOTICE}</p>
+            )}
             {advert.description
               ?.replace(/\n{3,}/g, "\n\n")
               .split("\n")

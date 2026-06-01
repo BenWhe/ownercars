@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
+import { redactContactDetails } from "@/lib/content/redaction";
 import { parseMessageThreadId } from "@/lib/messages/thread";
 
 type Context = { params: Promise<{ id: string }> };
@@ -141,13 +142,23 @@ export async function POST(request: NextRequest, context: Context) {
     return NextResponse.json({ error: "Not authorised to reply to this conversation." }, { status: 403 });
   }
 
+  const redactedBody = redactContactDetails(body);
+
+  if (!redactedBody.text) {
+    return NextResponse.json(
+      { error: "Please include a message without phone numbers or email addresses." },
+      { status: 400 }
+    );
+  }
+
   const { data: message, error } = await supabase
     .from("messages")
     .insert({
       advert_id: advertId,
       sender_id: user.id,
       recipient_id: otherUserId,
-      body,
+      body: redactedBody.text,
+      contact_details_redacted: redactedBody.redacted,
     })
     .select("*")
     .single();

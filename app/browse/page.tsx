@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { CONTACT_REDACTION_NOTICE, redactContactDetails } from "@/lib/content/redaction";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -175,6 +176,7 @@ function BrowseContent() {
         <div className="listing-grid">
           {adverts.map((ad: any) => {
             const displayTitle = advertDisplayTitle(ad);
+            const safeDescription = redactContactDetails(ad.description);
 
             return (
               <Link
@@ -208,7 +210,10 @@ function BrowseContent() {
                     <span>OwnerCars protected contact</span>
                   </div>
 
-                  <p className="listing-description">{ad.description}</p>
+                  <p className="listing-description">{safeDescription.text}</p>
+                  {safeDescription.redacted && (
+                    <p className="redaction-notice">{CONTACT_REDACTION_NOTICE}</p>
+                  )}
                 </div>
               </Link>
             );
