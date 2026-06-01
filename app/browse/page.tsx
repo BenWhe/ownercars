@@ -81,7 +81,7 @@ function BrowseContent() {
         .from("adverts")
         .select("*, advert_photos(*)")
         .eq("status", "published")
-        .order("created_at", { ascending: false });
+        .order("published_at", { ascending: false });
 
       if (error) {
         setMessage(error.message);
@@ -142,7 +142,7 @@ function BrowseContent() {
     <>
       <section className="browse-hero">
         <p className="eyebrow">Private cars only</p>
-        <h1>Browse private cars</h1>
+        <h1>Latest adverts</h1>
         <p>
           Search cars listed by private owners. Seller details stay protected and
           buyer messages go through OwnerCars.
