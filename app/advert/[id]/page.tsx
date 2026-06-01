@@ -48,6 +48,20 @@ export default function AdvertPage() {
       setAdvert(result.advert);
       setCurrentUserId(result.userId ?? null);
       setMessage("");
+
+      // After returning from sign-in, restore and auto-send any pending draft.
+      // Only attempt if the user is authenticated and is not the seller.
+      const advertId = result.advert.id;
+      const userId = result.userId ?? null;
+      const isSeller = userId && userId === result.advert.seller_id;
+
+      if (userId && !isSeller) {
+        const pending = localStorage.getItem(`pending_message_${advertId}`);
+        if (pending) {
+          setSellerMessageBody(pending);
+          await submitMessage(pending, advertId);
+        }
+      }
     }
 
     if (params.id) fetchAdvert();
@@ -77,6 +91,37 @@ export default function AdvertPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeIndex, advert]);
 
+  // Core send logic, called both from the form and from the auto-submit path
+  // after returning from sign-in.
+  async function submitMessage(body: string, advertId: string) {
+    setSellerMessageStatus("Sending message...");
+
+    const res = await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ advertId, body }),
+    });
+
+    const result = await res.json();
+
+    if (res.status === 401) {
+      // Save draft so it can be restored after the user signs in.
+      localStorage.setItem(`pending_message_${advertId}`, body);
+      router.push(`/login?next=/advert/${advertId}`);
+      return;
+    }
+
+    if (!res.ok) {
+      setSellerMessageStatus(result.error || "Could not send message.");
+      return;
+    }
+
+    // Success — clean up draft and navigate to the conversation thread.
+    localStorage.removeItem(`pending_message_${advertId}`);
+    setSellerMessageBody("");
+    router.push(`/messages/${result.threadId}`);
+  }
+
   async function handleMessageSeller(e: React.FormEvent) {
     e.preventDefault();
 
@@ -89,28 +134,7 @@ export default function AdvertPage() {
 
     if (!advert?.id) return;
 
-    setSellerMessageStatus("Sending message...");
-
-    const res = await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ advertId: advert.id, body: cleanBody }),
-    });
-
-    const result = await res.json();
-
-    if (res.status === 401) {
-      router.push(`/login?next=/advert/${advert.id}`);
-      return;
-    }
-
-    if (!res.ok) {
-      setSellerMessageStatus(result.error || "Could not send message.");
-      return;
-    }
-
-    setSellerMessageBody("");
-    router.push(`/messages/${result.threadId}`);
+    await submitMessage(cleanBody, advert.id);
   }
 
   if (message) {
