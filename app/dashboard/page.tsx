@@ -2,14 +2,27 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { DownloadForSaleCardButton } from "@/app/components/ForSaleCard";
 import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
 import { ADVERT_STATUS, sellerStatusLabel } from "@/lib/adverts/lifecycle";
+
+function statusVariant(status: string | null): string {
+  if (status === ADVERT_STATUS.PUBLISHED) return "published";
+  if (status === ADVERT_STATUS.PAUSED) return "paused";
+  return "muted";
+}
 
 type DashboardAdvert = {
   id: string;
   title: string | null;
   price: number | string | null;
   mileage: number | string | null;
+  make: string | null;
+  model: string | null;
+  year: number | string | null;
+  fuel_type: string | null;
+  gearbox: string | null;
+  colour: string | null;
   status: string | null;
   advert_photos?: Array<{ image_url: string | null }>;
 };
@@ -91,22 +104,22 @@ export default function DashboardPage() {
         <div className="dashboard-grid">
           {adverts.map((ad) => (
             <article className="dashboard-card" key={ad.id}>
-              {ad.advert_photos?.[0]?.image_url ? (
-                <img
-                  className="dashboard-photo-img"
-                  src={ad.advert_photos[0].image_url}
-                  alt={ad.title || "OwnerCars advert"}
-                />
-              ) : (
-                <div className="dashboard-photo"></div>
-              )}
+              <div className="dashboard-photo-wrap">
+                {ad.advert_photos?.[0]?.image_url ? (
+                  <img
+                    className="dashboard-photo-img"
+                    src={ad.advert_photos[0].image_url}
+                    alt={ad.title || "OwnerCars advert"}
+                  />
+                ) : (
+                  <div className="dashboard-photo"></div>
+                )}
+                <span className={`status-badge status-badge--${statusVariant(ad.status)}`}>
+                  {sellerStatusLabel(ad.status)}
+                </span>
+              </div>
 
               <div className="dashboard-card-body">
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <span className="seller-badge">Private seller</span>
-                  <span className="status-badge">{sellerStatusLabel(ad.status)}</span>
-                </div>
-
                 <h2>{ad.title}</h2>
 
                 <p className="listing-price">
@@ -114,16 +127,22 @@ export default function DashboardPage() {
                 </p>
 
                 <p className="dashboard-meta">
-                  {Number(ad.mileage).toLocaleString()} miles
+                  {[
+                    ad.mileage ? `${Number(ad.mileage).toLocaleString()} miles` : null,
+                    ad.fuel_type,
+                    ad.gearbox,
+                  ].filter(Boolean).join(" · ")}
                 </p>
 
-                <div className="dashboard-actions">
+                <div className="dashboard-actions-primary">
                   {ad.status === ADVERT_STATUS.PUBLISHED ? (
-                    <Link href={`/advert/${ad.id}`}>View advert</Link>
+                    <Link className="dashboard-cta" href={`/advert/${ad.id}`}>View advert</Link>
                   ) : ad.status === ADVERT_STATUS.DRAFT || ad.status === ADVERT_STATUS.PENDING_PAYMENT ? (
-                    <Link href={`/publish-advert/${ad.id}`}>Publish advert</Link>
+                    <Link className="dashboard-cta" href={`/publish-advert/${ad.id}`}>Publish advert</Link>
                   ) : null}
+                </div>
 
+                <div className="dashboard-actions">
                   <Link href={`/edit-advert/${ad.id}`}>Edit</Link>
 
                   {ad.status === ADVERT_STATUS.PUBLISHED && (
@@ -143,13 +162,19 @@ export default function DashboardPage() {
                       Mark as sold
                     </button>
                   )}
+
+                  {ad.status === ADVERT_STATUS.PUBLISHED && (
+                    <DownloadForSaleCardButton advert={ad} />
+                  )}
                 </div>
 
-                <PromoteAdvertTools
-                  advertId={ad.id}
-                  title={ad.title || "OwnerCars advert"}
-                  compact
-                />
+                <div className="dashboard-promote-wrap">
+                  <PromoteAdvertTools
+                    advertId={ad.id}
+                    title={ad.title || "OwnerCars advert"}
+                    compact
+                  />
+                </div>
               </div>
             </article>
           ))}
