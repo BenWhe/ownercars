@@ -80,14 +80,16 @@ export function ForSaleCard({ advert }: ForSaleCardProps) {
         flexDirection: "column",
       }}
     >
-      <div style={{ position: "relative", height: 180, width: "100%", background: "#E5E7EB" }}>
+      {/* 16:9 photo area — flexShrink:0 prevents flex from squashing it;
+          img is absolutely positioned so html2canvas renders cover reliably */}
+      <div style={{ position: "relative", height: 202, width: "100%", overflow: "hidden", background: "#E5E7EB", flexShrink: 0 }}>
         {photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={photoUrl}
             alt={title || "OwnerCars advert"}
             crossOrigin="anonymous"
-            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
           />
         ) : null}
         <div
@@ -162,6 +164,7 @@ export function ForSaleCard({ advert }: ForSaleCardProps) {
       <div
         style={{
           height: 120,
+          flexShrink: 0,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -189,6 +192,7 @@ export function ForSaleCard({ advert }: ForSaleCardProps) {
       <div
         style={{
           height: 62,
+          flexShrink: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
