@@ -21,28 +21,18 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    return NextResponse.json({ unreadCount: 0 });
   }
 
-  const { data, error } = await supabase
-    .from("adverts")
-    .select("*, advert_photos(*)")
-    .eq("seller_id", user.id)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
-  }
-
-  const { count: unreadCount, error: unreadError } = await supabase
+  const { count, error } = await supabase
     .from("messages")
     .select("*", { count: "exact", head: true })
     .eq("recipient_id", user.id)
     .is("read_at", null);
 
-  if (unreadError) {
-    return NextResponse.json({ error: unreadError.message }, { status: 400 });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({ adverts: data || [], userId: user.id, unreadCount: unreadCount || 0 });
+  return NextResponse.json({ unreadCount: count || 0 });
 }

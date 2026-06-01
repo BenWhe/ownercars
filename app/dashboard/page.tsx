@@ -29,6 +29,7 @@ type DashboardAdvert = {
 
 export default function DashboardPage() {
   const [adverts, setAdverts] = useState<DashboardAdvert[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [message, setMessage] = useState("Loading your adverts...");
 
   async function updateLifecycle(advertId: string, action: "pause" | "reactivate" | "sold") {
@@ -67,6 +68,7 @@ export default function DashboardPage() {
       }
 
       setAdverts(result.adverts || []);
+      setUnreadCount(result.unreadCount || 0);
       setMessage("");
     }
 
@@ -86,6 +88,12 @@ export default function DashboardPage() {
         <Link className="button primary" href="/create-advert">
           Create new advert
         </Link>
+
+        {unreadCount > 0 && (
+          <Link className="dashboard-message-alert" href="/messages">
+            You have {unreadCount} unread message{unreadCount === 1 ? "" : "s"}
+          </Link>
+        )}
       </section>
 
       <section className="dashboard-section">

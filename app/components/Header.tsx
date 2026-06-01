@@ -1,57 +1,28 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { signOutAndClearSession } from "@/lib/auth/client";
-import { createClient } from "@/lib/supabase/client";
 
 export default function Header() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const userIdRef = useRef("");
 
   async function fetchUnreadCount() {
-    const uid = userIdRef.current;
-    if (!uid) {
-      setUnreadCount(0);
-      return;
+    const res = await fetch("/api/messages/unread");
+    const result = await res.json();
+
+    if (res.ok) {
+      setUnreadCount(result.unreadCount || 0);
     }
-
-    const supabase = createClient();
-
-    const { data: conversations } = await supabase
-      .from("conversations")
-      .select("id")
-      .or(`buyer_id.eq.${uid},seller_id.eq.${uid}`);
-
-    const conversationIds =
-      conversations?.map((conversation: { id: string }) => conversation.id) || [];
-
-    if (conversationIds.length === 0) {
-      setUnreadCount(0);
-      return;
-    }
-
-    const { count } = await supabase
-      .from("messages")
-      .select("*", { count: "exact", head: true })
-      .in("conversation_id", conversationIds)
-      .neq("sender_id", uid)
-      .is("read_at", null);
-
-    setUnreadCount(count || 0);
   }
 
   useEffect(() => {
-    const supabase = createClient();
-
     async function checkSession() {
       const res = await fetch("/api/account");
       const result = await res.json();
       const user = result.user;
-      userIdRef.current = user?.id ?? "";
       setLoggedIn(!!user);
 
       if (user) {
@@ -71,36 +42,10 @@ export default function Header() {
     window.addEventListener("ownercars:auth-changed", checkSession);
     window.addEventListener("focus", checkSession);
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
-      userIdRef.current = session?.user?.id ?? "";
-      setLoggedIn(!!session);
-
-      if (session) {
-        await fetchUnreadCount();
-      } else {
-        setUnreadCount(0);
-      }
-    });
-
-    const channel = supabase
-      .channel("header-message-notifications")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "messages" },
-        () => {
-          fetchUnreadCount();
-        }
-      )
-      .subscribe();
-
     return () => {
       window.removeEventListener("ownercars:messages-read", handleMessagesRead);
       window.removeEventListener("ownercars:auth-changed", checkSession);
       window.removeEventListener("focus", checkSession);
-      subscription.unsubscribe();
-      supabase.removeChannel(channel);
     };
   }, []);
 

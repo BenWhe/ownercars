@@ -1,8 +1,13 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
+import { ADVERT_STATUS } from "@/lib/adverts/lifecycle";
+
+type Context = { params: Promise<{ id: string }> };
+
+export async function GET(req: NextRequest, context: Context) {
+  const { id } = await context.params;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -20,29 +25,20 @@ export async function GET() {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
-
   const { data, error } = await supabase
     .from("adverts")
     .select("*, advert_photos(*)")
-    .eq("seller_id", user.id)
-    .order("created_at", { ascending: false });
+    .eq("id", id)
+    .eq("status", ADVERT_STATUS.PUBLISHED)
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  const { count: unreadCount, error: unreadError } = await supabase
-    .from("messages")
-    .select("*", { count: "exact", head: true })
-    .eq("recipient_id", user.id)
-    .is("read_at", null);
-
-  if (unreadError) {
-    return NextResponse.json({ error: unreadError.message }, { status: 400 });
+  if (!data) {
+    return NextResponse.json({ error: "This advert isn’t live yet." }, { status: 404 });
   }
 
-  return NextResponse.json({ adverts: data || [], userId: user.id, unreadCount: unreadCount || 0 });
+  return NextResponse.json({ advert: data, userId: user?.id ?? null });
 }
