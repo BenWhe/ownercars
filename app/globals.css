@@ -537,7 +537,7 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 24px;
 }
 
@@ -700,7 +700,7 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   background: #111;
   color: #fff;
   border-radius: 50px;
-  padding: 14px;
+  padding: 12px 20px;
   font-size: 15px;
   font-weight: 600;
   text-align: center;
@@ -749,6 +749,15 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   margin-top: 16px;
   border-top: 1px solid #f0f0f0;
   padding-top: 16px;
+}
+
+.dashboard-promote-wrap .promote-advert-card {
+  border: none;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
 }
 
 .promote-advert-card {
