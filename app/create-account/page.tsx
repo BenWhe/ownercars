@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import GoogleSignInButton from "@/app/components/GoogleSignInButton";
 
@@ -10,13 +9,17 @@ function safeNextPath(next: string | null) {
 }
 
 export default function CreateAccountPage() {
-  const router = useRouter();
-
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [nextPath, setNextPath] = useState<string | null>(null);
+
+  // Confirmation screen state
+  const [signUpComplete, setSignUpComplete] = useState(false);
+  const [signedUpEmail, setSignedUpEmail] = useState("");
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -31,42 +34,88 @@ export default function CreateAccountPage() {
 
     const supabase = createClient();
 
-    const { data, error } = await supabase.auth.signUp({
+    // Pass first_name in options.data so it's stored in user_metadata
+    // even before email confirmation (no separate updateUser call needed).
+    const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: { first_name: firstName.trim() },
+      },
     });
 
     if (error) {
       setMessage(error.message);
     } else {
-      // Save first name to user metadata immediately after sign-up.
-      await supabase.auth.updateUser({ data: { first_name: firstName.trim() } });
-
-      const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
-
-      setMessage(
-        next
-          ? data.session
-            ? "Account created. Taking you back to your advert..."
-            : "Account created. Sign in to continue your advert."
-          : "Account created. You can now sign in."
-      );
-      setTimeout(() => {
-        if (next && data.session) {
-          window.location.href = next;
-          return;
-        }
-
-        if (next) {
-          window.location.href = `/login?next=${encodeURIComponent(next)}`;
-          return;
-        }
-
-        router.push("/login");
-      }, 1200);
+      setSignedUpEmail(email);
+      setSignUpComplete(true);
     }
   }
 
+  async function handleResend() {
+    setResending(true);
+    setResendMessage("");
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: signedUpEmail,
+    });
+
+    setResending(false);
+    setResendMessage(error ? error.message : "Verification email resent — check your inbox.");
+  }
+
+  // ── Email verification confirmation screen ───────────────────────────────────
+  if (signUpComplete) {
+    return (
+      <main className="auth-page">
+        <section className="auth-card">
+          <p className="eyebrow">Almost there</p>
+
+          <h1>Check your email</h1>
+
+          <p className="auth-sub">
+            We&apos;ve sent a verification link to <strong>{signedUpEmail}</strong>.
+            Click the link to activate your account before signing in.
+          </p>
+
+          <p style={{ fontSize: 14, color: "var(--muted)", margin: "12px 0 20px" }}>
+            Can&apos;t find the email? Check your spam or junk folder.
+          </p>
+
+          {resendMessage && (
+            <p className="auth-message" style={{ color: resendMessage.startsWith("Verification") ? "var(--accent)" : undefined, marginBottom: 12 }}>
+              {resendMessage}
+            </p>
+          )}
+
+          <button
+            type="button"
+            className="button secondary"
+            style={{ width: "100%", justifyContent: "center" }}
+            onClick={handleResend}
+            disabled={resending}
+          >
+            {resending ? "Sending…" : "Resend verification email"}
+          </button>
+
+          <div className="auth-divider">
+            <span>Already verified?</span>
+          </div>
+
+          <a
+            className="auth-secondary-link"
+            href={nextPath ? `/login?next=${encodeURIComponent(nextPath)}` : "/login"}
+          >
+            Sign in
+          </a>
+        </section>
+      </main>
+    );
+  }
+
+  // ── Sign-up form ─────────────────────────────────────────────────────────────
   return (
     <main className="auth-page">
       <section className="auth-card">
@@ -99,6 +148,7 @@ export default function CreateAccountPage() {
           <label>
             Email address
             <input
+              required
               type="email"
               placeholder="you@example.com"
               value={email}
@@ -109,6 +159,7 @@ export default function CreateAccountPage() {
           <label>
             Password
             <input
+              required
               type="password"
               placeholder="Create a password"
               value={password}
