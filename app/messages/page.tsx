@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { CONTACT_REDACTION_NOTICE, redactContactDetails } from "@/lib/content/redaction";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -89,6 +90,8 @@ export default function MessagesPage() {
         <div className="messages-list">
           {conversations.map((conversation: any) => {
             const advert = conversation.adverts;
+            const safePreview = redactContactDetails(conversation.lastMessage?.body);
+            const previewRedacted = conversation.lastMessage?.contact_details_redacted || safePreview.redacted;
 
             return (
               <Link
@@ -108,8 +111,12 @@ export default function MessagesPage() {
                     {conversation.lastMessage?.sender_id === userId
                       ? "You: "
                       : ""}
-                    {conversation.lastMessage?.body}
+                    {safePreview.text}
                   </p>
+
+                  {previewRedacted && (
+                    <p className="redaction-notice">{CONTACT_REDACTION_NOTICE}</p>
+                  )}
 
                   <p className="message-card-time">
                     {formatMessageDate(conversation.lastMessage?.created_at)}

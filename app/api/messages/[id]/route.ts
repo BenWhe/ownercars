@@ -1,7 +1,9 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
+import { redactContactDetails } from "@/lib/content/redaction";
 import { parseMessageThreadId } from "@/lib/messages/thread";
 
 type Context = { params: Promise<{ id: string }> };
@@ -78,12 +80,24 @@ export async function GET(req: NextRequest, context: Context) {
     .eq("recipient_id", user.id)
     .is("read_at", null);
 
+  // Fetch the other user's account creation date so sellers can see
+  // how long the buyer has been a member.
+  let otherUserMemberSince: string | null = null;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (serviceRoleKey && supabaseUrl) {
+    const adminSupabase = createServiceClient(supabaseUrl, serviceRoleKey);
+    const { data: userData } = await adminSupabase.auth.admin.getUserById(otherUserId);
+    otherUserMemberSince = userData?.user?.created_at ?? null;
+  }
+
   return NextResponse.json({
     conversation: {
       id,
       advert_id: advertId,
       other_user_id: otherUserId,
       adverts: advert,
+      other_user_member_since: otherUserMemberSince,
       status: "open",
     },
     messages: messages || [],
@@ -141,13 +155,23 @@ export async function POST(request: NextRequest, context: Context) {
     return NextResponse.json({ error: "Not authorised to reply to this conversation." }, { status: 403 });
   }
 
+  const redactedBody = redactContactDetails(body);
+
+  if (!redactedBody.text) {
+    return NextResponse.json(
+      { error: "Please include a message without phone numbers or email addresses." },
+      { status: 400 }
+    );
+  }
+
   const { data: message, error } = await supabase
     .from("messages")
     .insert({
       advert_id: advertId,
       sender_id: user.id,
       recipient_id: otherUserId,
-      body,
+      body: redactedBody.text,
+      contact_details_redacted: redactedBody.redacted,
     })
     .select("*")
     .single();

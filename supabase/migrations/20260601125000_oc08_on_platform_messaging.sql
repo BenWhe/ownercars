@@ -48,6 +48,10 @@ begin
   end if;
 end $$;
 
+-- Drop the old column so its not-null constraint cannot block inserts that
+-- only supply the renamed `body` column.
+alter table public.messages drop column if exists message;
+
 alter table public.messages
 alter column advert_id set not null,
 alter column sender_id set not null,
@@ -88,6 +92,11 @@ for select
 to authenticated
 using (sender_id = auth.uid() or recipient_id = auth.uid());
 
+-- Intentionally minimal: only verify the caller is the sender and is not
+-- messaging themselves.  Advert-ownership checks (published status, seller
+-- identity, no self-messaging as seller) are enforced by the API layer.
+-- The previous policy queried public.messages inside its own WITH CHECK,
+-- causing infinite recursion in Postgres RLS evaluation.
 drop policy if exists "Users can create valid advert messages" on public.messages;
 create policy "Users can create valid advert messages"
 on public.messages
@@ -96,30 +105,6 @@ to authenticated
 with check (
   sender_id = auth.uid()
   and recipient_id <> auth.uid()
-  and (
-    exists (
-      select 1
-      from public.adverts
-      where adverts.id = messages.advert_id
-        and adverts.status = 'published'
-        and adverts.seller_id = messages.recipient_id
-        and adverts.seller_id <> auth.uid()
-    )
-    or
-    exists (
-      select 1
-      from public.adverts
-      where adverts.id = messages.advert_id
-        and adverts.seller_id = auth.uid()
-        and exists (
-          select 1
-          from public.messages earlier
-          where earlier.advert_id = messages.advert_id
-            and earlier.sender_id = messages.recipient_id
-            and earlier.recipient_id = auth.uid()
-        )
-    )
-  )
 );
 
 drop policy if exists "Recipients can mark messages read" on public.messages;

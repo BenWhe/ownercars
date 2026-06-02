@@ -20,5 +20,14 @@ export async function GET() {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  return NextResponse.json({ user: user ? { id: user.id, email: user.email } : null });
+  return NextResponse.json({
+    user: user
+      ? {
+          id: user.id,
+          email: user.email,
+          user_metadata: user.user_metadata,
+          email_confirmed_at: user.email_confirmed_at ?? null,
+        }
+      : null,
+  });
 }

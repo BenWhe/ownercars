@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { CONTACT_REDACTION_NOTICE, redactContactDetails } from "@/lib/content/redaction";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -30,6 +31,15 @@ function formatMessageDate(value?: string) {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatMemberSince(value?: string | null) {
+  if (!value) return null;
+
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "long",
+    year: "numeric",
   }).format(new Date(value));
 }
 
@@ -111,12 +121,19 @@ export default function MessageThreadPage() {
 
   const advert = conversation?.adverts;
   const title = advertTitle(advert);
+  const isSeller = userId && advert?.seller_id && userId === advert.seller_id;
+  const memberSince = isSeller
+    ? formatMemberSince(conversation?.other_user_member_since)
+    : null;
 
   return (
     <main>
       <section className="dashboard-hero">
         <p className="eyebrow">Secure messaging</p>
         <h1>{title}</h1>
+        {memberSince && (
+          <p className="member-since-notice">Buyer account created {memberSince}</p>
+        )}
         <p>
           Keep messages on OwnerCars to protect contact details, vehicle
           registration information and viewing details.
@@ -135,13 +152,16 @@ export default function MessageThreadPage() {
 
           {messages.map((msg: any) => {
             const ownMessage = msg.sender_id === userId;
+            const safeBody = redactContactDetails(msg.body);
+            const wasRedacted = msg.contact_details_redacted || safeBody.redacted;
 
             return (
               <div
                 key={msg.id}
                 className={ownMessage ? "message-bubble own" : "message-bubble"}
               >
-                <p>{msg.body}</p>
+                <p>{safeBody.text}</p>
+                {wasRedacted && <p className="redaction-notice">{CONTACT_REDACTION_NOTICE}</p>}
                 <time>{formatMessageDate(msg.created_at)}</time>
               </div>
             );

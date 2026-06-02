@@ -605,7 +605,8 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 }
 
 .advert-form input,
-.advert-form textarea {
+.advert-form textarea,
+.advert-form select {
   display: block;
   width: 100%;
   margin-top: 8px;
@@ -614,6 +615,8 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   padding: 16px;
   font-size: 16px;
   font-family: inherit;
+  background: white;
+  color: var(--text);
 }
 
 .advert-form textarea {
@@ -969,6 +972,39 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 .auth-message {
   font-size: 13px;
   color: #dc2626;
+}
+
+.google-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid #dadce0;
+  border-radius: 999px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f1f1f;
+  cursor: pointer;
+  box-sizing: border-box;
+  margin-bottom: 4px;
+}
+
+.google-btn:hover {
+  background: #f8f9fa;
+  border-color: #b8bbbf;
+}
+
+.auth-context-banner {
+  background: #2563EB;
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 20px;
 }
 
 .auth-inline-form {
@@ -1952,6 +1988,33 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   padding: 14px 16px;
   font-weight: 700;
 }
+
+.genuine-buyer-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: #444;
+  line-height: 1.4;
+  cursor: pointer;
+  margin: 4px 0;
+}
+
+.genuine-buyer-label input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #2563EB;
+}
+
+.member-since-notice {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 4px 0 0;
+}
+
 .messages-section,
 .message-thread-section {
   max-width: 900px;
@@ -2942,4 +3005,17 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   font-weight: 800;
   padding: 10px 14px;
   text-decoration: none;
+}
+
+.redaction-notice {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.message-bubble .redaction-notice {
+  color: inherit;
+  opacity: 0.72;
+  font-size: 12px;
 }

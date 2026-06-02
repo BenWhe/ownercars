@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
 import { ADVERT_STATUS } from "@/lib/adverts/lifecycle";
+import { redactContactDetails } from "@/lib/content/redaction";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -40,5 +41,14 @@ export async function GET(req: NextRequest, context: Context) {
     return NextResponse.json({ error: "This advert isn’t live yet." }, { status: 404 });
   }
 
-  return NextResponse.json({ advert: data, userId: user?.id ?? null });
+  const description = redactContactDetails(data.description);
+
+  return NextResponse.json({
+    advert: {
+      ...data,
+      description: description.text,
+      description_contact_details_redacted: description.redacted,
+    },
+    userId: user?.id ?? null,
+  });
 }

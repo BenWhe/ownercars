@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
+import { CONTACT_REDACTION_NOTICE } from "@/lib/content/redaction";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -47,6 +48,20 @@ export default function AdvertPage() {
       setAdvert(result.advert);
       setCurrentUserId(result.userId ?? null);
       setMessage("");
+
+      // After returning from sign-in, restore and auto-send any pending draft.
+      // Only attempt if the user is authenticated and is not the seller.
+      const advertId = result.advert.id;
+      const userId = result.userId ?? null;
+      const isSeller = userId && userId === result.advert.seller_id;
+
+      if (userId && !isSeller) {
+        const pending = localStorage.getItem(`pending_message_${advertId}`);
+        if (pending) {
+          setSellerMessageBody(pending);
+          await submitMessage(pending, advertId);
+        }
+      }
     }
 
     if (params.id) fetchAdvert();
@@ -76,24 +91,24 @@ export default function AdvertPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeIndex, advert]);
 
-  async function handleMessageSeller(e: React.FormEvent) {
-    e.preventDefault();
-
-    const cleanBody = sellerMessageBody.trim();
-    if (!cleanBody || !advert?.id) return;
-
+  // Core send logic, called both from the form and from the auto-submit path
+  // after returning from sign-in. genuineBuyerDeclared defaults to true for
+  // the auto-submit path where the user already showed intent.
+  async function submitMessage(body: string, advertId: string) {
     setSellerMessageStatus("Sending message...");
 
     const res = await fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ advertId: advert.id, body: cleanBody }),
+      body: JSON.stringify({ advertId, body, genuineBuyerDeclared: true }),
     });
 
     const result = await res.json();
 
     if (res.status === 401) {
-      router.push(`/login?next=/advert/${advert.id}`);
+      // Save draft so it can be restored after the user signs in.
+      localStorage.setItem(`pending_message_${advertId}`, body);
+      router.push(`/login?next=/advert/${advertId}`);
       return;
     }
 
@@ -102,8 +117,25 @@ export default function AdvertPage() {
       return;
     }
 
+    // Success — clean up draft and navigate to the conversation thread.
+    localStorage.removeItem(`pending_message_${advertId}`);
     setSellerMessageBody("");
     router.push(`/messages/${result.threadId}`);
+  }
+
+  async function handleMessageSeller(e: React.FormEvent) {
+    e.preventDefault();
+
+    const cleanBody = sellerMessageBody.trim();
+
+    if (!cleanBody) {
+      setSellerMessageStatus("Please enter a message before sending.");
+      return;
+    }
+
+    if (!advert?.id) return;
+
+    await submitMessage(cleanBody, advert.id);
   }
 
   if (message) {
@@ -185,11 +217,27 @@ export default function AdvertPage() {
                 <textarea
                   id="seller-message"
                   value={sellerMessageBody}
-                  onChange={(e) => setSellerMessageBody(e.target.value)}
+                  onChange={(e) => {
+                    setSellerMessageBody(e.target.value);
+                    if (sellerMessageStatus) setSellerMessageStatus("");
+                  }}
                   placeholder="Ask about the car, viewing availability, or history..."
                 />
-                {sellerMessageStatus && <p className="message-notice">{sellerMessageStatus}</p>}
-                <button className="secure-message-button" type="submit" disabled={!sellerMessageBody.trim()}>
+
+                {sellerMessageStatus && (
+                  <p className="message-notice">{sellerMessageStatus}</p>
+                )}
+
+                <button
+                  className="secure-message-button"
+                  type="submit"
+                  aria-disabled={!sellerMessageBody.trim()}
+                  style={
+                    !sellerMessageBody.trim()
+                      ? { opacity: 0.5, cursor: "not-allowed" }
+                      : undefined
+                  }
+                >
                   Send message
                 </button>
               </form>
@@ -253,6 +301,9 @@ export default function AdvertPage() {
           </div>
 
           <div className="advert-description">
+            {advert.description_contact_details_redacted && (
+              <p className="redaction-notice">{CONTACT_REDACTION_NOTICE}</p>
+            )}
             {advert.description
               ?.replace(/\n{3,}/g, "\n\n")
               .split("\n")

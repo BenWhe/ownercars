@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { safeNextPath } from "@/lib/auth/routes";
+import GoogleSignInButton from "@/app/components/GoogleSignInButton";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -137,6 +138,8 @@ export default function LoginPage() {
     };
   }, []);
 
+  const fromAdvert = !!nextPath?.includes("/advert/");
+
   return (
     <main className="auth-page">
       <section className="auth-card">
@@ -148,6 +151,23 @@ export default function LoginPage() {
           OwnerCars protects sellers by keeping contact details hidden and allowing
           only verified buyers to message through the platform.
         </p>
+
+        {fromAdvert && !isRecoverySession && (
+          <p className="auth-context-banner">
+            Your message is saved and ready to send. To protect sellers, only
+            verified buyers can contact them — please sign in or create a free
+            account to send your message.
+          </p>
+        )}
+
+        {!isRecoverySession && (
+          <>
+            <GoogleSignInButton nextPath={nextPath} />
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
+          </>
+        )}
 
         {isRecoverySession ? (
           <form onSubmit={handleUpdatePassword} className="auth-form">
