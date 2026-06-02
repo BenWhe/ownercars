@@ -12,6 +12,12 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
+  // Support form
+  const [supportSubject, setSupportSubject] = useState("Problem with my advert");
+  const [supportBody, setSupportBody] = useState("");
+  const [supportSending, setSupportSending] = useState(false);
+  const [supportMessage, setSupportMessage] = useState("");
+
   useEffect(() => {
     async function loadUser() {
       // Use the Supabase client directly — getUser() returns full metadata
@@ -43,6 +49,30 @@ export default function AccountPage() {
 
     setSaving(false);
     setSaveMessage(error ? error.message : "First name saved.");
+  }
+
+  async function handleSupportSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSupportSending(true);
+    setSupportMessage("");
+
+    const res = await fetch("/api/support", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject: supportSubject, body: supportBody }),
+    });
+
+    setSupportSending(false);
+
+    if (res.ok) {
+      setSupportMessage("Message sent. We'll be in touch within 2 business days.");
+      setSupportBody("");
+    } else {
+      const result = await res.json().catch(() => ({}));
+      setSupportMessage(
+        result.error ?? "Something went wrong. Please email support@ownercars.co.uk directly."
+      );
+    }
   }
 
   async function handleLogout() {
@@ -125,6 +155,57 @@ export default function AccountPage() {
             <StatusRow label="Account created" complete />
             <StatusRow label="Email verified" complete={emailConfirmed} />
           </div>
+        </div>
+
+        {/* Contact support */}
+        <div className="advert-form" style={{ marginBottom: 20 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 20 }}>
+            Contact support
+          </h2>
+
+          <form onSubmit={handleSupportSubmit}>
+            <label style={{ marginBottom: 16 }}>
+              Subject
+              <select
+                value={supportSubject}
+                onChange={(e) => setSupportSubject(e.target.value)}
+              >
+                <option>Problem with my advert</option>
+                <option>Payment issue</option>
+                <option>Report a buyer</option>
+                <option>Account issue</option>
+                <option>Other</option>
+              </select>
+            </label>
+
+            <label style={{ marginBottom: 16 }}>
+              Message
+              <textarea
+                required
+                minLength={20}
+                value={supportBody}
+                onChange={(e) => {
+                  setSupportBody(e.target.value);
+                  if (supportMessage) setSupportMessage("");
+                }}
+                placeholder="Describe your issue in as much detail as possible…"
+              />
+            </label>
+
+            <button type="submit" disabled={supportSending}>
+              {supportSending ? "Sending…" : "Send message"}
+            </button>
+
+            {supportMessage && (
+              <p style={{
+                marginTop: 12,
+                fontSize: 14,
+                color: supportMessage.startsWith("Message sent") ? "var(--accent)" : "#dc2626",
+              }}>
+                {supportMessage}
+              </p>
+            )}
+          </form>
         </div>
 
         {/* Actions */}

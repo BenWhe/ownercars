@@ -605,7 +605,8 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 }
 
 .advert-form input,
-.advert-form textarea {
+.advert-form textarea,
+.advert-form select {
   display: block;
   width: 100%;
   margin-top: 8px;
@@ -614,6 +615,8 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   padding: 16px;
   font-size: 16px;
   font-family: inherit;
+  background: white;
+  color: var(--text);
 }
 
 .advert-form textarea {
