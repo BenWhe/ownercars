@@ -2909,3 +2909,37 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   flex-basis: 100%;
   margin-left: 28px;
 }
+
+.advert-message-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.advert-message-form label {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.advert-message-form textarea {
+  min-height: 110px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px 16px;
+  font: inherit;
+  color: var(--text);
+  background: #fff;
+}
+
+.dashboard-message-alert {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 14px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--blue);
+  font-weight: 800;
+  padding: 10px 14px;
+  text-decoration: none;
+}

@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
-import { createClient } from "@/lib/supabase/client";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -24,7 +23,6 @@ function advertDisplayTitle(advert: any) {
 }
 
 export default function AdvertPage() {
-  const supabase = createClient();
   const params = useParams();
   const router = useRouter();
 
@@ -32,29 +30,23 @@ export default function AdvertPage() {
   const [advert, setAdvert] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [message, setMessage] = useState("Loading advert...");
+  const [sellerMessageBody, setSellerMessageBody] = useState("");
+  const [sellerMessageStatus, setSellerMessageStatus] = useState("");
   const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
     async function fetchAdvert() {
-      const { data, error } = await supabase
-        .from("adverts")
-        .select("*, advert_photos(*)")
-        .eq("id", params.id)
-        .eq("status", "published")
-        .maybeSingle();
+      const res = await fetch(`/api/public-adverts/${params.id}`);
+      const result = await res.json();
 
-      if (error) {
-        setMessage(error.message);
-      } else if (!data) {
-        setMessage("This advert isn’t live yet.");
-      } else {
-        const accountRes = await fetch("/api/account");
-        const accountResult = await accountRes.json();
-
-        setAdvert(data);
-        setCurrentUserId(accountResult.user?.id ?? null);
-        setMessage("");
+      if (!res.ok) {
+        setMessage(result.error || "This advert isn’t live yet.");
+        return;
       }
+
+      setAdvert(result.advert);
+      setCurrentUserId(result.userId ?? null);
+      setMessage("");
     }
 
     if (params.id) fetchAdvert();
@@ -84,55 +76,34 @@ export default function AdvertPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeIndex, advert]);
 
-  async function handleMessageSeller() {
-    const accountRes = await fetch("/api/account");
-    const accountResult = await accountRes.json();
-    const user = accountResult.user;
+  async function handleMessageSeller(e: React.FormEvent) {
+    e.preventDefault();
 
-    if (!user) {
-      router.push("/login");
+    const cleanBody = sellerMessageBody.trim();
+    if (!cleanBody || !advert?.id) return;
+
+    setSellerMessageStatus("Sending message...");
+
+    const res = await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ advertId: advert.id, body: cleanBody }),
+    });
+
+    const result = await res.json();
+
+    if (res.status === 401) {
+      router.push(`/login?next=/advert/${advert.id}`);
       return;
     }
 
-    if (!advert?.seller_id) {
-      alert("Seller details missing.");
+    if (!res.ok) {
+      setSellerMessageStatus(result.error || "Could not send message.");
       return;
     }
 
-    if (user.id === advert.seller_id) {
-      alert("You cannot message your own advert.");
-      return;
-    }
-
-    const { data: existing } = await supabase
-      .from("conversations")
-      .select("id")
-      .eq("advert_id", advert.id)
-      .eq("buyer_id", user.id)
-      .eq("seller_id", advert.seller_id)
-      .maybeSingle();
-
-    if (existing) {
-      router.push(`/messages/${existing.id}`);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("conversations")
-      .insert({
-        advert_id: advert.id,
-        buyer_id: user.id,
-        seller_id: advert.seller_id,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    router.push(`/messages/${data.id}`);
+    setSellerMessageBody("");
+    router.push(`/messages/${result.threadId}`);
   }
 
   if (message) {
@@ -208,14 +179,21 @@ export default function AdvertPage() {
               </span>
             </div>
 
-            <div className="advert-actions">
-              <button
-                className="secure-message-button"
-                onClick={handleMessageSeller}
-              >
-                Message seller
-              </button>
-            </div>
+            {!isAdvertOwner && (
+              <form className="advert-message-form" onSubmit={handleMessageSeller}>
+                <label htmlFor="seller-message">Message seller</label>
+                <textarea
+                  id="seller-message"
+                  value={sellerMessageBody}
+                  onChange={(e) => setSellerMessageBody(e.target.value)}
+                  placeholder="Ask about the car, viewing availability, or history..."
+                />
+                {sellerMessageStatus && <p className="message-notice">{sellerMessageStatus}</p>}
+                <button className="secure-message-button" type="submit" disabled={!sellerMessageBody.trim()}>
+                  Send message
+                </button>
+              </form>
+            )}
           </div>
 
           {isAdvertOwner && (

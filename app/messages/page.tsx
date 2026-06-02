@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -53,53 +52,20 @@ export default function MessagesPage() {
       return;
     }
 
-    const { conversations: data, userId: uid } = result;
-    setUserId(uid);
-
-    const conversationsWithMessages = (data || [])
-      .filter((conversation: any) => conversation.messages?.length > 0)
-      .map((conversation: any) => {
-        const sortedMessages = [...conversation.messages].sort(
-          (a: any, b: any) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        );
-
-        const lastMessage = sortedMessages[sortedMessages.length - 1];
-
-        const unreadCount = sortedMessages.filter(
-          (msg: any) => msg.sender_id !== uid && !msg.read_at
-        ).length;
-
-        return {
-          ...conversation,
-          lastMessage,
-          unreadCount,
-        };
-      });
-
-    setConversations(conversationsWithMessages);
+    setUserId(result.userId);
+    setConversations(result.conversations || []);
     setMessage("");
   }
 
   useEffect(() => {
-    const supabase = createClient();
-
     fetchConversations();
 
-    const channel = supabase
-      .channel("messages-inbox-updates")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "messages" },
-        () => {
-          fetchConversations();
-        }
-      )
-      .subscribe();
+    function refreshOnFocus() {
+      fetchConversations();
+    }
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    window.addEventListener("focus", refreshOnFocus);
+    return () => window.removeEventListener("focus", refreshOnFocus);
   }, []);
 
   return (
@@ -142,7 +108,7 @@ export default function MessagesPage() {
                     {conversation.lastMessage?.sender_id === userId
                       ? "You: "
                       : ""}
-                    {conversation.lastMessage?.message}
+                    {conversation.lastMessage?.body}
                   </p>
 
                   <p className="message-card-time">

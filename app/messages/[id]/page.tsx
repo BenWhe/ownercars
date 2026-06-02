@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -22,14 +21,6 @@ function advertTitle(advert: any) {
   )}`.trim();
 }
 
-function containsContactDetails(text: string) {
-  const phoneRegex = /(\+?\d[\d\s().-]{7,}\d)/;
-  const emailRegex = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
-  const whatsappRegex = /(whatsapp|wa\.me)/i;
-
-  return phoneRegex.test(text) || emailRegex.test(text) || whatsappRegex.test(text);
-}
-
 function formatMessageDate(value?: string) {
   if (!value) return "";
 
@@ -43,7 +34,6 @@ function formatMessageDate(value?: string) {
 }
 
 export default function MessageThreadPage() {
-  const supabase = createClient();
   const params = useParams();
   const conversationId = params.id as string;
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -53,21 +43,6 @@ export default function MessageThreadPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [body, setBody] = useState("");
   const [notice, setNotice] = useState("Loading conversation...");
-
-  const blockedContactDetails = containsContactDetails(body);
-
-  async function markIncomingAsRead(currentUserId: string) {
-    const { error } = await supabase
-      .from("messages")
-      .update({ read_at: new Date().toISOString() })
-      .eq("conversation_id", conversationId)
-      .neq("sender_id", currentUserId)
-      .is("read_at", null);
-
-    if (!error) {
-      window.dispatchEvent(new Event("ownercars:messages-read"));
-    }
-  }
 
   async function fetchThread() {
     const res = await fetch(`/api/messages/${conversationId}`);
@@ -93,32 +68,18 @@ export default function MessageThreadPage() {
     setConversation(result.conversation);
     setMessages(result.messages || []);
     setNotice("");
-
-    await markIncomingAsRead(result.userId);
+    window.dispatchEvent(new Event("ownercars:messages-read"));
   }
 
   useEffect(() => {
     fetchThread();
 
-    const channel = supabase
-      .channel(`message-thread-${conversationId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        () => {
-          fetchThread();
-        }
-      )
-      .subscribe();
+    function refreshOnFocus() {
+      fetchThread();
+    }
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    window.addEventListener("focus", refreshOnFocus);
+    return () => window.removeEventListener("focus", refreshOnFocus);
   }, [conversationId]);
 
   useEffect(() => {
@@ -129,49 +90,24 @@ export default function MessageThreadPage() {
     e.preventDefault();
 
     const cleanBody = body.trim();
-    if (!cleanBody || !conversation || blockedContactDetails) return;
+    if (!cleanBody || !conversation) return;
 
-    const { error } = await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      sender_id: userId,
-      message: cleanBody,
+    const res = await fetch(`/api/messages/${conversationId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: cleanBody }),
     });
 
-    if (error) {
-      setNotice(error.message);
+    const result = await res.json();
+
+    if (!res.ok) {
+      setNotice(result.error || "Could not send message.");
       return;
     }
-
-    await supabase
-      .from("conversations")
-      .update({ updated_at: new Date().toISOString() })
-      .eq("id", conversationId);
 
     setBody("");
     await fetchThread();
   }
-
-  useEffect(() => {
-    async function recordBlockedAttempt() {
-      const cleanBody = body.trim();
-
-      if (!blockedContactDetails || !conversation || cleanBody.length < 6) return;
-
-      await supabase.from("buyer_security_events").insert({
-        buyer_id: conversation.buyer_id,
-        seller_id: conversation.seller_id,
-        advert_id: conversation.advert_id,
-        conversation_id: conversation.id,
-        event_type: "off_platform_contact_attempt",
-        event_status: "recorded",
-        message_excerpt: cleanBody.slice(0, 180),
-      });
-    }
-
-    const timer = window.setTimeout(recordBlockedAttempt, 800);
-
-    return () => window.clearTimeout(timer);
-  }, [blockedContactDetails, body, conversation]);
 
   const advert = conversation?.adverts;
   const title = advertTitle(advert);
@@ -205,7 +141,7 @@ export default function MessageThreadPage() {
                 key={msg.id}
                 className={ownMessage ? "message-bubble own" : "message-bubble"}
               >
-                <p>{msg.message}</p>
+                <p>{msg.body}</p>
                 <time>{formatMessageDate(msg.created_at)}</time>
               </div>
             );
@@ -219,18 +155,9 @@ export default function MessageThreadPage() {
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Write a message..."
-            className={blockedContactDetails ? "message-input-warning" : ""}
           />
 
-          {blockedContactDetails && (
-            <p className="message-safety-warning">
-              For seller and buyer protection, phone numbers, email addresses and
-              WhatsApp links cannot be sent at this stage. Please continue the
-              conversation through OwnerCars.
-            </p>
-          )}
-
-          <button type="submit" disabled={!body.trim() || blockedContactDetails}>
+          <button type="submit" disabled={!body.trim()}>
             Send message
           </button>
         </form>
