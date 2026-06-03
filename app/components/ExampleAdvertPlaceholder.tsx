@@ -15,12 +15,13 @@ export default function ExampleAdvertPlaceholder({ className, style }: Props) {
         justifyContent: 'center',
         overflow: 'hidden',
         gap: '8px',
+        borderRadius: 'inherit',
         ...style,
       }}
     >
       <svg
         version="1.0"
-        viewBox="0 0 64 50"
+        viewBox="0 0 64 56"
         style={{ width: '52%', height: 'auto' }}
         xmlns="http://www.w3.org/2000/svg"
       >
