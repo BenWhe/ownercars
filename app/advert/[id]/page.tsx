@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
+import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -138,6 +139,12 @@ export default function AdvertPage() {
     <main>
       <section className="form-section">
         <div className="advert-form">
+          {advert.is_example && (
+            <div className="example-banner">
+              This is an example listing to show how OwnerCars works. It is not a real car for sale.
+            </div>
+          )}
+
           {advert.advert_photos?.[0]?.image_url ? (
             <img
               className="advert-photo-main-img"
@@ -146,6 +153,8 @@ export default function AdvertPage() {
               onClick={() => setActiveIndex(0)}
               style={{ cursor: "zoom-in" }}
             />
+          ) : advert.is_example ? (
+            <ExampleAdvertPlaceholder className="advert-photo-main" />
           ) : (
             <div className="advert-photo-main"></div>
           )}
@@ -166,6 +175,11 @@ export default function AdvertPage() {
 
           <div className="advert-heading-block">
             <p className="advert-kicker">Private seller advert</p>
+            {advert.is_example && (
+              <span className="example-badge" style={{ display: "inline-block", marginBottom: 10 }}>
+                Example listing
+              </span>
+            )}
 
             <h1 className="advert-title">{displayTitle}</h1>
 

@@ -247,6 +247,26 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   font-weight: 800;
 }
 
+.example-badge {
+  display: inline-flex;
+  background: #f0f0f0;
+  color: #666;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.example-banner {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
 .listing-card h2 {
   font-size: 22px;
   letter-spacing: -.04em;

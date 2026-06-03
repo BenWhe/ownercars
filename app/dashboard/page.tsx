@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DownloadForSaleCardButton } from "@/app/components/ForSaleCard";
 import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
+import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
 import { ADVERT_STATUS, sellerStatusLabel } from "@/lib/adverts/lifecycle";
 
 function statusVariant(status: string | null): string {
@@ -24,6 +25,7 @@ type DashboardAdvert = {
   gearbox: string | null;
   colour: string | null;
   status: string | null;
+  is_example?: boolean | null;
   advert_photos?: Array<{ image_url: string | null }>;
 };
 
@@ -119,6 +121,8 @@ export default function DashboardPage() {
                     src={ad.advert_photos[0].image_url}
                     alt={ad.title || "OwnerCars advert"}
                   />
+                ) : ad.is_example ? (
+                  <ExampleAdvertPlaceholder className="dashboard-photo" />
                 ) : (
                   <div className="dashboard-photo"></div>
                 )}

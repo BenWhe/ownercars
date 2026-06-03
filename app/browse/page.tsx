@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -353,6 +354,8 @@ export default function BrowsePage() {
                     src={ad.advert_photos[0].image_url}
                     alt={displayTitle}
                   />
+                ) : ad.is_example ? (
+                  <ExampleAdvertPlaceholder className="listing-photo" />
                 ) : (
                   <div className="listing-photo"></div>
                 )}
@@ -360,6 +363,9 @@ export default function BrowsePage() {
                 <div className="listing-body">
                   <div className="listing-topline">
                     <span className="seller-badge">Private seller</span>
+                    {ad.is_example && (
+                      <span className="example-badge">Example listing</span>
+                    )}
                   </div>
 
                   <h2>{displayTitle}</h2>
