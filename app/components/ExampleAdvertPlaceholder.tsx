@@ -18,7 +18,12 @@ export default function ExampleAdvertPlaceholder({ className, style }: Props) {
         ...style,
       }}
     >
-      <svg version="1.0" viewBox="0 0 64 64" style={{ width: '52%', height: 'auto' }} xmlns="http://www.w3.org/2000/svg">
+      <svg
+        version="1.0"
+        viewBox="0 0 64 50"
+        style={{ width: '52%', height: 'auto', colorScheme: 'only light' }}
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <g>
           <g>
             <path fill="#2563EB" d="M27,8h10c17.495,0,18,21.544,18,24h2c0-2.661-0.533-26-19-26H26C18.904,6,7,9.378,7,32h2C9,16.523,15.393,8,27,8z"/>
@@ -38,7 +43,7 @@ export default function ExampleAdvertPlaceholder({ className, style }: Props) {
             <path fill="#cccccc" d="M43.293,18.708c0.195,0.195,0.451,0.293,0.707,0.293s0.512-0.098,0.707-0.293c0.391-0.391,0.391-1.023,0-1.414l-2-2c-0.391-0.391-1.023-0.391-1.414,0s-0.391,1.023,0,1.414L43.293,18.708z"/>
             <path fill="#cccccc" d="M43.293,23.707C43.488,23.902,43.744,24,44,24s0.512-0.098,0.707-0.293c0.391-0.391,0.391-1.023,0-1.414l-7-7c-0.391-0.391-1.023-0.391-1.414,0s-0.391,1.023,0,1.414L43.293,23.707z"/>
           </g>
-<g>
+          <g>
             <circle fill="#e8f0fe" cx="11" cy="43" r="2"/>
             <circle fill="#e8f0fe" cx="53" cy="43" r="2"/>
           </g>
@@ -49,7 +54,7 @@ export default function ExampleAdvertPlaceholder({ className, style }: Props) {
           Owner<span style={{ color: '#2563EB' }}>Cars</span><span style={{ color: '#2563EB', fontWeight: 400, fontSize: '11px' }}>.co.uk</span>
         </span>
         <br/>
-        <span style={{ fontFamily: '-apple-system, sans-serif', fontSize: '9px', color: '#555555', letterSpacing: '1.5px' }}>EXAMPLE LISTING</span>
+        <span style={{ fontFamily: '-apple-system, sans-serif', fontSize: '9px', color: '#9ca3af', letterSpacing: '1.5px' }}>EXAMPLE LISTING</span>
       </div>
     </div>
   );
