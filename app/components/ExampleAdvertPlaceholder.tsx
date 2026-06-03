@@ -21,7 +21,7 @@ export default function ExampleAdvertPlaceholder({ className, style }: Props) {
     >
       <svg
         version="1.0"
-        viewBox="0 0 64 56"
+        viewBox="0 0 64 60"
         style={{ width: '52%', height: 'auto' }}
         xmlns="http://www.w3.org/2000/svg"
       >
