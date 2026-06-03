@@ -221,6 +221,7 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 }
 
 .listing-photo::after {
+  display: none;
   content: "";
   position: absolute;
   left: 50%;
@@ -346,6 +347,7 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 }
 
 .advert-photo-main::after {
+  display: none;
   content: "";
   position: absolute;
   left: 50%;
