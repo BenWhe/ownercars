@@ -14,7 +14,7 @@ export default function ExampleAdvertPlaceholder({ className, style }: Props) {
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        gap: '8px',
+        gap: '12px',
         borderRadius: 'inherit',
         ...style,
       }}
@@ -22,7 +22,7 @@ export default function ExampleAdvertPlaceholder({ className, style }: Props) {
       <svg
         version="1.0"
         viewBox="0 0 64 60"
-        style={{ width: '52%', height: 'auto' }}
+        style={{ width: '38%', height: 'auto' }}
         xmlns="http://www.w3.org/2000/svg"
       >
         <g>
@@ -49,12 +49,13 @@ export default function ExampleAdvertPlaceholder({ className, style }: Props) {
           </g>
         </g>
       </svg>
-      <div style={{ textAlign: 'center', lineHeight: 1.3 }}>
-        <span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontSize: '14px', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.2px' }}>
-          Owner<span style={{ color: '#2563EB' }}>Cars</span><span style={{ color: '#2563EB', fontWeight: 400, fontSize: '11px' }}>.co.uk</span>
-        </span>
-        <br/>
-        <span style={{ fontFamily: '-apple-system, sans-serif', fontSize: '9px', color: '#9ca3af', letterSpacing: '1.5px' }}>EXAMPLE LISTING</span>
+      <div style={{ textAlign: 'center', lineHeight: 1.4 }}>
+        <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontSize: '17px', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.3px' }}>
+          Owner<span style={{ color: '#2563EB' }}>Cars</span>
+        </div>
+        <div style={{ fontFamily: '-apple-system, sans-serif', fontSize: '9px', fontWeight: 500, color: '#6b7a8d', letterSpacing: '2px', marginTop: '2px' }}>
+          EXAMPLE LISTING
+        </div>
       </div>
     </div>
   );
