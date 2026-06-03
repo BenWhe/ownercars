@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -79,6 +80,11 @@ export default function HomePage() {
               className="hero-card-img"
               src={latestAdvert.advert_photos[0].image_url}
               alt={latestTitle || "Latest advert"}
+            />
+          ) : latestAdvert?.is_example ? (
+            <ExampleAdvertPlaceholder
+              className="hero-card-img"
+              style={{ borderRadius: "12px 12px 0 0" }}
             />
           ) : (
             <div className="mock-photo"></div>

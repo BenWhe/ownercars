@@ -14,6 +14,8 @@ export default function ExampleAdvertPlaceholder({
     <div
       className={className}
       style={{
+        width: "100%",
+        height: "100%",
         background: "#111111",
         display: "flex",
         flexDirection: "column",
@@ -26,7 +28,7 @@ export default function ExampleAdvertPlaceholder({
     >
       <span
         style={{
-          fontSize: 20,
+          fontSize: 24,
           fontWeight: 700,
           color: "#ffffff",
           fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -46,7 +48,7 @@ export default function ExampleAdvertPlaceholder({
 
       <span
         style={{
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: 600,
           color: "#555555",
           textTransform: "uppercase",
