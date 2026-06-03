@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
 
-  // ── Distinct makes for the filter dropdown ──────────────────────────────────
+  // ── Distinct makes ──────────────────────────────────────────────────────────
   if (searchParams.get("makes") === "1") {
     const { data, error } = await supabase
       .from("adverts")
@@ -40,12 +40,46 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ makes });
   }
 
+  // ── Distinct models for a given make ────────────────────────────────────────
+  if (searchParams.get("models") === "1") {
+    const make = searchParams.get("make")?.trim();
+    if (!make) {
+      return NextResponse.json({ models: [] });
+    }
+
+    const { data, error } = await supabase
+      .from("adverts")
+      .select("model")
+      .eq("status", "published")
+      .ilike("make", make)
+      .not("model", "is", null)
+      .order("model");
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    const models = [
+      ...new Set(
+        (data ?? [])
+          .map((r) => (r.model as string | null)?.trim())
+          .filter(Boolean)
+      ),
+    ].sort() as string[];
+
+    return NextResponse.json({ models });
+  }
+
   // ── Filtered advert list ────────────────────────────────────────────────────
   const make = searchParams.get("make")?.trim();
+  const model = searchParams.get("model")?.trim();
+  const bodyType = searchParams.get("bodyType")?.trim();
+  const fuelType = searchParams.get("fuelType")?.trim();
   const maxPrice = searchParams.get("maxPrice");
   const minPrice = searchParams.get("minPrice");
   const maxMileage = searchParams.get("maxMileage");
-  const fuelType = searchParams.get("fuelType")?.trim();
+  const colour = searchParams.get("colour")?.trim();
+  const minYear = searchParams.get("minYear");
 
   let query = supabase
     .from("adverts")
@@ -53,21 +87,15 @@ export async function GET(request: NextRequest) {
     .eq("status", "published")
     .order("published_at", { ascending: false });
 
-  if (make) {
-    query = query.ilike("make", make);
-  }
-  if (maxPrice) {
-    query = query.lte("price", Number(maxPrice));
-  }
-  if (minPrice) {
-    query = query.gte("price", Number(minPrice));
-  }
-  if (maxMileage) {
-    query = query.lte("mileage", Number(maxMileage));
-  }
-  if (fuelType) {
-    query = query.ilike("fuel_type", fuelType);
-  }
+  if (make) query = query.ilike("make", make);
+  if (model) query = query.ilike("model", model);
+  if (bodyType) query = query.ilike("body_type", bodyType);
+  if (fuelType) query = query.ilike("fuel_type", fuelType);
+  if (maxPrice) query = query.lte("price", Number(maxPrice));
+  if (minPrice) query = query.gte("price", Number(minPrice));
+  if (maxMileage) query = query.lte("mileage", Number(maxMileage));
+  if (colour) query = query.ilike("colour", colour);
+  if (minYear) query = query.gte("year", Number(minYear));
 
   const { data, error } = await query;
 

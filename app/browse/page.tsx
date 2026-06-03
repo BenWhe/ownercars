@@ -31,6 +31,8 @@ function priceParams(value: string): Record<string, string> {
   return { maxPrice: value };
 }
 
+// ── Static option lists ───────────────────────────────────────────────────────
+
 const PRICE_OPTIONS = [
   { value: "", label: "Any price" },
   { value: "2000", label: "Under £2,000" },
@@ -55,11 +57,61 @@ const FUEL_OPTIONS = [
   { value: "Hybrid", label: "Hybrid" },
 ];
 
-const EMPTY_FILTERS = { make: "", price: "", mileage: "", fuel: "" };
+const BODY_TYPE_OPTIONS = [
+  { value: "", label: "Any body type" },
+  { value: "Hatchback", label: "Hatchback" },
+  { value: "Saloon", label: "Saloon" },
+  { value: "SUV", label: "SUV" },
+  { value: "Estate", label: "Estate" },
+  { value: "Coupe", label: "Coupe" },
+  { value: "Convertible", label: "Convertible" },
+  { value: "MPV", label: "MPV" },
+  { value: "Van", label: "Van" },
+];
+
+const COLOUR_OPTIONS = [
+  { value: "", label: "Any colour" },
+  { value: "Black", label: "Black" },
+  { value: "White", label: "White" },
+  { value: "Silver", label: "Silver" },
+  { value: "Grey", label: "Grey" },
+  { value: "Blue", label: "Blue" },
+  { value: "Red", label: "Red" },
+  { value: "Green", label: "Green" },
+  { value: "Yellow", label: "Yellow" },
+  { value: "Orange", label: "Orange" },
+  { value: "Brown", label: "Brown" },
+];
+
+// Year from: current year down to 2000
+const THIS_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = [
+  { value: "", label: "Any year" },
+  ...Array.from({ length: THIS_YEAR - 2000 + 1 }, (_, i) => {
+    const year = THIS_YEAR - i;
+    return { value: String(year), label: String(year) };
+  }),
+];
+
+// ── Initial filter state ──────────────────────────────────────────────────────
+
+const EMPTY_FILTERS = {
+  make: "",
+  model: "",
+  bodyType: "",
+  fuel: "",
+  price: "",
+  mileage: "",
+  colour: "",
+  yearFrom: "",
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function BrowsePage() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [makes, setMakes] = useState<string[]>([]);
+  const [models, setModels] = useState<string[]>([]);
   const [adverts, setAdverts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -72,15 +124,31 @@ export default function BrowsePage() {
       .catch(() => {});
   }, []);
 
-  // Re-fetch adverts whenever filters change
+  // Fetch distinct models whenever the make filter changes
+  useEffect(() => {
+    if (!filters.make) {
+      setModels([]);
+      return;
+    }
+    fetch(`/api/browse?models=1&make=${encodeURIComponent(filters.make)}`)
+      .then((r) => r.json())
+      .then((d) => setModels(d.models ?? []))
+      .catch(() => setModels([]));
+  }, [filters.make]);
+
+  // Re-fetch adverts whenever any filter changes
   useEffect(() => {
     setLoading(true);
     setError("");
 
     const params = new URLSearchParams();
     if (filters.make) params.set("make", filters.make);
-    if (filters.mileage) params.set("maxMileage", filters.mileage);
+    if (filters.model) params.set("model", filters.model);
+    if (filters.bodyType) params.set("bodyType", filters.bodyType);
     if (filters.fuel) params.set("fuelType", filters.fuel);
+    if (filters.mileage) params.set("maxMileage", filters.mileage);
+    if (filters.colour) params.set("colour", filters.colour);
+    if (filters.yearFrom) params.set("minYear", filters.yearFrom);
 
     const pp = priceParams(filters.price);
     Object.entries(pp).forEach(([k, v]) => params.set(k, v));
@@ -118,11 +186,14 @@ export default function BrowsePage() {
         </p>
       </section>
 
-      {/* ── Filter bar ─────────────────────────────────────────────────────── */}
+      {/* ── Filter bar: Make → Model → Body type → Fuel → Price → Mileage → Colour → Year → Clear */}
       <div className="browse-filters">
+        {/* Make */}
         <select
           value={filters.make}
-          onChange={(e) => setFilters((f) => ({ ...f, make: e.target.value }))}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, make: e.target.value, model: "" }))
+          }
           aria-label="Filter by make"
         >
           <option value="">Any make</option>
@@ -133,6 +204,56 @@ export default function BrowsePage() {
           ))}
         </select>
 
+        {/* Model — depends on make */}
+        <select
+          value={filters.model}
+          onChange={(e) => setFilters((f) => ({ ...f, model: e.target.value }))}
+          disabled={!filters.make}
+          aria-label="Filter by model"
+        >
+          {!filters.make ? (
+            <option value="">Select a make first</option>
+          ) : (
+            <>
+              <option value="">Any model</option>
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {capitaliseWords(m)}
+                </option>
+              ))}
+            </>
+          )}
+        </select>
+
+        {/* Body type */}
+        <select
+          value={filters.bodyType}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, bodyType: e.target.value }))
+          }
+          aria-label="Filter by body type"
+        >
+          {BODY_TYPE_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        {/* Fuel type */}
+        <select
+          value={filters.fuel}
+          onChange={(e) => setFilters((f) => ({ ...f, fuel: e.target.value }))}
+          aria-label="Filter by fuel type"
+        >
+          {FUEL_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        {/* Max price */}
         <select
           value={filters.price}
           onChange={(e) => setFilters((f) => ({ ...f, price: e.target.value }))}
@@ -145,6 +266,7 @@ export default function BrowsePage() {
           ))}
         </select>
 
+        {/* Max mileage */}
         <select
           value={filters.mileage}
           onChange={(e) =>
@@ -159,12 +281,30 @@ export default function BrowsePage() {
           ))}
         </select>
 
+        {/* Colour */}
         <select
-          value={filters.fuel}
-          onChange={(e) => setFilters((f) => ({ ...f, fuel: e.target.value }))}
-          aria-label="Filter by fuel type"
+          value={filters.colour}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, colour: e.target.value }))
+          }
+          aria-label="Filter by colour"
         >
-          {FUEL_OPTIONS.map(({ value, label }) => (
+          {COLOUR_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        {/* Year from */}
+        <select
+          value={filters.yearFrom}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, yearFrom: e.target.value }))
+          }
+          aria-label="Filter by year from"
+        >
+          {YEAR_OPTIONS.map(({ value, label }) => (
             <option key={value} value={value}>
               {label}
             </option>
