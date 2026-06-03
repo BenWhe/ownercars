@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
@@ -15,10 +14,7 @@ function capitaliseWords(str?: string) {
 }
 
 export default function HomePage() {
-  const router = useRouter();
-
   const [latestAdvert, setLatestAdvert] = useState<any>(null);
-  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     async function fetchLatestAdvert() {
@@ -76,7 +72,7 @@ export default function HomePage() {
             <img
               className="hero-card-img"
               src={latestAdvert.advert_photos[0].image_url}
-              alt={latestAdvert.title}
+              alt={[latestAdvert.year, capitaliseWords(latestAdvert.make), capitaliseWords(latestAdvert.model)].filter(Boolean).join(" ")}
             />
           ) : (
             <div className="mock-photo"></div>
@@ -106,39 +102,6 @@ export default function HomePage() {
             </p>
           </div>
         </Link>
-      </section>
-
-      <section className="search-panel">
-        <div className="search-panel-inner">
-          <div className="search-panel-copy">
-            <p className="eyebrow">Search your way</p>
-            <h2>Find cars using natural language</h2>
-            <p className="search-helper">
-              Try “diesel SUV under 15000”, “5 doors petrol”, or “manual Porsche”.
-            </p>
-          </div>
-
-          <form
-            className="search-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-
-              const params = new URLSearchParams();
-              if (searchTerm) params.set("q", searchTerm);
-
-              router.push(`/browse?${params.toString()}`);
-            }}
-          >
-            <input
-              type="text"
-              placeholder='Try "diesel SUV under 15000"'
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-
-            <button type="submit">Search</button>
-          </form>
-        </div>
       </section>
 
       <section className="cards-section">
