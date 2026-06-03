@@ -14,8 +14,6 @@ export default function ExampleAdvertPlaceholder({
     <div
       className={className}
       style={{
-        width: "100%",
-        height: "100%",
         background: "#111111",
         display: "flex",
         flexDirection: "column",
