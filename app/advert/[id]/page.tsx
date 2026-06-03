@@ -141,7 +141,7 @@ export default function AdvertPage() {
         <div className="advert-form">
           {advert.is_example && (
             <div className="example-banner">
-              This is an example listing to show how OwnerCars works. It is not a real car for sale.
+              This is an example listing created to show how OwnerCars works. It is not a real car for sale.
             </div>
           )}
 

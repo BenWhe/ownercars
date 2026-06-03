@@ -19,29 +19,38 @@ export default function ExampleAdvertPlaceholder({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 6,
+        gap: 10,
         overflow: "hidden",
         ...style,
       }}
     >
       <span
         style={{
-          fontSize: 18,
-          fontWeight: 900,
-          letterSpacing: "-0.04em",
+          fontSize: 20,
+          fontWeight: 700,
           color: "#ffffff",
           fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         }}
       >
-        OwnerCars<span style={{ color: "#145cff" }}>.co.uk</span>
+        OwnerCars<span style={{ color: "#2563EB" }}>.co.uk</span>
       </span>
+
       <span
         style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: "#6b7280",
+          display: "block",
+          width: 48,
+          height: 1,
+          background: "#222222",
+        }}
+      />
+
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: "#555555",
           textTransform: "uppercase",
-          letterSpacing: "0.1em",
+          letterSpacing: "0.12em",
           fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         }}
       >
