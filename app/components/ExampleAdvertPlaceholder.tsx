@@ -8,7 +8,7 @@ export default function ExampleAdvertPlaceholder({ className, style }: Props) {
     <div
       className={className}
       style={{
-        background: '#f0f4ff',
+        background: '#2a2f3e',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -38,8 +38,8 @@ export default function ExampleAdvertPlaceholder({ className, style }: Props) {
             <path fill="none" stroke="#2563EB" strokeWidth="0.5" d="M43.293,23.707C43.488,23.902,43.744,24,44,24s0.512-0.098,0.707-0.293c0.391-0.391,0.391-1.023,0-1.414l-7-7c-0.391-0.391-1.023-0.391-1.414,0s-0.391,1.023,0,1.414L43.293,23.707z"/>
           </g>
           <g>
-            <rect x="8" y="54" fill="#3a5a6f" width="6" height="4"/>
-            <rect x="50" y="54" fill="#3a5a6f" width="6" height="4"/>
+            <rect x="8" y="54" fill="transparent" width="6" height="4"/>
+            <rect x="50" y="54" fill="transparent" width="6" height="4"/>
           </g>
           <g>
             <circle fill="#1e3a7a" cx="11" cy="43" r="2"/>
@@ -48,11 +48,11 @@ export default function ExampleAdvertPlaceholder({ className, style }: Props) {
         </g>
       </svg>
       <div style={{ textAlign: 'center', lineHeight: 1.3 }}>
-        <span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontSize: '16px', fontWeight: 700, color: '#111111', letterSpacing: '-0.2px' }}>
+        <span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontSize: '16px', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.2px' }}>
           Owner<span style={{ color: '#2563EB' }}>Cars</span><span style={{ color: '#2563EB', fontWeight: 400, fontSize: '11px' }}>.co.uk</span>
         </span>
         <br/>
-        <span style={{ fontFamily: '-apple-system, sans-serif', fontSize: '11px', color: '#888888', letterSpacing: '1.5px' }}>EXAMPLE LISTING</span>
+        <span style={{ fontFamily: '-apple-system, sans-serif', fontSize: '11px', color: '#555555', letterSpacing: '1.5px' }}>EXAMPLE LISTING</span>
       </div>
     </div>
   );
