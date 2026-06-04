@@ -1,9 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -19,156 +18,323 @@ function advertDisplayTitle(ad: any) {
   const title = `${ad.year || ""} ${capitaliseWords(ad.make)} ${capitaliseWords(
     ad.model
   )}`.trim();
-
   return title || ad.title || "Private car advert";
 }
 
-function parseSearch(query: string) {
-  const q = query.toLowerCase();
-
-  const filters: any = {
-    priceMax: null,
-    fuelType: null,
-    gearbox: null,
-    bodyType: null,
-    doors: null,
-    seats: null,
-  };
-
-  const priceMatch =
-    q.match(/under\s*£?\s*(\d+)/) ||
-    q.match(/below\s*£?\s*(\d+)/) ||
-    q.match(/up to\s*£?\s*(\d+)/);
-
-  if (priceMatch) filters.priceMax = Number(priceMatch[1]);
-
-  if (q.includes("petrol")) filters.fuelType = "Petrol";
-  if (q.includes("diesel")) filters.fuelType = "Diesel";
-  if (q.includes("electric") || q.includes("ev")) filters.fuelType = "Electric";
-  if (q.includes("hybrid")) filters.fuelType = "Hybrid";
-
-  if (q.includes("manual")) filters.gearbox = "Manual";
-  if (q.includes("automatic") || q.includes("auto")) filters.gearbox = "Automatic";
-
-  if (q.includes("suv") || q.includes("4x4")) filters.bodyType = "SUV";
-  if (q.includes("hatchback")) filters.bodyType = "Hatchback";
-  if (q.includes("saloon")) filters.bodyType = "Saloon";
-  if (q.includes("estate")) filters.bodyType = "Estate";
-  if (q.includes("coupe")) filters.bodyType = "Coupe";
-  if (q.includes("convertible")) filters.bodyType = "Convertible";
-
-  const doorMatch = q.match(/(\d+)\s*door/);
-  if (doorMatch) filters.doors = Number(doorMatch[1]);
-
-  const seatMatch = q.match(/(\d+)\s*seat/);
-  if (seatMatch) filters.seats = Number(seatMatch[1]);
-
-  return filters;
+// Maps the price dropdown value to { minPrice?, maxPrice? } params
+function priceParams(value: string): Record<string, string> {
+  if (!value) return {};
+  if (value === "over-20000") return { minPrice: "20000" };
+  if (value.includes("-")) {
+    const [min, max] = value.split("-");
+    return { minPrice: min, maxPrice: max };
+  }
+  return { maxPrice: value };
 }
 
-function BrowseContent() {
-  const searchParams = useSearchParams();
-  const query = searchParams.get("q") || "";
+// ── Static option lists ───────────────────────────────────────────────────────
 
+const PRICE_OPTIONS = [
+  { value: "", label: "Any price" },
+  { value: "2000", label: "Under £2,000" },
+  { value: "2000-5000", label: "£2,000–£5,000" },
+  { value: "5000-10000", label: "£5,000–£10,000" },
+  { value: "10000-20000", label: "£10,000–£20,000" },
+  { value: "over-20000", label: "Over £20,000" },
+];
+
+const MILEAGE_OPTIONS = [
+  { value: "", label: "Any mileage" },
+  { value: "20000", label: "Under 20,000" },
+  { value: "50000", label: "Under 50,000" },
+  { value: "100000", label: "Under 100,000" },
+];
+
+const FUEL_OPTIONS = [
+  { value: "", label: "Any fuel" },
+  { value: "Petrol", label: "Petrol" },
+  { value: "Diesel", label: "Diesel" },
+  { value: "Electric", label: "Electric" },
+  { value: "Hybrid", label: "Hybrid" },
+];
+
+const BODY_TYPE_OPTIONS = [
+  { value: "", label: "Any body type" },
+  { value: "Hatchback", label: "Hatchback" },
+  { value: "Saloon", label: "Saloon" },
+  { value: "SUV", label: "SUV" },
+  { value: "Estate", label: "Estate" },
+  { value: "Coupe", label: "Coupe" },
+  { value: "Convertible", label: "Convertible" },
+  { value: "MPV", label: "MPV" },
+  { value: "Van", label: "Van" },
+];
+
+const COLOUR_OPTIONS = [
+  { value: "", label: "Any colour" },
+  { value: "Black", label: "Black" },
+  { value: "White", label: "White" },
+  { value: "Silver", label: "Silver" },
+  { value: "Grey", label: "Grey" },
+  { value: "Blue", label: "Blue" },
+  { value: "Red", label: "Red" },
+  { value: "Green", label: "Green" },
+  { value: "Yellow", label: "Yellow" },
+  { value: "Orange", label: "Orange" },
+  { value: "Brown", label: "Brown" },
+];
+
+// Year from: current year down to 2000
+const THIS_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = [
+  { value: "", label: "Any year" },
+  ...Array.from({ length: THIS_YEAR - 2000 + 1 }, (_, i) => {
+    const year = THIS_YEAR - i;
+    return { value: String(year), label: String(year) };
+  }),
+];
+
+// ── Initial filter state ──────────────────────────────────────────────────────
+
+const EMPTY_FILTERS = {
+  make: "",
+  model: "",
+  bodyType: "",
+  fuel: "",
+  price: "",
+  mileage: "",
+  colour: "",
+  yearFrom: "",
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function BrowsePage() {
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [makes, setMakes] = useState<string[]>([]);
+  const [models, setModels] = useState<string[]>([]);
   const [adverts, setAdverts] = useState<any[]>([]);
-  const [message, setMessage] = useState("Loading cars...");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
+  // Fetch distinct makes once on mount
   useEffect(() => {
-    async function fetchAdverts() {
-      const supabase = createClient();
+    fetch("/api/browse?makes=1")
+      .then((r) => r.json())
+      .then((d) => setMakes(d.makes ?? []))
+      .catch(() => {});
+  }, []);
 
-      const { data, error } = await supabase
-        .from("adverts")
-        .select("*, advert_photos(*)")
-        .eq("status", "published")
-        .order("published_at", { ascending: false });
-
-      if (error) {
-        setMessage(error.message);
-        return;
-      }
-
-      let filtered = data || [];
-
-      if (query) {
-        const filters = parseSearch(query);
-
-        filtered = filtered.filter((ad: any) => {
-          const searchableText = `
-            ${ad.make || ""}
-            ${ad.model || ""}
-            ${ad.title || ""}
-            ${ad.body_type || ""}
-            ${ad.fuel_type || ""}
-            ${ad.gearbox || ""}
-            ${ad.description || ""}
-          `.toLowerCase();
-
-          if (filters.priceMax && Number(ad.price) > filters.priceMax) return false;
-          if (filters.fuelType && ad.fuel_type !== filters.fuelType) return false;
-          if (filters.gearbox && ad.gearbox !== filters.gearbox) return false;
-          if (filters.bodyType && ad.body_type !== filters.bodyType) return false;
-          if (filters.doors && Number(ad.doors) !== filters.doors) return false;
-          if (filters.seats && Number(ad.seats) !== filters.seats) return false;
-
-          const cleanedQuery = query
-            .toLowerCase()
-            .replace(/under\s*£?\s*\d+/g, "")
-            .replace(/below\s*£?\s*\d+/g, "")
-            .replace(/up to\s*£?\s*\d+/g, "")
-            .replace(/petrol|diesel|electric|ev|hybrid/g, "")
-            .replace(/manual|automatic|auto/g, "")
-            .replace(/suv|4x4|hatchback|saloon|estate|coupe|convertible/g, "")
-            .replace(/\d+\s*door/g, "")
-            .replace(/\d+\s*seat/g, "")
-            .trim();
-
-          if (cleanedQuery && !searchableText.includes(cleanedQuery)) {
-            return false;
-          }
-
-          return true;
-        });
-      }
-
-      setAdverts(filtered);
-      setMessage("");
+  // Fetch distinct models whenever the make filter changes
+  useEffect(() => {
+    if (!filters.make) {
+      setModels([]);
+      return;
     }
+    fetch(`/api/browse?models=1&make=${encodeURIComponent(filters.make)}`)
+      .then((r) => r.json())
+      .then((d) => setModels(d.models ?? []))
+      .catch(() => setModels([]));
+  }, [filters.make]);
 
-    fetchAdverts();
-  }, [query]);
+  // Re-fetch adverts whenever any filter changes
+  useEffect(() => {
+    setLoading(true);
+    setError("");
+
+    const params = new URLSearchParams();
+    if (filters.make) params.set("make", filters.make);
+    if (filters.model) params.set("model", filters.model);
+    if (filters.bodyType) params.set("bodyType", filters.bodyType);
+    if (filters.fuel) params.set("fuelType", filters.fuel);
+    if (filters.mileage) params.set("maxMileage", filters.mileage);
+    if (filters.colour) params.set("colour", filters.colour);
+    if (filters.yearFrom) params.set("minYear", filters.yearFrom);
+
+    const pp = priceParams(filters.price);
+    Object.entries(pp).forEach(([k, v]) => params.set(k, v));
+
+    fetch(`/api/browse?${params}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) {
+          setError(d.error);
+        } else {
+          setAdverts(d.adverts ?? []);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Could not load adverts.");
+        setLoading(false);
+      });
+  }, [filters]);
+
+  function clearFilters() {
+    setFilters(EMPTY_FILTERS);
+  }
+
+  const hasActiveFilters = Object.values(filters).some(Boolean);
 
   return (
-    <>
+    <main>
       <section className="browse-hero">
         <p className="eyebrow">Private cars only</p>
         <h1>Latest adverts</h1>
         <p>
-          Search cars listed by private owners. Seller details stay protected and
-          buyer messages go through OwnerCars.
+          Filter cars listed by private owners. Seller details stay protected
+          and buyer messages go through OwnerCars.
         </p>
       </section>
 
-      <section className="browse-search">
-        <input type="text" placeholder='Try "diesel SUV under 15000"' />
-        <button type="button">Search</button>
-      </section>
+      {/* ── Filter bar: Make → Model → Body type → Fuel → Price → Mileage → Colour → Year → Clear */}
+      <div className="browse-filters">
+        {/* Make */}
+        <select
+          value={filters.make}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, make: e.target.value, model: "" }))
+          }
+          aria-label="Filter by make"
+        >
+          <option value="">Any make</option>
+          {makes.map((m) => (
+            <option key={m} value={m}>
+              {capitaliseWords(m)}
+            </option>
+          ))}
+        </select>
 
+        {/* Model — depends on make */}
+        <select
+          value={filters.model}
+          onChange={(e) => setFilters((f) => ({ ...f, model: e.target.value }))}
+          disabled={!filters.make}
+          aria-label="Filter by model"
+        >
+          {!filters.make ? (
+            <option value="">Select a make first</option>
+          ) : (
+            <>
+              <option value="">Any model</option>
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {capitaliseWords(m)}
+                </option>
+              ))}
+            </>
+          )}
+        </select>
+
+        {/* Body type */}
+        <select
+          value={filters.bodyType}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, bodyType: e.target.value }))
+          }
+          aria-label="Filter by body type"
+        >
+          {BODY_TYPE_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        {/* Fuel type */}
+        <select
+          value={filters.fuel}
+          onChange={(e) => setFilters((f) => ({ ...f, fuel: e.target.value }))}
+          aria-label="Filter by fuel type"
+        >
+          {FUEL_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        {/* Max price */}
+        <select
+          value={filters.price}
+          onChange={(e) => setFilters((f) => ({ ...f, price: e.target.value }))}
+          aria-label="Filter by price"
+        >
+          {PRICE_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        {/* Max mileage */}
+        <select
+          value={filters.mileage}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, mileage: e.target.value }))
+          }
+          aria-label="Filter by mileage"
+        >
+          {MILEAGE_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        {/* Colour */}
+        <select
+          value={filters.colour}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, colour: e.target.value }))
+          }
+          aria-label="Filter by colour"
+        >
+          {COLOUR_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        {/* Year from */}
+        <select
+          value={filters.yearFrom}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, yearFrom: e.target.value }))
+          }
+          aria-label="Filter by year from"
+        >
+          {YEAR_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            className="browse-filters-clear"
+            onClick={clearFilters}
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {/* ── Listing grid ───────────────────────────────────────────────────── */}
       <section className="listing-section">
-        {message && <p>{message}</p>}
+        {loading && <p>Loading cars…</p>}
+        {!loading && error && <p>{error}</p>}
 
-        {!message && query && (
-          <p className="interpreted-search">
-            Showing results for: <strong>{query}</strong>
-          </p>
+        {!loading && !error && adverts.length === 0 && (
+          <p>No adverts match your filters.</p>
         )}
 
-        {!message && adverts.length === 0 && <p>No cars listed yet.</p>}
-
-        {!message && (
+        {!loading && !error && adverts.length > 0 && (
           <p style={{ color: "var(--muted)", marginBottom: "20px" }}>
-            Showing {adverts.length} private car
-            {adverts.length === 1 ? "" : "s"}
+            Showing {adverts.length} private car{adverts.length === 1 ? "" : "s"}
           </p>
         )}
 
@@ -188,6 +354,8 @@ function BrowseContent() {
                     src={ad.advert_photos[0].image_url}
                     alt={displayTitle}
                   />
+                ) : ad.is_example ? (
+                  <ExampleAdvertPlaceholder className="listing-photo" />
                 ) : (
                   <div className="listing-photo"></div>
                 )}
@@ -195,6 +363,9 @@ function BrowseContent() {
                 <div className="listing-body">
                   <div className="listing-topline">
                     <span className="seller-badge">Private seller</span>
+                    {ad.is_example && (
+                      <span className="example-badge">Example listing</span>
+                    )}
                   </div>
 
                   <h2>{displayTitle}</h2>
@@ -215,16 +386,6 @@ function BrowseContent() {
           })}
         </div>
       </section>
-    </>
-  );
-}
-
-export default function BrowsePage() {
-  return (
-    <main>
-      <Suspense fallback={<p style={{ padding: "80px" }}>Loading cars...</p>}>
-        <BrowseContent />
-      </Suspense>
     </main>
   );
 }

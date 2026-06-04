@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -33,6 +34,12 @@ export default function HomePage() {
 
     fetchLatestAdvert();
   }, []);
+
+  const latestTitle = latestAdvert
+    ? [latestAdvert.year, capitaliseWords(latestAdvert.make), capitaliseWords(latestAdvert.model)]
+        .filter(Boolean)
+        .join(" ")
+    : null;
 
   return (
     <main>
@@ -74,6 +81,11 @@ export default function HomePage() {
               src={latestAdvert.advert_photos[0].image_url}
               alt={[latestAdvert.year, capitaliseWords(latestAdvert.make), capitaliseWords(latestAdvert.model)].filter(Boolean).join(" ")}
             />
+          ) : latestAdvert?.is_example ? (
+            <ExampleAdvertPlaceholder
+              className="hero-card-img"
+              style={{ borderRadius: "12px 12px 0 0" }}
+            />
           ) : (
             <div className="mock-photo"></div>
           )}
@@ -82,11 +94,7 @@ export default function HomePage() {
             <span className="latest-badge">Latest advert</span>
 
             <p className="mock-title">
-              {latestAdvert
-                ? `${latestAdvert.year} ${capitaliseWords(
-                    latestAdvert.make
-                  )} ${capitaliseWords(latestAdvert.model)}`
-                : "Latest private advert"}
+              {latestTitle || "Latest private advert"}
             </p>
 
             <p className="mock-price">
