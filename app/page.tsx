@@ -79,7 +79,7 @@ export default function HomePage() {
             <img
               className="hero-card-img"
               src={latestAdvert.advert_photos[0].image_url}
-              alt={latestTitle || "Latest advert"}
+              alt={[latestAdvert.year, capitaliseWords(latestAdvert.make), capitaliseWords(latestAdvert.model)].filter(Boolean).join(" ")}
             />
           ) : latestAdvert?.is_example ? (
             <ExampleAdvertPlaceholder
