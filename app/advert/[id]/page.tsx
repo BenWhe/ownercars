@@ -31,6 +31,7 @@ export default function AdvertPage() {
   const [advert, setAdvert] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [message, setMessage] = useState("Loading advert...");
+  const [loading, setLoading] = useState(true);
   const [sellerMessageBody, setSellerMessageBody] = useState("");
   const [sellerMessageStatus, setSellerMessageStatus] = useState("");
   const touchStartX = useRef<number | null>(null);
@@ -42,12 +43,14 @@ export default function AdvertPage() {
 
       if (!res.ok) {
         setMessage(result.error || "This advert isn’t live yet.");
+        setLoading(false);
         return;
       }
 
       setAdvert(result.advert);
       setCurrentUserId(result.userId ?? null);
       setMessage("");
+      setLoading(false);
     }
 
     if (params.id) fetchAdvert();
@@ -109,6 +112,10 @@ export default function AdvertPage() {
 
     setSellerMessageBody("");
     router.push(`/messages/${result.threadId}`);
+  }
+
+  if (loading) {
+    return null;
   }
 
   if (message) {
