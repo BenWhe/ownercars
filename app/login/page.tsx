@@ -194,6 +194,13 @@ export default function LoginPage() {
                 />
               </label>
 
+              <a
+                href="/forgot-password"
+                style={{ fontSize: "0.85rem", color: "var(--color-muted, #888)", textDecoration: "none", textAlign: "right", display: "block", marginBottom: "4px" }}
+              >
+                Forgot password?
+              </a>
+
               <button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Signing in..." : "Sign in"}
               </button>
