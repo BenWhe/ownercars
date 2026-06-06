@@ -1,4 +1,4 @@
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Server configuration error." }, { status: 500 });
     }
 
-    const supabase = createBrowserClient(supabaseUrl, anonKey);
+    const supabase = createClient(supabaseUrl, anonKey);
 
     const { error: sessionError } = await supabase.auth.setSession({
       access_token,
@@ -34,7 +34,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error("update-password error:", err);
     return NextResponse.json({ error: "An unexpected error occurred." }, { status: 500 });
   }
 }
