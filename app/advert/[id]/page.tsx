@@ -161,7 +161,10 @@ export default function AdvertPage() {
               className="advert-photo-main-img"
               src={advert.advert_photos[0].image_url}
               alt={displayTitle}
-              onClick={() => setActiveIndex(0)}
+              onClick={() => {
+                touchStartX.current = null;
+                setActiveIndex(0);
+              }}
               style={{ cursor: "zoom-in" }}
             />
           ) : advert.is_example ? (
@@ -304,7 +307,7 @@ export default function AdvertPage() {
             const touchEndX = e.changedTouches[0].clientX;
             const diff = touchStartX.current - touchEndX;
 
-            if (Math.abs(diff) > 50) {
+            if (Math.abs(diff) > 80) {
               if (diff > 0) {
                 setActiveIndex((activeIndex + 1) % advert.advert_photos.length);
               } else {
