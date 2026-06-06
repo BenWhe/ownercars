@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -45,6 +46,12 @@ export default function ResetPasswordPage() {
 
     if (result.success) {
       setMessage("Password updated. Taking you to your account...");
+
+      if (result.email) {
+        const supabase = createClient();
+        await supabase.auth.signInWithPassword({ email: result.email, password });
+      }
+
       setTimeout(() => {
         window.location.replace("/account");
       }, 1200);

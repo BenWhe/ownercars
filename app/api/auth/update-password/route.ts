@@ -27,13 +27,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: sessionError.message }, { status: 400 });
     }
 
+    const { data: { user } } = await supabase.auth.getUser();
+    const email = user?.email;
+
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, email });
   } catch (err) {
     console.error("update-password error:", err);
     return NextResponse.json({ error: "An unexpected error occurred." }, { status: 500 });
