@@ -45,10 +45,10 @@ export default function HomePage() {
     <main>
       <section className="hero">
         <div className="hero-content">
-          <p className="eyebrow">Private cars. Private sellers. One simple price.</p>
-          <h1>Sell your car privately for less</h1>
+          <p className="eyebrow">PRIVATE CARS. PRIVATE SELLERS. PRIVACY SECURED.</p>
+          <h1>Sell your car privately. Keep your details private too.</h1>
 
-          <span className="price-badge">Launch offer</span>
+          <span className="price-badge">🔒 Launch price — rising to £9.99</span>
 
           <h2 className="price-hero">
             <span className="price-old">£9.99</span>
@@ -56,9 +56,7 @@ export default function HomePage() {
           </h2>
 
           <p className="hero-subtitle">
-            Launch offer: advertise until sold for £2.50, create advert and
-            interact with buyers through the platform to keep your phone number
-            and email safe.
+            Other platforms expose your phone number the moment you call a buyer back. Service history, MOT certificates, walk-around videos? Every other platform pushes you to WhatsApp. OwnerCars keeps everything on-platform — from first message to final paperwork.
           </p>
 
           <div className="hero-actions">
@@ -112,6 +110,10 @@ export default function HomePage() {
         </Link>
       </section>
 
+      <section className="trust-strip">
+        <p>No phone number shown · No address exposed · Documents shared securely on-platform · No ongoing charges</p>
+      </section>
+
       <section className="cards-section">
         <div className="section-heading">
           <p className="eyebrow">Why OwnerCars?</p>
@@ -120,28 +122,39 @@ export default function HomePage() {
 
         <div className="feature-grid">
           <article className="feature-card">
-            <h3>£2.50 launch price</h3>
+            <h3>Your details, your rules</h3>
             <p>
-              Advertise until sold for £2.50. No upgrade pressure or complicated
-              package choices.
+              Your phone number, home address and vehicle registration are never shown publicly. Buyers message you through OwnerCars. You decide when — and to whom — you share anything further.
             </p>
           </article>
 
           <article className="feature-card">
-            <h3>Advertise until sold</h3>
+            <h3>What this really means</h3>
             <p>
-              Your advert stays live while the car is available, with periodic
-              checks to keep listings fresh.
+              When a buyer requests your service history or MOT certificate, we log it. A buyer repeatedly requesting documents from multiple sellers without purchasing gets flagged and acted upon. Document harvesting — one of the most common scams in private car sales — doesn&apos;t happen here. This only exists at OwnerCars.
             </p>
           </article>
 
           <article className="feature-card">
-            <h3>Contact details protected</h3>
+            <h3>One price. No surprises.</h3>
             <p>
-              Buyer enquiries are handled through the platform so sellers do not
-              need to expose their email or phone number.
+              AutoTrader&apos;s Ultimate package costs £97.50. PistonHeads charges £34.99 every 30 days — over £100 if your car takes three months to sell. OwnerCars is £9.99, once, until your car sells. Six months or six days, the price is the same.
             </p>
           </article>
+
+          <article className="feature-card feature-card--full">
+            <h3>Private sellers only.</h3>
+            <p>No dealers. No trade listings. Every car on OwnerCars is from a private individual — which means genuine buyers, not forecourt browsers.</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="vault-teaser">
+        <div className="section-heading">
+          <p className="eyebrow">THE OWNERCARS SECURE VAULT</p>
+          <h2>Share the details that matter — with the buyers who&apos;ve earned them</h2>
+          <p>Service history, MOT certificates, V5C, walk-around video. Every other platform asks you to send these over WhatsApp to someone you&apos;ve never met. OwnerCars gives you a secure, on-platform vault. You control who sees what. Every access is logged. You can revoke it at any time. Your documents never leave OwnerCars.</p>
+          <Link className="button primary" href="/seller-protection">See how the vault works</Link>
         </div>
       </section>
 
@@ -192,8 +205,8 @@ export default function HomePage() {
       </section>
 
       <section className="cta-band">
-        <h2>Ready to sell your car privately?</h2>
-        <p>Create your advert for £2.50 and keep your seller details protected.</p>
+        <h2>Launch price: £2.50 until sold. Rising to £9.99.</h2>
+        <p>Join the private sellers who are selling smarter.</p>
         <Link className="button light" href="/create-advert">
           Start your advert
         </Link>
