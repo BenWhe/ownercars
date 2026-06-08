@@ -117,6 +117,8 @@ export default function BrowsePage() {
 
   // DIAGNOSTIC — logs every render of postcode state
   console.log("[postcode render]", { mounted, postcodeInput, buyerTown });
+  // DIAGNOSTIC — logs what the postcode JSX section will render
+  console.log("[postcode JSX]", { mounted, postcodeInput, buyerTown, rendering: mounted ? (buyerTown ? "chip" : "input") : "hidden" });
 
   // On mount: try to load postcode from logged-in profile, then localStorage
   useEffect(() => {
@@ -361,7 +363,6 @@ export default function BrowsePage() {
         </select>
 
         {/* Postcode / location — only render after client has read localStorage */}
-        {/* DIAGNOSTIC */ console.log("[postcode JSX]", { mounted, postcodeInput, buyerTown, rendering: mounted ? (buyerTown ? "chip" : "input") : "hidden" })}
         {mounted && (
           buyerTown ? (
             <button type="button" className="browse-postcode-active" onClick={clearPostcode}>
