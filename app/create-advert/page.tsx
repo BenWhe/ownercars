@@ -586,7 +586,7 @@ export default function CreateAdvertPage() {
               placeholder="e.g. DT6 3NP"
               maxLength={8}
             />
-            <p className="field-hint">Never shown publicly — we display nearest town only.</p>
+            <p className="field-hint">Your postcode is never visible on the platform. We display nearest town only.</p>
             {postcodeError && <p className="field-error" role="alert">{postcodeError}</p>}
           </label>
 
