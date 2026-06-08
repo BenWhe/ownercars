@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
     .upload(filePath, new Uint8Array(arrayBuffer), { contentType: file.type, upsert: true });
 
   if (uploadError) {
+    console.error("Vault upload error:", uploadError);
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 
