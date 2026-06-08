@@ -115,67 +115,46 @@ export default function BrowsePage() {
   const [mounted, setMounted] = useState(false);
   const [postcodeError, setPostcodeError] = useState("");
 
-  // DIAGNOSTIC — logs every render of postcode state
-  console.log("[postcode render]", { mounted, postcodeInput, buyerTown });
-  // DIAGNOSTIC — logs what the postcode JSX section will render
-  console.log("[postcode JSX]", { mounted, postcodeInput, buyerTown, rendering: mounted ? (buyerTown ? "chip" : "input") : "hidden" });
-
   // On mount: try to load postcode from logged-in profile, then localStorage
   useEffect(() => {
     async function loadBuyerLocation() {
       const storedPostcode = localStorage.getItem("buyer_postcode") ?? "";
       const storedTown = localStorage.getItem("buyer_town") ?? "";
-      console.log("[loadBuyerLocation] localStorage read:", { storedPostcode, storedTown });
-
-      console.log("[loadBuyerLocation] calling setPostcodeInput:", storedPostcode);
       setPostcodeInput(storedPostcode);
-      console.log("[loadBuyerLocation] calling setBuyerTown:", storedTown);
       setBuyerTown(storedTown);
-      console.log("[loadBuyerLocation] calling setMounted(true)");
       setMounted(true);
 
       // Try profile first
-      console.log("[loadBuyerLocation] awaiting /api/account...");
       const accountRes = await fetch("/api/account");
-      console.log("[loadBuyerLocation] /api/account response ok:", accountRes.ok);
       if (accountRes.ok) {
         const accountResult = await accountRes.json();
-        console.log("[loadBuyerLocation] profile from API:", accountResult.profile);
         if (accountResult.profile?.latitude && accountResult.profile?.longitude) {
-          console.log("[loadBuyerLocation] profile has lat/lng — calling setPostcodeInput:", accountResult.profile.postcode ?? "");
           setBuyerLat(accountResult.profile.latitude);
           setBuyerLng(accountResult.profile.longitude);
           setPostcodeInput(accountResult.profile.postcode ?? "");
           const storedTown2 = localStorage.getItem("buyer_town") ?? "";
-          console.log("[loadBuyerLocation] storedTown2 for geocode check:", storedTown2);
           if (!storedTown2 && accountResult.profile.postcode) {
-            console.log("[loadBuyerLocation] no stored town, geocoding profile postcode...");
             const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(accountResult.profile.postcode)}`);
             if (geoRes.ok) {
               const geoResult = await geoRes.json();
-              console.log("[loadBuyerLocation] geocode result nearest_town:", geoResult.nearest_town);
               setBuyerTown(geoResult.nearest_town ?? "");
+              localStorage.setItem("buyer_postcode", accountResult.profile.postcode);
               localStorage.setItem("buyer_town", geoResult.nearest_town ?? "");
             }
           }
-          console.log("[loadBuyerLocation] returning from profile path");
           return;
         }
       }
       // Fall back to localStorage
       const stored = localStorage.getItem("buyer_postcode");
-      console.log("[loadBuyerLocation] localStorage fallback path, stored:", stored);
       if (stored) {
-        console.log("[loadBuyerLocation] fallback: calling setPostcodeInput:", stored);
         setPostcodeInput(stored);
         const storedTown3 = localStorage.getItem("buyer_town") ?? "";
-        console.log("[loadBuyerLocation] fallback: calling setBuyerTown:", storedTown3);
         setBuyerTown(storedTown3);
-        console.log("[loadBuyerLocation] fallback: geocoding for lat/lng...");
+        // Geocode silently for lat/lng (needed for distance calculation)
         const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(stored)}`);
         if (geoRes.ok) {
           const geoResult = await geoRes.json();
-          console.log("[loadBuyerLocation] fallback: geocode lat/lng:", geoResult.latitude, geoResult.longitude);
           setBuyerLat(geoResult.latitude);
           setBuyerLng(geoResult.longitude);
         }
@@ -307,7 +286,6 @@ export default function BrowsePage() {
       </section>
 
       <div className="browse-filters">
-        {/* Make */}
         <select
           value={filters.make}
           onChange={(e) => setFilters((f) => ({ ...f, make: e.target.value, model: "" }))}
@@ -319,7 +297,6 @@ export default function BrowsePage() {
           ))}
         </select>
 
-        {/* Model */}
         <select
           value={filters.model}
           onChange={(e) => setFilters((f) => ({ ...f, model: e.target.value }))}
