@@ -105,9 +105,9 @@ export default function AccountPage() {
 
             {/* Postcode */}
             <div className="account-card">
-              <p className="eyebrow" style={{ marginBottom: "6px" }}>Your postcode</p>
+              <p className="eyebrow" style={{ marginBottom: "6px" }}>YOUR POSTCODE</p>
               <p className="account-hint">
-                Needed to calculate distances to adverts. Your postcode is never visible on the platform.
+                Used to show you how far away adverts are. Never shown to anyone.
               </p>
 
               <form onSubmit={handleSavePostcode} className="account-postcode-form">

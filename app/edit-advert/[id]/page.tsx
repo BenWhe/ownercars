@@ -376,7 +376,7 @@ export default function EditAdvertPage() {
             </label>
 
             <label>
-              Seller postcode
+              Where is the car located?
               <input
                 type="text"
                 value={postcode}
@@ -384,7 +384,7 @@ export default function EditAdvertPage() {
                 placeholder="e.g. DT6 3NP"
                 maxLength={8}
               />
-              <p className="field-hint">Needed to calculate distances to adverts. Your postcode is never visible on the platform.</p>
+              <p className="field-hint">Enter the postcode where the car is kept. We show nearest town to buyers — your postcode is never visible.</p>
               {postcodeError && <p className="field-error" role="alert">{postcodeError}</p>}
             </label>
 
