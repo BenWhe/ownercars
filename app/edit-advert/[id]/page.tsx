@@ -174,16 +174,29 @@ export default function EditAdvertPage() {
     formData.append("advert_id", params.id as string);
     formData.append("document_type", docType);
 
-    const res = await fetch("/api/vault/upload", { method: "POST", body: formData });
-    const result = await res.json();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
-    if (!res.ok) {
-      setVaultStatus((s) => ({ ...s, [docType]: result.error || "Upload failed." }));
-      return;
+    try {
+      const res = await fetch("/api/vault/upload", {
+        method: "POST",
+        body: formData,
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      const result = await res.json();
+
+      if (!res.ok) {
+        setVaultStatus((s) => ({ ...s, [docType]: result.error || "Upload failed." }));
+        return;
+      }
+
+      setVaultDocs((prev) => new Set([...prev, docType]));
+      setVaultStatus((s) => ({ ...s, [docType]: "" }));
+    } catch (err: any) {
+      clearTimeout(timeout);
+      setVaultStatus((s) => ({ ...s, [docType]: err.name === 'AbortError' ? 'Upload timed out.' : err.message || 'Upload failed.' }));
     }
-
-    setVaultDocs((prev) => new Set([...prev, docType]));
-    setVaultStatus((s) => ({ ...s, [docType]: "" }));
   }
 
   async function uploadVaultLink(url: string) {
