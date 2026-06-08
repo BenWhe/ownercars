@@ -3126,15 +3126,24 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 }
 
 .vault-request-toggle {
-  background: none;
-  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #2563EB;
+  color: white;
+  border: none;
   border-radius: 999px;
-  padding: 10px 18px;
-  font-size: 14px;
-  font-weight: 600;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-  color: var(--text);
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.vault-request-toggle:hover {
+  background: #1d4ed8;
 }
 
 .vault-requested-notice {
@@ -3175,17 +3184,21 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 }
 
 .vault-request-btn {
-  padding: 10px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #2563EB;
+  color: white;
+  border: none;
   border-radius: 999px;
-  border: 1px solid var(--line);
-  background: white;
+  padding: 11px 18px;
   font-size: 14px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  color: var(--text);
+  width: 100%;
 }
 
 .vault-request-btn:hover {
-  background: var(--panel);
+  background: #1d4ed8;
 }
