@@ -112,10 +112,12 @@ export default function BrowsePage() {
     if (typeof window === 'undefined') return "";
     return localStorage.getItem("buyer_postcode") ?? "";
   });
-  const [postcodeLoading, setPostcodeLoading] = useState(true);
   const [buyerLat, setBuyerLat] = useState<number | null>(null);
   const [buyerLng, setBuyerLng] = useState<number | null>(null);
-  const [buyerTown, setBuyerTown] = useState<string | null>(null);
+  const [buyerTown, setBuyerTown] = useState(() => {
+    if (typeof window === 'undefined') return "";
+    return localStorage.getItem("buyer_town") ?? "";
+  });
   const [postcodeError, setPostcodeError] = useState("");
 
   // On mount: try to load postcode from logged-in profile, then localStorage
@@ -140,20 +142,22 @@ export default function BrowsePage() {
           return;
         }
       }
-      // Fall back to localStorage
+      // Fall back to localStorage — town is already initialised from localStorage in state
       const stored = localStorage.getItem("buyer_postcode");
       if (stored) {
         setPostcodeInput(stored);
+        const storedTown = localStorage.getItem("buyer_town") ?? "";
+        setBuyerTown(storedTown);
+        // Still need lat/lng for distance calculation — geocode silently
         const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(stored)}`);
         if (geoRes.ok) {
           const geoResult = await geoRes.json();
           setBuyerLat(geoResult.latitude);
           setBuyerLng(geoResult.longitude);
-          setBuyerTown(geoResult.nearest_town ?? null);
         }
       }
     }
-    loadBuyerLocation().finally(() => setPostcodeLoading(false));
+    loadBuyerLocation();
   }, []);
 
   useEffect(() => {
@@ -229,9 +233,10 @@ export default function BrowsePage() {
 
     setBuyerLat(geoResult.latitude);
     setBuyerLng(geoResult.longitude);
-    setBuyerTown(geoResult.nearest_town ?? null);
+    setBuyerTown(geoResult.nearest_town ?? "");
     setPostcodeInput(geoResult.postcode);
     localStorage.setItem("buyer_postcode", geoResult.postcode);
+    localStorage.setItem("buyer_town", geoResult.nearest_town ?? "");
 
     // Save to profile if logged in
     try {
@@ -258,9 +263,10 @@ export default function BrowsePage() {
   function clearPostcode() {
     setBuyerLat(null);
     setBuyerLng(null);
-    setBuyerTown(null);
+    setBuyerTown("");
     setPostcodeInput("");
     localStorage.removeItem("buyer_postcode");
+    localStorage.removeItem("buyer_town");
   }
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
@@ -333,25 +339,23 @@ export default function BrowsePage() {
         </select>
 
         {/* Postcode / location */}
-        {!postcodeLoading && (
-          buyerTown ? (
-            <button type="button" className="browse-postcode-active" onClick={clearPostcode}>
-              Near {buyerTown} ✕
-            </button>
-          ) : (
-            <form onSubmit={handleSetPostcode} style={{ display: "contents" }}>
-              <input
-                type="text"
-                className="browse-postcode-input"
-                placeholder="Your postcode"
-                value={postcodeInput}
-                onChange={(e) => { setPostcodeInput(e.target.value); setPostcodeError(""); }}
-                maxLength={8}
-                aria-label="Your postcode for distance"
-              />
-              <button type="submit" className="browse-postcode-set">Set</button>
-            </form>
-          )
+        {buyerTown ? (
+          <button type="button" className="browse-postcode-active" onClick={clearPostcode}>
+            Near {buyerTown} ✕
+          </button>
+        ) : (
+          <form onSubmit={handleSetPostcode} style={{ display: "contents" }}>
+            <input
+              type="text"
+              className="browse-postcode-input"
+              placeholder="Your postcode"
+              value={postcodeInput}
+              onChange={(e) => { setPostcodeInput(e.target.value); setPostcodeError(""); }}
+              maxLength={8}
+              aria-label="Your postcode for distance"
+            />
+            <button type="submit" className="browse-postcode-set">Set</button>
+          </form>
         )}
 
         {hasActiveFilters && (
