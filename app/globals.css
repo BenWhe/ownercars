@@ -2935,3 +2935,257 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   padding: 10px 14px;
   text-decoration: none;
 }
+
+/* ── Secure Vault ──────────────────────────────────────────────────────────── */
+
+.vault-section {
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+
+.vault-section h3 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.vault-section-note {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+.vault-doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vault-doc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.vault-doc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vault-doc-label {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.vault-doc-hint {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.vault-doc-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.vault-uploaded {
+  color: #16a34a;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.vault-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+.vault-remove-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #fca5a5;
+  background: transparent;
+  color: #dc2626;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.vault-link-input {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  width: 200px;
+}
+
+.vault-status {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Vault events in message thread */
+
+.vault-event {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 18px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  margin: 4px 0;
+}
+
+.vault-event-share {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.vault-event-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.vault-event-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vault-event-body p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.vault-event-body time {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.vault-share-btn {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+.vault-doc-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.vault-expired {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* Buyer request section below compose */
+
+.vault-request-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.vault-request-toggle {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.vault-requested-notice {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+  padding: 8px 0;
+}
+
+.vault-request-panel {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.vault-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #92400e;
+}
+
+.vault-notice p {
+  margin: 0;
+}
+
+.vault-request-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.vault-request-btn {
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: white;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.vault-request-btn:hover {
+  background: var(--panel);
+}

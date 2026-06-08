@@ -1,0 +1,127 @@
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
+import { isValidDocumentType, DOCUMENT_DISPLAY_NAMES } from "@/lib/vault/documents";
+import { parseMessageThreadId } from "@/lib/messages/thread";
+
+const SIGNED_URL_EXPIRY_SECONDS = 900; // 15 minutes
+
+// POST /api/vault/share
+// Seller shares a document with the buyer via the message thread.
+export async function POST(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+    return NextResponse.json({ error: "Server configuration error." }, { status: 500 });
+  }
+
+  const cookieStore = await cookies();
+  const supabaseAuth = createServerClient(supabaseUrl, anonKey, {
+    cookies: {
+      getAll() { return cookieStore.getAll(); },
+      setAll() {},
+    },
+  });
+
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+
+  let body: {
+    advert_id?: string;
+    document_type?: string;
+    thread_id?: string;
+    request_message_id?: string;
+  };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const { advert_id, document_type, thread_id } = body;
+
+  if (!advert_id || !document_type || !thread_id) {
+    return NextResponse.json({ error: "Missing advert_id, document_type, or thread_id." }, { status: 400 });
+  }
+
+  if (!isValidDocumentType(document_type)) {
+    return NextResponse.json({ error: "Invalid document_type." }, { status: 400 });
+  }
+
+  const thread = parseMessageThreadId(thread_id);
+  if (!thread || thread.advertId !== advert_id) {
+    return NextResponse.json({ error: "Invalid thread_id." }, { status: 400 });
+  }
+
+  const buyerId = thread.otherUserId;
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  // Verify user is the seller
+  const { data: advert } = await supabase
+    .from("adverts")
+    .select("id, seller_id")
+    .eq("id", advert_id)
+    .maybeSingle();
+
+  if (!advert || advert.seller_id !== user.id) {
+    return NextResponse.json({ error: "Not authorised to share documents for this advert." }, { status: 403 });
+  }
+
+  // Fetch the vault document
+  const { data: doc } = await supabase
+    .from("vault_documents")
+    .select("id, file_url, document_type")
+    .eq("advert_id", advert_id)
+    .eq("document_type", document_type)
+    .maybeSingle();
+
+  if (!doc) {
+    return NextResponse.json({ error: "Document not found in vault." }, { status: 404 });
+  }
+
+  const displayName = DOCUMENT_DISPLAY_NAMES[document_type];
+  let signedUrl: string;
+  let urlExpiresAt: string;
+
+  if (document_type === "video_link") {
+    // Video links are stored as plain URLs — share directly
+    signedUrl = doc.file_url;
+    // Set a far-future expiry to indicate it doesn't expire
+    urlExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+  } else {
+    // Generate a signed URL from the private bucket
+    const { data: signed, error: signError } = await supabase.storage
+      .from("vault-documents")
+      .createSignedUrl(doc.file_url, SIGNED_URL_EXPIRY_SECONDS);
+
+    if (signError || !signed?.signedUrl) {
+      return NextResponse.json({ error: "Could not generate secure link." }, { status: 500 });
+    }
+
+    signedUrl = signed.signedUrl;
+    urlExpiresAt = new Date(Date.now() + SIGNED_URL_EXPIRY_SECONDS * 1000).toISOString();
+  }
+
+  const { error } = await supabase.from("messages").insert({
+    advert_id,
+    sender_id: user.id,
+    recipient_id: buyerId,
+    event_type: "document_share",
+    document_type,
+    signed_url: signedUrl,
+    url_expires_at: urlExpiresAt,
+    body: `Shared ${displayName} · link expires in 15 minutes`,
+  });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  return NextResponse.json({ success: true });
+}
