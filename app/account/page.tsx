@@ -152,10 +152,9 @@ export default function AccountPage() {
                   Create advert
                 </Link>
                 <button
-                  type="button"
                   onClick={logout}
                   className="button"
-                  style={{ background: 'transparent', color: '#dc2626', border: '1.5px solid #dc2626' }}
+                  style={{ background: 'transparent', color: '#dc2626', border: 'none', fontWeight: 700 }}
                 >
                   Log out
                 </button>
