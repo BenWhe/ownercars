@@ -108,21 +108,22 @@ export default function BrowsePage() {
   const [error, setError] = useState("");
 
   // Buyer location state
-  const [postcodeInput, setPostcodeInput] = useState(() => {
-    if (typeof window === 'undefined') return "";
-    return localStorage.getItem("buyer_postcode") ?? "";
-  });
+  const [postcodeInput, setPostcodeInput] = useState("");
   const [buyerLat, setBuyerLat] = useState<number | null>(null);
   const [buyerLng, setBuyerLng] = useState<number | null>(null);
-  const [buyerTown, setBuyerTown] = useState(() => {
-    if (typeof window === 'undefined') return "";
-    return localStorage.getItem("buyer_town") ?? "";
-  });
+  const [buyerTown, setBuyerTown] = useState("");
+  const [mounted, setMounted] = useState(false);
   const [postcodeError, setPostcodeError] = useState("");
 
   // On mount: try to load postcode from logged-in profile, then localStorage
   useEffect(() => {
     async function loadBuyerLocation() {
+      const storedPostcode = localStorage.getItem("buyer_postcode") ?? "";
+      const storedTown = localStorage.getItem("buyer_town") ?? "";
+      setPostcodeInput(storedPostcode);
+      setBuyerTown(storedTown);
+      setMounted(true);
+
       // Try profile first
       const accountRes = await fetch("/api/account");
       if (accountRes.ok) {
@@ -341,24 +342,26 @@ export default function BrowsePage() {
           {YEAR_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
         </select>
 
-        {/* Postcode / location */}
-        {buyerTown ? (
-          <button type="button" className="browse-postcode-active" onClick={clearPostcode}>
-            Near {buyerTown} ✕
-          </button>
-        ) : (
-          <form onSubmit={handleSetPostcode} style={{ display: "contents" }}>
-            <input
-              type="text"
-              className="browse-postcode-input"
-              placeholder="Your postcode"
-              value={postcodeInput}
-              onChange={(e) => { setPostcodeInput(e.target.value); setPostcodeError(""); }}
-              maxLength={8}
-              aria-label="Your postcode for distance"
-            />
-            <button type="submit" className="browse-postcode-set">Set</button>
-          </form>
+        {/* Postcode / location — only render after client has read localStorage */}
+        {mounted && (
+          buyerTown ? (
+            <button type="button" className="browse-postcode-active" onClick={clearPostcode}>
+              Near {buyerTown} ✕
+            </button>
+          ) : (
+            <form onSubmit={handleSetPostcode} style={{ display: "contents" }}>
+              <input
+                type="text"
+                className="browse-postcode-input"
+                placeholder="Your postcode"
+                value={postcodeInput}
+                onChange={(e) => { setPostcodeInput(e.target.value); setPostcodeError(""); }}
+                maxLength={8}
+                aria-label="Your postcode for distance"
+              />
+              <button type="submit" className="browse-postcode-set">Set</button>
+            </form>
+          )
         )}
 
         {hasActiveFilters && (
