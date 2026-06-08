@@ -119,7 +119,11 @@ export default function MessageThreadPage() {
 
     const result = await res.json();
     if (!res.ok) {
-      setNotice(result.error || "Could not send message.");
+      if (result.code === "POSTCODE_REQUIRED") {
+        setNotice("__POSTCODE_REQUIRED__");
+      } else {
+        setNotice(result.error || "Could not send message.");
+      }
       return;
     }
 
@@ -198,7 +202,14 @@ export default function MessageThreadPage() {
       </section>
 
       <section className="message-thread-section">
-        {notice && <p className="message-notice">{notice}</p>}
+        {notice && notice !== "__POSTCODE_REQUIRED__" && (
+          <p className="message-notice">{notice}</p>
+        )}
+        {notice === "__POSTCODE_REQUIRED__" && (
+          <p className="message-notice">
+            Please <a href="/account" style={{ color: "var(--accent)", fontWeight: 700 }}>add your postcode to your account</a> before messaging sellers.
+          </p>
+        )}
 
         <div className="message-thread">
           {messages.length === 0 && !notice && (

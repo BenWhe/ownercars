@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
 import { ADVERT_STATUS } from "@/lib/adverts/lifecycle";
@@ -128,6 +129,25 @@ export async function POST(request: NextRequest) {
 
   if (advert.seller_id === user.id) {
     return NextResponse.json({ error: "You cannot message your own advert." }, { status: 400 });
+  }
+
+  // Gate: buyer must have a postcode set before messaging
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (supabaseUrl && serviceRoleKey) {
+    const admin = createClient(supabaseUrl, serviceRoleKey);
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("postcode")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!profile?.postcode) {
+      return NextResponse.json(
+        { error: "Please add your postcode to your account before messaging sellers.", code: "POSTCODE_REQUIRED" },
+        { status: 403 }
+      );
+    }
   }
 
   const { data: message, error } = await supabase

@@ -205,6 +205,10 @@ export default function AdvertPage() {
               <span className="advert-mileage">
                 {Number(advert.mileage).toLocaleString()} miles
               </span>
+
+              {advert.nearest_town && (
+                <span className="advert-location">Near {advert.nearest_town}</span>
+              )}
             </div>
 
             {!isAdvertOwner && (

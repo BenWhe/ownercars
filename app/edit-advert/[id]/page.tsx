@@ -20,6 +20,8 @@ export default function EditAdvertPage() {
   const [paid, setPaid] = useState(false);
   const [message, setMessage] = useState("Loading advert...");
   const [photos, setPhotos] = useState<any[]>([]);
+  const [postcode, setPostcode] = useState("");
+  const [postcodeError, setPostcodeError] = useState("");
   const [vaultDocs, setVaultDocs] = useState<Set<DocumentType>>(new Set());
   const [vaultStatus, setVaultStatus] = useState<Record<string, string>>({});
 
@@ -52,6 +54,7 @@ export default function EditAdvertPage() {
       setStatus(data.status || "draft");
       setPaid(Boolean(data.paid));
       // Photos are included in the advert response — no separate browser-client call.
+      setPostcode(data.postcode || "");
       setPhotos(data.advert_photos || []);
       setMessage("");
 
@@ -267,6 +270,24 @@ export default function EditAdvertPage() {
 
   async function handleUpdate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setPostcodeError("");
+
+    // Geocode postcode if provided
+    let geoPayload: { postcode?: string; latitude?: number; longitude?: number; nearest_town?: string } = {};
+    if (postcode.trim()) {
+      const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(postcode.trim())}`);
+      const geoResult = await geoRes.json();
+      if (!geoRes.ok) {
+        setPostcodeError("Please enter a valid UK postcode.");
+        return;
+      }
+      geoPayload = {
+        postcode: geoResult.postcode,
+        latitude: geoResult.latitude,
+        longitude: geoResult.longitude,
+        nearest_town: geoResult.nearest_town,
+      };
+    }
 
     const res = await fetch(`/api/adverts/${params.id}`, {
       method: "PATCH",
@@ -276,6 +297,7 @@ export default function EditAdvertPage() {
         price: Number(price),
         mileage: Number(mileage),
         description,
+        ...geoPayload,
       }),
     });
 
@@ -351,6 +373,19 @@ export default function EditAdvertPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe the vehicle..."
               />
+            </label>
+
+            <label>
+              Seller postcode
+              <input
+                type="text"
+                value={postcode}
+                onChange={(e) => { setPostcode(e.target.value); setPostcodeError(""); }}
+                placeholder="e.g. DT6 3NP"
+                maxLength={8}
+              />
+              <p className="field-hint">Never shown publicly — we display nearest town only.</p>
+              {postcodeError && <p className="field-error" role="alert">{postcodeError}</p>}
             </label>
 
             <h3 style={{ marginTop: "24px" }}>Photos</h3>
