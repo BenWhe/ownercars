@@ -169,33 +169,59 @@ export default function EditAdvertPage() {
 
   async function uploadVaultFile(docType: DocumentType, file: File) {
     setVaultStatus((s) => ({ ...s, [docType]: "Uploading..." }));
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("advert_id", params.id as string);
-    formData.append("document_type", docType);
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const res = await fetch("/api/vault/upload", {
+      // Step 1: get a signed upload URL from our API (ownership check happens here)
+      const presignRes = await fetch("/api/vault/presign", {
         method: "POST",
-        body: formData,
-        signal: controller.signal
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          advert_id: params.id,
+          document_type: docType,
+          filename: file.name,
+          content_type: file.type,
+        }),
       });
-      clearTimeout(timeout);
-      const result = await res.json();
+      const presignResult = await presignRes.json();
 
-      if (!res.ok) {
-        setVaultStatus((s) => ({ ...s, [docType]: result.error || "Upload failed." }));
+      if (!presignRes.ok) {
+        setVaultStatus((s) => ({ ...s, [docType]: presignResult.error || "Could not prepare upload." }));
+        return;
+      }
+
+      const { signed_url, file_path } = presignResult;
+
+      // Step 2: PUT the file directly to Supabase storage — bypasses Vercel entirely
+      setVaultStatus((s) => ({ ...s, [docType]: "Uploading to vault..." }));
+      const putRes = await fetch(signed_url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+
+      if (!putRes.ok) {
+        const putText = await putRes.text().catch(() => "");
+        setVaultStatus((s) => ({ ...s, [docType]: `Storage upload failed: ${putText || putRes.status}` }));
+        return;
+      }
+
+      // Step 3: record the file path in the DB
+      const recordRes = await fetch("/api/vault/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ advert_id: params.id, document_type: docType, file_path }),
+      });
+      const recordResult = await recordRes.json();
+
+      if (!recordRes.ok) {
+        setVaultStatus((s) => ({ ...s, [docType]: recordResult.error || "Upload failed." }));
         return;
       }
 
       setVaultDocs((prev) => new Set([...prev, docType]));
       setVaultStatus((s) => ({ ...s, [docType]: "" }));
     } catch (err: any) {
-      clearTimeout(timeout);
-      setVaultStatus((s) => ({ ...s, [docType]: err.name === 'AbortError' ? 'Upload timed out.' : err.message || 'Upload failed.' }));
+      setVaultStatus((s) => ({ ...s, [docType]: err.message || "Upload failed." }));
     }
   }
 
