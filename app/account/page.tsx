@@ -120,7 +120,7 @@ export default function AccountPage() {
             <div className="rounded-3xl bg-white p-8 shadow-sm">
               <h2 className="text-xl font-bold">Your postcode</h2>
               <p className="mt-2 text-sm text-slate-500">
-                Your postcode is never visible on the platform.
+                Needed to calculate distances to adverts. Your postcode is never visible on the platform.
               </p>
 
               <form onSubmit={handleSavePostcode} className="mt-5 flex items-start gap-3 flex-wrap">

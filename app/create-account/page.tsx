@@ -137,7 +137,7 @@ export default function CreateAccountPage() {
               onChange={(e) => { setPostcode(e.target.value); setPostcodeError(""); }}
               maxLength={8}
             />
-            <p className="field-hint">Your postcode is never visible on the platform.</p>
+            <p className="field-hint">Needed to calculate distances to adverts. Your postcode is never visible on the platform.</p>
             {postcodeError && <p className="field-error" role="alert">{postcodeError}</p>}
           </label>
 
