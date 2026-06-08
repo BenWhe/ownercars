@@ -131,12 +131,15 @@ export default function BrowsePage() {
           setBuyerLat(accountResult.profile.latitude);
           setBuyerLng(accountResult.profile.longitude);
           setPostcodeInput(accountResult.profile.postcode ?? "");
-          // Geocode to get town name
-          if (accountResult.profile.postcode) {
+          // Use stored town from localStorage — already initialised in state
+          // Only update if localStorage is empty
+          const storedTown = localStorage.getItem("buyer_town") ?? "";
+          if (!storedTown && accountResult.profile.postcode) {
             const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(accountResult.profile.postcode)}`);
             if (geoRes.ok) {
               const geoResult = await geoRes.json();
-              setBuyerTown(geoResult.nearest_town ?? null);
+              setBuyerTown(geoResult.nearest_town ?? "");
+              localStorage.setItem("buyer_town", geoResult.nearest_town ?? "");
             }
           }
           return;
