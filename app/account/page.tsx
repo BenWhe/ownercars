@@ -129,10 +129,13 @@ export default function AccountPage() {
                   className="button primary"
                   style={{ padding: "10px 20px" }}
                 >
-                  {postcodeSaving ? "Saving…" : "Save postcode"}
+                  {postcodeSaving ? "Saving…" : postcode ? "Update postcode" : "Save postcode"}
                 </button>
               </form>
 
+              {postcode && postcodeInput === postcode && !postcodeSaved && (
+                <p style={{ fontSize: '13px', color: '#16a34a', margin: '6px 0 0' }}>✓ Postcode saved</p>
+              )}
               {postcodeError && (
                 <p className="account-error">{postcodeError}</p>
               )}

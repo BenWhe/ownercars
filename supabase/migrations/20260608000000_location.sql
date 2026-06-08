@@ -15,6 +15,12 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+alter table public.profiles
+  add column if not exists postcode text,
+  add column if not exists latitude float8,
+  add column if not exists longitude float8,
+  add column if not exists updated_at timestamptz default now();
+
 alter table public.profiles enable row level security;
 
 create policy "Users manage own profile"
