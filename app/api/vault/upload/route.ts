@@ -110,6 +110,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "File must be under 10 MB." }, { status: 400 });
   }
 
+  console.log("Vault upload attempt:", { advert_id, document_type, fileType: file.type, fileSize: file.size });
+
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   const { data: advert } = await supabase.from("adverts").select("id, seller_id").eq("id", advert_id).maybeSingle();
@@ -126,7 +128,7 @@ export async function POST(request: NextRequest) {
     .upload(filePath, new Uint8Array(arrayBuffer), { contentType: file.type, upsert: true });
 
   if (uploadError) {
-    console.error("Vault upload error:", uploadError);
+    console.error("Storage upload error:", JSON.stringify(uploadError));
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 
@@ -145,6 +147,7 @@ export async function POST(request: NextRequest) {
   );
 
   if (dbError) {
+    console.error("DB upsert error:", JSON.stringify(dbError));
     return NextResponse.json({ error: dbError.message }, { status: 400 });
   }
 
