@@ -154,7 +154,8 @@ export default function AccountPage() {
                 <button
                   type="button"
                   onClick={logout}
-                  className="account-logout-btn"
+                  className="button"
+                  style={{ background: 'transparent', color: '#dc2626', border: '1.5px solid #dc2626' }}
                 >
                   Log out
                 </button>
