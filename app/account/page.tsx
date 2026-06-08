@@ -77,131 +77,92 @@ export default function AccountPage() {
     setPostcodeSaved(true);
   }
 
+  if (loading) return null;
+
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <Link href="/" className="text-2xl font-bold tracking-tight text-blue-600">
-            OwnerCars
-          </Link>
+    <main>
+      <section className="dashboard-hero">
+        <p className="eyebrow">Your account</p>
+        <h1>Account settings</h1>
+        <p>Manage your email, postcode and account preferences.</p>
+      </section>
 
-          <nav className="hidden items-center gap-8 text-sm font-medium text-slate-700 md:flex">
-            <Link href="/browse">Browse cars</Link>
-            <Link href="/create-advert">Sell your car</Link>
-            <Link href="/dashboard">Dashboard</Link>
-          </nav>
-        </div>
-      </header>
-
-      <section className="mx-auto max-w-4xl px-6 py-12">
-        <h1 className="text-4xl font-bold tracking-tight">Your account</h1>
-
-        {loading && <p className="mt-6 text-slate-600">Loading...</p>}
-
-        {!loading && !email && (
-          <div className="mt-8 rounded-3xl bg-white p-8 shadow-sm">
-            <p className="text-lg font-semibold">You are not logged in.</p>
-            <Link
-              href="/login"
-              className="mt-6 inline-block rounded-full bg-blue-600 px-6 py-3 font-semibold text-white"
-            >
+      <section className="form-section">
+        {!email ? (
+          <div className="account-card">
+            <p style={{ marginBottom: "16px" }}>You are not logged in.</p>
+            <Link href="/login" className="button primary" style={{ display: "inline-flex" }}>
               Go to login
             </Link>
           </div>
-        )}
-
-        {!loading && email && (
-          <div className="mt-8 space-y-6">
-            <div className="rounded-3xl bg-white p-8 shadow-sm">
-              <p className="text-sm font-semibold text-blue-600">Account details</p>
-              <p className="mt-3 text-lg font-bold">{email}</p>
+        ) : (
+          <>
+            {/* Email */}
+            <div className="account-card">
+              <p className="eyebrow" style={{ marginBottom: "6px" }}>Email address</p>
+              <p className="account-value">{email}</p>
             </div>
 
-            <div className="rounded-3xl bg-white p-8 shadow-sm">
-              <h2 className="text-xl font-bold">Your postcode</h2>
-              <p className="mt-2 text-sm text-slate-500">
+            {/* Postcode */}
+            <div className="account-card">
+              <p className="eyebrow" style={{ marginBottom: "6px" }}>Your postcode</p>
+              <p className="account-hint">
                 Needed to calculate distances to adverts. Your postcode is never visible on the platform.
               </p>
 
-              <form onSubmit={handleSavePostcode} className="mt-5 flex items-start gap-3 flex-wrap">
+              <form onSubmit={handleSavePostcode} className="account-postcode-form">
                 <input
                   type="text"
                   value={postcodeInput}
-                  onChange={(e) => { setPostcodeInput(e.target.value); setPostcodeError(""); setPostcodeSaved(false); }}
+                  onChange={(e) => {
+                    setPostcodeInput(e.target.value);
+                    setPostcodeError("");
+                    setPostcodeSaved(false);
+                  }}
                   placeholder="e.g. DT6 3NP"
                   maxLength={8}
-                  className="h-11 rounded-full border border-slate-200 px-4 text-sm font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  className="account-postcode-input"
                 />
                 <button
                   type="submit"
                   disabled={postcodeSaving}
-                  className="h-11 rounded-full bg-blue-600 px-5 text-sm font-semibold text-white disabled:opacity-60"
+                  className="button primary"
+                  style={{ padding: "10px 20px" }}
                 >
-                  {postcodeSaving ? "Saving..." : "Save postcode"}
+                  {postcodeSaving ? "Saving…" : "Save postcode"}
                 </button>
               </form>
 
               {postcodeError && (
-                <p className="mt-2 text-sm text-red-600">{postcodeError}</p>
+                <p className="account-error">{postcodeError}</p>
               )}
               {postcodeSaved && (
-                <p className="mt-2 text-sm text-green-600">✓ Postcode saved — {postcode}</p>
+                <p className="account-success">✓ Postcode saved — {postcode}</p>
               )}
             </div>
 
-            <div className="rounded-3xl bg-white p-8 shadow-sm">
-              <h2 className="text-xl font-bold">Seller status</h2>
-
-              <div className="mt-6 space-y-3 text-sm text-slate-700">
-                <Status label="Account created" complete />
-                <Status label="Email verified" complete />
-                <Status label="Phone verified" complete={false} />
-                <Status label="Advert created" complete />
-                <Status label="Payment completed" complete={false} />
-                <Status label="Admin approval" complete={false} />
-              </div>
-            </div>
-
-            <div className="rounded-3xl bg-white p-8 shadow-sm">
-              <h2 className="text-xl font-bold">Actions</h2>
-
-              <div className="mt-6 flex flex-wrap gap-4">
-                <Link
-                  href="/create-advert"
-                  className="rounded-full bg-blue-600 px-6 py-3 font-semibold text-white"
-                >
-                  Create advert
-                </Link>
-
-                <Link
-                  href="/dashboard"
-                  className="rounded-full border border-slate-300 px-6 py-3 font-semibold text-slate-900"
-                >
+            {/* Actions */}
+            <div className="account-card">
+              <p className="eyebrow" style={{ marginBottom: "16px" }}>Actions</p>
+              <div className="account-actions">
+                <Link href="/dashboard" className="button secondary">
                   View dashboard
                 </Link>
-
+                <Link href="/create-advert" className="button secondary">
+                  Create advert
+                </Link>
                 <button
+                  type="button"
                   onClick={logout}
-                  className="rounded-full border border-red-200 px-6 py-3 font-semibold text-red-600"
+                  className="account-logout-btn"
                 >
-                  Logout
+                  Log out
                 </button>
               </div>
             </div>
-          </div>
+          </>
         )}
       </section>
     </main>
-  );
-}
-
-function Status({ label, complete }: { label: string; complete: boolean }) {
-  return (
-    <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-      <span>{label}</span>
-      <span className={`text-sm font-bold ${complete ? "text-green-600" : "text-slate-400"}`}>
-        {complete ? "✓" : "Pending"}
-      </span>
-    </div>
   );
 }

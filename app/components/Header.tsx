@@ -139,6 +139,10 @@ export default function Header() {
                     Dashboard
                   </Link>
 
+                  <Link href="/account" onClick={() => setMenuOpen(false)}>
+                    Account
+                  </Link>
+
                   <button
                     type="button"
                     className="apple-menu-logout"
