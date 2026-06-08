@@ -145,16 +145,16 @@ export default function AccountPage() {
             <div className="account-card">
               <p className="eyebrow" style={{ marginBottom: "16px" }}>Actions</p>
               <div className="account-actions">
-                <Link href="/dashboard" className="button secondary">
+                <Link href="/dashboard" className="button primary">
                   View dashboard
                 </Link>
-                <Link href="/create-advert" className="button secondary">
+                <Link href="/create-advert" className="button primary">
                   Create advert
                 </Link>
                 <button
                   onClick={logout}
-                  className="button"
-                  style={{ background: 'transparent', color: '#dc2626', border: 'none', fontWeight: 700 }}
+                  className="button primary"
+                  style={{ background: '#dc2626' }}
                 >
                   Log out
                 </button>
