@@ -108,7 +108,11 @@ export default function BrowsePage() {
   const [error, setError] = useState("");
 
   // Buyer location state
-  const [postcodeInput, setPostcodeInput] = useState("");
+  const [postcodeInput, setPostcodeInput] = useState(() => {
+    if (typeof window === 'undefined') return "";
+    return localStorage.getItem("buyer_postcode") ?? "";
+  });
+  const [postcodeLoading, setPostcodeLoading] = useState(true);
   const [buyerLat, setBuyerLat] = useState<number | null>(null);
   const [buyerLng, setBuyerLng] = useState<number | null>(null);
   const [buyerTown, setBuyerTown] = useState<string | null>(null);
@@ -149,7 +153,7 @@ export default function BrowsePage() {
         }
       }
     }
-    loadBuyerLocation();
+    loadBuyerLocation().finally(() => setPostcodeLoading(false));
   }, []);
 
   useEffect(() => {
@@ -329,23 +333,25 @@ export default function BrowsePage() {
         </select>
 
         {/* Postcode / location */}
-        {buyerTown ? (
-          <button type="button" className="browse-postcode-active" onClick={clearPostcode}>
-            Near {buyerTown} ✕
-          </button>
-        ) : (
-          <form onSubmit={handleSetPostcode} style={{ display: "contents" }}>
-            <input
-              type="text"
-              className="browse-postcode-input"
-              placeholder="Your postcode"
-              value={postcodeInput}
-              onChange={(e) => { setPostcodeInput(e.target.value); setPostcodeError(""); }}
-              maxLength={8}
-              aria-label="Your postcode for distance"
-            />
-            <button type="submit" className="browse-postcode-set">Set</button>
-          </form>
+        {!postcodeLoading && (
+          buyerTown ? (
+            <button type="button" className="browse-postcode-active" onClick={clearPostcode}>
+              Near {buyerTown} ✕
+            </button>
+          ) : (
+            <form onSubmit={handleSetPostcode} style={{ display: "contents" }}>
+              <input
+                type="text"
+                className="browse-postcode-input"
+                placeholder="Your postcode"
+                value={postcodeInput}
+                onChange={(e) => { setPostcodeInput(e.target.value); setPostcodeError(""); }}
+                maxLength={8}
+                aria-label="Your postcode for distance"
+              />
+              <button type="submit" className="browse-postcode-set">Set</button>
+            </form>
+          )
         )}
 
         {hasActiveFilters && (
