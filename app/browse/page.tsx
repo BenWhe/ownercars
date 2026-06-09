@@ -15,13 +15,10 @@ function capitaliseWords(str?: string) {
 }
 
 function advertDisplayTitle(ad: any) {
-  const title = `${ad.year || ""} ${capitaliseWords(ad.make)} ${capitaliseWords(
-    ad.model
-  )}`.trim();
+  const title = `${ad.year || ""} ${capitaliseWords(ad.make)} ${capitaliseWords(ad.model)}`.trim();
   return title || ad.title || "Private car advert";
 }
 
-// Maps the price dropdown value to { minPrice?, maxPrice? } params
 function priceParams(value: string): Record<string, string> {
   if (!value) return {};
   if (value === "over-20000") return { minPrice: "20000" };
@@ -31,8 +28,6 @@ function priceParams(value: string): Record<string, string> {
   }
   return { maxPrice: value };
 }
-
-// ── Static option lists ───────────────────────────────────────────────────────
 
 const PRICE_OPTIONS = [
   { value: "", label: "Any price" },
@@ -84,7 +79,6 @@ const COLOUR_OPTIONS = [
   { value: "Brown", label: "Brown" },
 ];
 
-// Year from: current year down to 2000
 const THIS_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = [
   { value: "", label: "Any year" },
@@ -93,8 +87,6 @@ const YEAR_OPTIONS = [
     return { value: String(year), label: String(year) };
   }),
 ];
-
-// ── Initial filter state ──────────────────────────────────────────────────────
 
 const EMPTY_FILTERS = {
   make: "",
@@ -107,8 +99,6 @@ const EMPTY_FILTERS = {
   yearFrom: "",
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export default function BrowsePage() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [makes, setMakes] = useState<string[]>([]);
@@ -117,7 +107,62 @@ export default function BrowsePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Fetch distinct makes once on mount
+  // Buyer location state
+  const [postcodeInput, setPostcodeInput] = useState("");
+  const [buyerLat, setBuyerLat] = useState<number | null>(null);
+  const [buyerLng, setBuyerLng] = useState<number | null>(null);
+  const [buyerTown, setBuyerTown] = useState("");
+  const [mounted, setMounted] = useState(false);
+  const [postcodeError, setPostcodeError] = useState("");
+
+  // On mount: try to load postcode from logged-in profile, then localStorage
+  useEffect(() => {
+    async function loadBuyerLocation() {
+      const storedPostcode = localStorage.getItem("buyer_postcode") ?? "";
+      const storedTown = localStorage.getItem("buyer_town") ?? "";
+      setPostcodeInput(storedPostcode);
+      setBuyerTown(storedTown);
+      setMounted(true);
+
+      // Try profile first
+      const accountRes = await fetch("/api/account");
+      if (accountRes.ok) {
+        const accountResult = await accountRes.json();
+        if (accountResult.profile?.latitude && accountResult.profile?.longitude) {
+          setBuyerLat(accountResult.profile.latitude);
+          setBuyerLng(accountResult.profile.longitude);
+          setPostcodeInput(accountResult.profile.postcode ?? "");
+          const storedTown2 = localStorage.getItem("buyer_town") ?? "";
+          if (!storedTown2 && accountResult.profile.postcode) {
+            const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(accountResult.profile.postcode)}`);
+            if (geoRes.ok) {
+              const geoResult = await geoRes.json();
+              setBuyerTown(geoResult.nearest_town ?? "");
+              localStorage.setItem("buyer_postcode", accountResult.profile.postcode);
+              localStorage.setItem("buyer_town", geoResult.nearest_town ?? "");
+            }
+          }
+          return;
+        }
+      }
+      // Fall back to localStorage
+      const stored = localStorage.getItem("buyer_postcode");
+      if (stored) {
+        setPostcodeInput(stored);
+        const storedTown3 = localStorage.getItem("buyer_town") ?? "";
+        setBuyerTown(storedTown3);
+        // Geocode silently for lat/lng (needed for distance calculation)
+        const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(stored)}`);
+        if (geoRes.ok) {
+          const geoResult = await geoRes.json();
+          setBuyerLat(geoResult.latitude);
+          setBuyerLng(geoResult.longitude);
+        }
+      }
+    }
+    loadBuyerLocation();
+  }, []);
+
   useEffect(() => {
     fetch("/api/browse?makes=1")
       .then((r) => r.json())
@@ -125,7 +170,6 @@ export default function BrowsePage() {
       .catch(() => {});
   }, []);
 
-  // Fetch distinct models whenever the make filter changes
   useEffect(() => {
     if (!filters.make) {
       setModels([]);
@@ -137,7 +181,6 @@ export default function BrowsePage() {
       .catch(() => setModels([]));
   }, [filters.make]);
 
-  // Re-fetch adverts whenever any filter changes
   useEffect(() => {
     setLoading(true);
     setError("");
@@ -150,6 +193,8 @@ export default function BrowsePage() {
     if (filters.mileage) params.set("maxMileage", filters.mileage);
     if (filters.colour) params.set("colour", filters.colour);
     if (filters.yearFrom) params.set("minYear", filters.yearFrom);
+    if (buyerLat !== null) params.set("buyer_lat", String(buyerLat));
+    if (buyerLng !== null) params.set("buyer_lng", String(buyerLng));
 
     const pp = priceParams(filters.price);
     Object.entries(pp).forEach(([k, v]) => params.set(k, v));
@@ -168,10 +213,63 @@ export default function BrowsePage() {
         setError("Could not load adverts.");
         setLoading(false);
       });
-  }, [filters]);
+  }, [filters, buyerLat, buyerLng]);
 
   function clearFilters() {
     setFilters(EMPTY_FILTERS);
+  }
+
+  async function handleSetPostcode(e: React.FormEvent) {
+    e.preventDefault();
+    setPostcodeError("");
+
+    const trimmed = postcodeInput.trim();
+    if (!trimmed) return;
+
+    const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(trimmed)}`);
+    const geoResult = await geoRes.json();
+
+    if (!geoRes.ok) {
+      setPostcodeError("Invalid postcode.");
+      return;
+    }
+
+    setBuyerLat(geoResult.latitude);
+    setBuyerLng(geoResult.longitude);
+    setBuyerTown(geoResult.nearest_town ?? "");
+    setPostcodeInput(geoResult.postcode);
+    localStorage.setItem("buyer_postcode", geoResult.postcode);
+    localStorage.setItem("buyer_town", geoResult.nearest_town ?? "");
+
+    // Save to profile if logged in
+    try {
+      const accountRes = await fetch("/api/account");
+      if (accountRes.ok) {
+        const accountResult = await accountRes.json();
+        if (accountResult.user) {
+          await fetch("/api/account", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              postcode: geoResult.postcode,
+              latitude: geoResult.latitude,
+              longitude: geoResult.longitude,
+            }),
+          });
+        }
+      }
+    } catch {
+      // Non-blocking
+    }
+  }
+
+  function clearPostcode() {
+    setBuyerLat(null);
+    setBuyerLng(null);
+    setBuyerTown("");
+    setPostcodeInput("");
+    localStorage.removeItem("buyer_postcode");
+    localStorage.removeItem("buyer_town");
   }
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
@@ -187,25 +285,18 @@ export default function BrowsePage() {
         </p>
       </section>
 
-      {/* ── Filter bar: Make → Model → Body type → Fuel → Price → Mileage → Colour → Year → Clear */}
       <div className="browse-filters">
-        {/* Make */}
         <select
           value={filters.make}
-          onChange={(e) =>
-            setFilters((f) => ({ ...f, make: e.target.value, model: "" }))
-          }
+          onChange={(e) => setFilters((f) => ({ ...f, make: e.target.value, model: "" }))}
           aria-label="Filter by make"
         >
           <option value="">Any make</option>
           {makes.map((m) => (
-            <option key={m} value={m}>
-              {capitaliseWords(m)}
-            </option>
+            <option key={m} value={m}>{capitaliseWords(m)}</option>
           ))}
         </select>
 
-        {/* Model — depends on make */}
         <select
           value={filters.model}
           onChange={(e) => setFilters((f) => ({ ...f, model: e.target.value }))}
@@ -218,112 +309,69 @@ export default function BrowsePage() {
             <>
               <option value="">Any model</option>
               {models.map((m) => (
-                <option key={m} value={m}>
-                  {capitaliseWords(m)}
-                </option>
+                <option key={m} value={m}>{capitaliseWords(m)}</option>
               ))}
             </>
           )}
         </select>
 
-        {/* Body type */}
-        <select
-          value={filters.bodyType}
-          onChange={(e) =>
-            setFilters((f) => ({ ...f, bodyType: e.target.value }))
-          }
-          aria-label="Filter by body type"
-        >
-          {BODY_TYPE_OPTIONS.map(({ value, label }) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
+        <select value={filters.bodyType} onChange={(e) => setFilters((f) => ({ ...f, bodyType: e.target.value }))} aria-label="Filter by body type">
+          {BODY_TYPE_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
         </select>
 
-        {/* Fuel type */}
-        <select
-          value={filters.fuel}
-          onChange={(e) => setFilters((f) => ({ ...f, fuel: e.target.value }))}
-          aria-label="Filter by fuel type"
-        >
-          {FUEL_OPTIONS.map(({ value, label }) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
+        <select value={filters.fuel} onChange={(e) => setFilters((f) => ({ ...f, fuel: e.target.value }))} aria-label="Filter by fuel type">
+          {FUEL_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
         </select>
 
-        {/* Max price */}
-        <select
-          value={filters.price}
-          onChange={(e) => setFilters((f) => ({ ...f, price: e.target.value }))}
-          aria-label="Filter by price"
-        >
-          {PRICE_OPTIONS.map(({ value, label }) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
+        <select value={filters.price} onChange={(e) => setFilters((f) => ({ ...f, price: e.target.value }))} aria-label="Filter by price">
+          {PRICE_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
         </select>
 
-        {/* Max mileage */}
-        <select
-          value={filters.mileage}
-          onChange={(e) =>
-            setFilters((f) => ({ ...f, mileage: e.target.value }))
-          }
-          aria-label="Filter by mileage"
-        >
-          {MILEAGE_OPTIONS.map(({ value, label }) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
+        <select value={filters.mileage} onChange={(e) => setFilters((f) => ({ ...f, mileage: e.target.value }))} aria-label="Filter by mileage">
+          {MILEAGE_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
         </select>
 
-        {/* Colour */}
-        <select
-          value={filters.colour}
-          onChange={(e) =>
-            setFilters((f) => ({ ...f, colour: e.target.value }))
-          }
-          aria-label="Filter by colour"
-        >
-          {COLOUR_OPTIONS.map(({ value, label }) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
+        <select value={filters.colour} onChange={(e) => setFilters((f) => ({ ...f, colour: e.target.value }))} aria-label="Filter by colour">
+          {COLOUR_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
         </select>
 
-        {/* Year from */}
-        <select
-          value={filters.yearFrom}
-          onChange={(e) =>
-            setFilters((f) => ({ ...f, yearFrom: e.target.value }))
-          }
-          aria-label="Filter by year from"
-        >
-          {YEAR_OPTIONS.map(({ value, label }) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
+        <select value={filters.yearFrom} onChange={(e) => setFilters((f) => ({ ...f, yearFrom: e.target.value }))} aria-label="Filter by year from">
+          {YEAR_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
         </select>
+
+        {/* Postcode / location — only render after client has read localStorage */}
+        {mounted && (
+          buyerTown ? (
+            <button type="button" className="browse-postcode-active" onClick={clearPostcode}>
+              Near {buyerTown} ✕
+            </button>
+          ) : (
+            <form onSubmit={handleSetPostcode} style={{ display: "contents" }}>
+              <input
+                type="text"
+                className="browse-postcode-input"
+                placeholder="Your postcode"
+                value={postcodeInput}
+                onChange={(e) => { setPostcodeInput(e.target.value); setPostcodeError(""); }}
+                maxLength={8}
+                aria-label="Your postcode for distance"
+              />
+              <button type="submit" className="browse-postcode-set">Set</button>
+            </form>
+          )
+        )}
 
         {hasActiveFilters && (
-          <button
-            type="button"
-            className="browse-filters-clear"
-            onClick={clearFilters}
-          >
+          <button type="button" className="browse-filters-clear" onClick={clearFilters}>
             Clear filters
           </button>
         )}
       </div>
 
-      {/* ── Listing grid ───────────────────────────────────────────────────── */}
+      {postcodeError && (
+        <p style={{ color: "#dc2626", fontSize: "13px", margin: "4px 0 0 24px" }}>{postcodeError}</p>
+      )}
+
       <section className="listing-section">
         {loading && <p>Loading cars…</p>}
         {!loading && error && <p>{error}</p>}
@@ -343,17 +391,9 @@ export default function BrowsePage() {
             const displayTitle = advertDisplayTitle(ad);
 
             return (
-              <Link
-                className="listing-card"
-                href={`/advert/${ad.id}`}
-                key={ad.id}
-              >
+              <Link className="listing-card" href={`/advert/${ad.id}`} key={ad.id}>
                 {ad.advert_photos?.[0]?.image_url ? (
-                  <img
-                    className="listing-photo-img"
-                    src={ad.advert_photos[0].image_url}
-                    alt={displayTitle}
-                  />
+                  <img className="listing-photo-img" src={ad.advert_photos[0].image_url} alt={displayTitle} />
                 ) : ad.is_example ? (
                   <ExampleAdvertPlaceholder className="listing-photo" />
                 ) : (
@@ -363,21 +403,25 @@ export default function BrowsePage() {
                 <div className="listing-body">
                   <div className="listing-topline">
                     <span className="seller-badge">Private seller</span>
-                    {ad.is_example && (
-                      <span className="example-badge">Example listing</span>
-                    )}
+                    {ad.is_example && <span className="example-badge">Example listing</span>}
                   </div>
 
                   <h2>{displayTitle}</h2>
 
-                  <p className="listing-price">
-                    £{Number(ad.price).toLocaleString()}
-                  </p>
+                  <p className="listing-price">£{Number(ad.price).toLocaleString()}</p>
 
                   <div className="listing-meta">
                     <span>{Number(ad.mileage).toLocaleString()} miles</span>
                     <span>OwnerCars protected contact</span>
                   </div>
+
+                  {(ad.nearest_town || ad.distance_miles !== undefined) && (
+                    <p className="listing-location">
+                      {ad.nearest_town && `Near ${ad.nearest_town}`}
+                      {ad.nearest_town && ad.distance_miles !== undefined && " · "}
+                      {ad.distance_miles !== undefined && `~${ad.distance_miles} miles away`}
+                    </p>
+                  )}
 
                   <p className="listing-description">{ad.description}</p>
                 </div>

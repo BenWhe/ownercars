@@ -70,7 +70,7 @@ export async function PATCH(req: NextRequest, context: Context) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  let body: { title?: string; price?: number; mileage?: number; description?: string };
+  let body: { title?: string; price?: number; mileage?: number; description?: string; postcode?: string; latitude?: number; longitude?: number; nearest_town?: string };
   try {
     body = await req.json();
   } catch {
@@ -84,6 +84,10 @@ export async function PATCH(req: NextRequest, context: Context) {
       price: body.price,
       mileage: body.mileage,
       description: body.description,
+      ...(body.postcode !== undefined && { postcode: body.postcode }),
+      ...(body.latitude !== undefined && { latitude: body.latitude }),
+      ...(body.longitude !== undefined && { longitude: body.longitude }),
+      ...(body.nearest_town !== undefined && { nearest_town: body.nearest_town }),
     })
     .eq("id", id)
     .eq("seller_id", user.id);

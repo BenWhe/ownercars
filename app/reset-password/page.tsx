@@ -98,7 +98,11 @@ export default function ResetPasswordPage() {
             {isSubmitting ? "Updating..." : "Update password"}
           </button>
 
-          {message && <p className="auth-message">{message}</p>}
+          {message && (
+            <p className={`auth-message${message.toLowerCase().includes('updated') ? ' auth-message--success' : ''}`}>
+              {message}
+            </p>
+          )}
         </form>
       </section>
     </main>

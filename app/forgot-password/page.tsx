@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
         </p>
 
         {submitted ? (
-          <p className="auth-message">
+          <p className="auth-message auth-message--success">
             If an account exists for that email, a reset link is on its way.
           </p>
         ) : (
@@ -62,7 +62,11 @@ export default function ForgotPasswordPage() {
               {isSubmitting ? "Sending..." : "Send reset link"}
             </button>
 
-            {message && <p className="auth-message">{message}</p>}
+            {message && (
+              <p className={`auth-message${message.toLowerCase().includes('on its way') ? ' auth-message--success' : ''}`}>
+                {message}
+              </p>
+            )}
           </form>
         )}
 

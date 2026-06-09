@@ -7,12 +7,20 @@ import { signOutAndClearSession } from "@/lib/auth/client";
 export default function AccountPage() {
   const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [postcode, setPostcode] = useState("");
+  const [postcodeInput, setPostcodeInput] = useState("");
+  const [postcodeError, setPostcodeError] = useState("");
+  const [postcodeSaving, setPostcodeSaving] = useState(false);
+  const [postcodeSaved, setPostcodeSaved] = useState(false);
 
   useEffect(() => {
     async function loadUser() {
       const res = await fetch("/api/account");
       const result = await res.json();
       setEmail(result.user?.email ?? null);
+      const existing = result.profile?.postcode ?? "";
+      setPostcode(existing);
+      setPostcodeInput(existing);
       setLoading(false);
     }
 
@@ -24,109 +32,140 @@ export default function AccountPage() {
     await signOutAndClearSession();
   }
 
+  async function handleSavePostcode(e: React.FormEvent) {
+    e.preventDefault();
+    setPostcodeError("");
+    setPostcodeSaved(false);
+    setPostcodeSaving(true);
+
+    const trimmed = postcodeInput.trim();
+    if (!trimmed) {
+      setPostcodeError("Please enter a postcode.");
+      setPostcodeSaving(false);
+      return;
+    }
+
+    const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(trimmed)}`);
+    const geoResult = await geoRes.json();
+
+    if (!geoRes.ok) {
+      setPostcodeError("Please enter a valid UK postcode.");
+      setPostcodeSaving(false);
+      return;
+    }
+
+    const patchRes = await fetch("/api/account", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        postcode: geoResult.postcode,
+        latitude: geoResult.latitude,
+        longitude: geoResult.longitude,
+      }),
+    });
+
+    setPostcodeSaving(false);
+
+    if (!patchRes.ok) {
+      const err = await patchRes.json();
+      setPostcodeError(err.error || "Could not save postcode.");
+      return;
+    }
+
+    setPostcode(geoResult.postcode);
+    setPostcodeInput(geoResult.postcode);
+    setPostcodeSaved(true);
+  }
+
+  if (loading) return null;
+
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <Link href="/" className="text-2xl font-bold tracking-tight text-blue-600">
-            OwnerCars
-          </Link>
+    <main>
+      <section className="dashboard-hero">
+        <p className="eyebrow">Your account</p>
+        <h1>Account settings</h1>
+        <p>Manage your email, postcode and account preferences.</p>
+      </section>
 
-          <nav className="hidden items-center gap-8 text-sm font-medium text-slate-700 md:flex">
-            <Link href="/browse">Browse cars</Link>
-            <Link href="/create-advert">Sell your car</Link>
-            <Link href="/dashboard">Dashboard</Link>
-          </nav>
-        </div>
-      </header>
-
-      <section className="mx-auto max-w-4xl px-6 py-12">
-        <h1 className="text-4xl font-bold tracking-tight">Your account</h1>
-
-        {loading && <p className="mt-6 text-slate-600">Loading...</p>}
-
-        {!loading && !email && (
-          <div className="mt-8 rounded-3xl bg-white p-8 shadow-sm">
-            <p className="text-lg font-semibold">You are not logged in.</p>
-            <Link
-              href="/login"
-              className="mt-6 inline-block rounded-full bg-blue-600 px-6 py-3 font-semibold text-white"
-            >
+      <section className="form-section">
+        {!email ? (
+          <div className="account-card">
+            <p style={{ marginBottom: "16px" }}>You are not logged in.</p>
+            <Link href="/login" className="button primary" style={{ display: "inline-flex" }}>
               Go to login
             </Link>
           </div>
-        )}
-
-        {!loading && email && (
-          <div className="mt-8 space-y-6">
-            <div className="rounded-3xl bg-white p-8 shadow-sm">
-              <p className="text-sm font-semibold text-blue-600">Account details</p>
-              <p className="mt-3 text-lg font-bold">{email}</p>
+        ) : (
+          <>
+            {/* Email */}
+            <div className="account-card">
+              <p className="eyebrow" style={{ marginBottom: "6px" }}>Email address</p>
+              <p className="account-value">{email}</p>
             </div>
 
-            <div className="rounded-3xl bg-white p-8 shadow-sm">
-              <h2 className="text-xl font-bold">Seller status</h2>
+            {/* Postcode */}
+            <div className="account-card">
+              <p className="eyebrow" style={{ marginBottom: "6px" }}>YOUR POSTCODE</p>
+              <p className="account-hint">
+                Used to show you how far away adverts are. Never shown to anyone.
+              </p>
 
-              <div className="mt-6 space-y-3 text-sm text-slate-700">
-                <Status label="Account created" complete />
-                <Status label="Email verified" complete />
-                <Status label="Phone verified" complete={false} />
-                <Status label="Advert created" complete />
-                <Status label="Payment completed" complete={false} />
-                <Status label="Admin approval" complete={false} />
-              </div>
+              <form onSubmit={handleSavePostcode} className="account-postcode-form">
+                <input
+                  type="text"
+                  value={postcodeInput}
+                  onChange={(e) => {
+                    setPostcodeInput(e.target.value);
+                    setPostcodeError("");
+                    setPostcodeSaved(false);
+                  }}
+                  placeholder="e.g. DT6 3NP"
+                  maxLength={8}
+                  className="account-postcode-input"
+                />
+                <button
+                  type="submit"
+                  disabled={postcodeSaving}
+                  className="button primary"
+                  style={{ padding: "10px 20px" }}
+                >
+                  {postcodeSaving ? "Saving…" : postcode ? "Update postcode" : "Save postcode"}
+                </button>
+              </form>
+
+              {postcode && postcodeInput === postcode && !postcodeSaved && (
+                <p style={{ fontSize: '13px', color: '#16a34a', margin: '6px 0 0' }}>✓ Postcode saved</p>
+              )}
+              {postcodeError && (
+                <p className="account-error">{postcodeError}</p>
+              )}
+              {postcodeSaved && (
+                <p className="account-success">✓ Postcode saved — {postcode}</p>
+              )}
             </div>
 
-            <div className="rounded-3xl bg-white p-8 shadow-sm">
-              <h2 className="text-xl font-bold">Actions</h2>
-
-              <div className="mt-6 flex flex-wrap gap-4">
-                <Link
-                  href="/create-advert"
-                  className="rounded-full bg-blue-600 px-6 py-3 font-semibold text-white"
-                >
-                  Create advert
-                </Link>
-
-                <Link
-                  href="/dashboard"
-                  className="rounded-full border border-slate-300 px-6 py-3 font-semibold text-slate-900"
-                >
+            {/* Actions */}
+            <div className="account-card">
+              <p className="eyebrow" style={{ marginBottom: "16px" }}>Actions</p>
+              <div className="account-actions">
+                <Link href="/dashboard" className="button primary">
                   View dashboard
                 </Link>
-
+                <Link href="/create-advert" className="button primary">
+                  Create advert
+                </Link>
                 <button
                   onClick={logout}
-                  className="rounded-full border border-red-200 px-6 py-3 font-semibold text-red-600"
+                  className="button primary"
+                  style={{ background: '#dc2626' }}
                 >
-                  Logout
+                  Log out
                 </button>
               </div>
             </div>
-          </div>
+          </>
         )}
       </section>
     </main>
-  );
-}
-
-function Status({
-  label,
-  complete,
-}: {
-  label: string;
-  complete: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-      <span>{label}</span>
-      <span
-        className={`text-sm font-bold ${
-          complete ? "text-green-600" : "text-slate-400"
-        }`}
-      >
-        {complete ? "✓" : "Pending"}
-      </span>
-    </div>
   );
 }

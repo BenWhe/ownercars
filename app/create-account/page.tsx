@@ -13,6 +13,8 @@ export default function CreateAccountPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [postcode, setPostcode] = useState("");
+  const [postcodeError, setPostcodeError] = useState("");
   const [message, setMessage] = useState("");
   const [nextPath, setNextPath] = useState<string | null>(null);
 
@@ -26,6 +28,16 @@ export default function CreateAccountPage() {
 
   async function handleCreateAccount(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setPostcodeError("");
+
+    // Validate postcode before signup
+    if (postcode.trim()) {
+      const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(postcode.trim())}`);
+      if (!geoRes.ok) {
+        setPostcodeError("Please enter a valid UK postcode.");
+        return;
+      }
+    }
 
     const supabase = createClient();
 
@@ -37,6 +49,27 @@ export default function CreateAccountPage() {
     if (error) {
       setMessage(error.message);
     } else {
+      // Save postcode to profile if user has a session (auto-confirm enabled)
+      if (data.session && postcode.trim()) {
+        try {
+          const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(postcode.trim())}`);
+          const geoResult = await geoRes.json();
+          if (geoRes.ok) {
+            await fetch("/api/account", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                postcode: geoResult.postcode,
+                latitude: geoResult.latitude,
+                longitude: geoResult.longitude,
+              }),
+            });
+          }
+        } catch {
+          // Non-blocking — postcode can be set from account page
+        }
+      }
+
       const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
 
       setMessage(
@@ -93,6 +126,19 @@ export default function CreateAccountPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+          </label>
+
+          <label>
+            Your postcode
+            <input
+              type="text"
+              placeholder="e.g. DT6 3NP"
+              value={postcode}
+              onChange={(e) => { setPostcode(e.target.value); setPostcodeError(""); }}
+              maxLength={8}
+            />
+            <p className="field-hint">Used to show distances to adverts and to help buyers find cars near them. Never shown to anyone.</p>
+            {postcodeError && <p className="field-error" role="alert">{postcodeError}</p>}
           </label>
 
           <button type="submit">Create account</button>

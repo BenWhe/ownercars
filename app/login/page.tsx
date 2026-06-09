@@ -119,7 +119,13 @@ export default function LoginPage() {
             {isSubmitting ? "Signing in..." : "Sign in"}
           </button>
 
-          {message && <p className="auth-message">{message}</p>}
+          {message && (
+            <p className={`auth-message${message.toLowerCase().includes('confirm') ? ' auth-message--notice' : ''}`}>
+              {message.toLowerCase().includes('confirm')
+                ? "Your email address hasn't been confirmed yet. Please check your inbox and click the confirmation link we sent you."
+                : message}
+            </p>
+          )}
         </form>
 
         <div className="auth-divider">

@@ -61,6 +61,8 @@ export default function CreateAdvertPage() {
   const [fuelType, setFuelType] = useState("");
   const [previouslyWrittenOff, setPreviouslyWrittenOff] = useState("");
   const [confirmedPrivateSeller, setConfirmedPrivateSeller] = useState(false);
+  const [postcode, setPostcode] = useState("");
+  const [postcodeError, setPostcodeError] = useState("");
 
   const currentDraft = useCallback((): AdvertDraft => {
     return {
@@ -292,11 +294,28 @@ export default function CreateAdvertPage() {
 
     saveDraftToLocalStorage();
 
+    // Geocode postcode if provided
+    let geoPayload: { postcode?: string; latitude?: number; longitude?: number; nearest_town?: string } = {};
+    if (postcode.trim()) {
+      const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(postcode.trim())}`);
+      const geoResult = await geoRes.json();
+      if (!geoRes.ok) {
+        setPostcodeError("Please enter a valid UK postcode.");
+        return;
+      }
+      geoPayload = {
+        postcode: geoResult.postcode,
+        latitude: geoResult.latitude,
+        longitude: geoResult.longitude,
+        nearest_town: geoResult.nearest_town,
+      };
+    }
+
     try {
       const res = await fetch("/api/create-draft-advert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(currentDraft()),
+        body: JSON.stringify({ ...currentDraft(), ...geoPayload }),
       });
 
       const result = await res.json();
@@ -556,6 +575,19 @@ export default function CreateAdvertPage() {
               </p>
             </div>
             {fieldError("description")}
+          </label>
+
+          <label>
+            Where is the car located?
+            <input
+              type="text"
+              value={postcode}
+              onChange={(e) => { setPostcode(e.target.value); setPostcodeError(""); }}
+              placeholder="e.g. DT6 3NP"
+              maxLength={8}
+            />
+            <p className="field-hint">Enter the postcode where the car is kept. We show nearest town to buyers — your postcode is never visible.</p>
+            {postcodeError && <p className="field-error" role="alert">{postcodeError}</p>}
           </label>
 
           <label className="checkbox-row">

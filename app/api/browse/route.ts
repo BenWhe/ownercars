@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 3958.8;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function createSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -71,6 +79,9 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Filtered advert list ────────────────────────────────────────────────────
+  const buyerLat = searchParams.get("buyer_lat") ? Number(searchParams.get("buyer_lat")) : null;
+  const buyerLng = searchParams.get("buyer_lng") ? Number(searchParams.get("buyer_lng")) : null;
+
   const make = searchParams.get("make")?.trim();
   const model = searchParams.get("model")?.trim();
   const bodyType = searchParams.get("bodyType")?.trim();
@@ -103,5 +114,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({ adverts: data ?? [] });
+  const adverts = (data ?? []).map((ad: any) => {
+    if (buyerLat !== null && buyerLng !== null && ad.latitude && ad.longitude) {
+      const dist = haversineDistance(buyerLat, buyerLng, ad.latitude, ad.longitude);
+      return { ...ad, distance_miles: Math.round(dist) };
+    }
+    return ad;
+  });
+
+  return NextResponse.json({ adverts });
 }
