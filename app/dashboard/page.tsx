@@ -132,7 +132,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="dashboard-card-body">
-                <h2>{ad.title}</h2>
+                <h2>{[ad.year, ad.make, ad.model].filter(Boolean).map(s => s?.charAt(0).toUpperCase() + s?.slice(1)).join(' ') || ad.title || 'Untitled advert'}</h2>
 
                 <p className="listing-price">
                   £{Number(ad.price).toLocaleString()}
