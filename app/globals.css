@@ -3397,3 +3397,24 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   font-family: inherit;
   cursor: pointer;
 }
+
+.trust-strip {
+  text-align: center;
+  padding: 16px 40px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+  color: #666;
+  letter-spacing: 0.2px;
+}
+
+.vault-teaser {
+  padding: 80px 40px;
+  text-align: center;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.feature-card--full {
+  grid-column: 1 / -1;
+  text-align: center;
+}
