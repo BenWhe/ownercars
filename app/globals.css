@@ -3707,7 +3707,6 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   .home-cta-band { margin: 0 16px 96px; padding: 56px 22px; }
   .home-sticky-cta {
     display: flex;
-    gap: 10px;
     position: fixed;
     bottom: 0;
     left: 0;
@@ -3717,8 +3716,12 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
     backdrop-filter: blur(18px);
     border-top: 1px solid var(--line);
     z-index: 60;
+    justify-content: center;
   }
-  .home-sticky-cta .home-btn { flex: 1; justify-content: center; }
+  .home-sticky-cta .home-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 768px) {
