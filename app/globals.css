@@ -3720,3 +3720,56 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   }
   .home-sticky-cta .home-btn { flex: 1; justify-content: center; }
 }
+
+@media (max-width: 768px) {
+  .browse-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0 16px 4px;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .browse-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .browse-filters select {
+    flex-shrink: 0;
+    height: 40px;
+    font-size: 13px;
+    padding: 0 30px 0 14px;
+    white-space: nowrap;
+  }
+
+  .browse-filters-clear {
+    flex-shrink: 0;
+    height: 40px;
+    font-size: 13px;
+    padding: 0 14px;
+    white-space: nowrap;
+  }
+
+  .browse-postcode-input {
+    flex-shrink: 0;
+    width: 130px;
+    height: 40px;
+    font-size: 13px;
+  }
+
+  .browse-postcode-set {
+    flex-shrink: 0;
+    height: 40px;
+    font-size: 13px;
+    padding: 0 14px;
+  }
+
+  .browse-postcode-active {
+    flex-shrink: 0;
+    height: 40px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+}
