@@ -1,216 +1,197 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
-
-function capitaliseWords(str?: string) {
-  if (!str) return "";
-  return str
-    .trim()
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
 
 export default function HomePage() {
-  const [latestAdvert, setLatestAdvert] = useState<any>(null);
-
-  useEffect(() => {
-    async function fetchLatestAdvert() {
-      const supabase = createClient();
-
-      const { data } = await supabase
-        .from("adverts")
-        .select("*, advert_photos(*)")
-        .eq("status", "published")
-        .order("published_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      setLatestAdvert(data);
-    }
-
-    fetchLatestAdvert();
-  }, []);
-
-  const latestTitle = latestAdvert
-    ? [latestAdvert.year, capitaliseWords(latestAdvert.make), capitaliseWords(latestAdvert.model)]
-        .filter(Boolean)
-        .join(" ")
-    : null;
-
   return (
     <main>
-      <section className="hero">
-        <div className="hero-content">
-          <p className="eyebrow">PRIVATE CARS. PRIVATE SELLERS. PRIVACY SECURED.</p>
-          <h1>Sell your car privately. Keep your details private too.</h1>
-
-          <span className="price-badge">🔒 Launch price — rising to £9.99</span>
-
-          <h2 className="price-hero">
-            <span className="price-old">£9.99</span>
-            <span className="price-new">£2.50</span>
-          </h2>
-
-          <p className="hero-subtitle">
-            Other platforms expose your phone number the moment you call a buyer back. Service history, MOT certificates, walk-around videos? Every other platform pushes you to WhatsApp. OwnerCars keeps everything on-platform — from first message to final paperwork.
-          </p>
-
-          <div className="hero-actions">
-            <Link className="button primary" href="/create-advert">
-              Start for £2.50
-            </Link>
-            <Link className="button secondary" href="/browse">
-              Browse private cars
-            </Link>
-          </div>
+      {/* HERO */}
+      <section className="home-hero">
+        <p className="eyebrow home-eyebrow">Private cars. Private sellers. Privacy secured.</p>
+        <h1 className="home-h1">
+          Sell your car privately.<br />
+          Keep your details <span className="home-private">private</span> too.
+        </h1>
+        <p className="home-hero-sub">
+          Advertise until sold. Buyers message you through OwnerCars — your phone number, email and address are never shown to anyone.
+        </p>
+        <div className="home-hero-price">
+          <span className="home-price-was">£9.99</span>
+          <span className="home-price-now">£2.50</span>
         </div>
-
-        <Link
-          href={latestAdvert ? `/advert/${latestAdvert.id}` : "/browse"}
-          className="hero-card latest-advert-card"
-        >
-          {latestAdvert?.advert_photos?.[0]?.image_url ? (
-            <img
-              className="hero-card-img"
-              src={latestAdvert.advert_photos[0].image_url}
-              alt={[latestAdvert.year, capitaliseWords(latestAdvert.make), capitaliseWords(latestAdvert.model)].filter(Boolean).join(" ")}
-            />
-          ) : latestAdvert?.is_example ? (
-            <ExampleAdvertPlaceholder
-              className="hero-card-img"
-              style={{ borderRadius: "12px 12px 0 0" }}
-            />
-          ) : (
-            <div className="mock-photo"></div>
-          )}
-
-          <div className="mock-listing">
-            <span className="latest-badge">Latest advert</span>
-
-            <p className="mock-title">
-              {latestTitle || "Latest private advert"}
-            </p>
-
-            <p className="mock-price">
-              {latestAdvert
-                ? `£${Number(latestAdvert.price).toLocaleString()}`
-                : "Browse live adverts"}
-            </p>
-
-            <p className="mock-meta">
-              {latestAdvert
-                ? `${Number(latestAdvert.mileage).toLocaleString()} miles`
-                : "Private sellers only"}
-            </p>
-          </div>
-        </Link>
-      </section>
-
-      <section className="trust-strip">
-        <p>No phone number shown · No address exposed · Documents shared securely on-platform · No ongoing charges</p>
-      </section>
-
-      <section className="cards-section">
-        <div className="section-heading">
-          <p className="eyebrow">Why OwnerCars?</p>
-          <h2>A marketplace built for private sellers</h2>
-        </div>
-
-        <div className="feature-grid">
-          <article className="feature-card">
-            <h3>Your details, your rules</h3>
-            <p>
-              Your phone number, home address and vehicle registration are never shown publicly. Buyers message you through OwnerCars. You decide when — and to whom — you share anything further.
-            </p>
-          </article>
-
-          <article className="feature-card">
-            <h3>What this really means</h3>
-            <p>
-              When a buyer requests your service history or MOT certificate, we log it. A buyer repeatedly requesting documents from multiple sellers without purchasing gets flagged and acted upon. Document harvesting — one of the most common scams in private car sales — doesn&apos;t happen here. This only exists at OwnerCars.
-            </p>
-          </article>
-
-          <article className="feature-card">
-            <h3>One price. No surprises.</h3>
-            <p>
-              AutoTrader&apos;s Ultimate package costs £97.50. PistonHeads charges £34.99 every 30 days — over £100 if your car takes three months to sell. OwnerCars is £9.99, once, until your car sells. Six months or six days, the price is the same.
-            </p>
-          </article>
-
-          <article className="feature-card feature-card--full">
-            <h3>Private sellers only.</h3>
-            <p>No dealers. No trade listings. Every car on OwnerCars is from a private individual — which means genuine buyers, not forecourt browsers.</p>
-          </article>
+        <p className="home-price-note">Launch price — first 500 adverts only</p>
+        <div className="home-hero-ctas">
+          <Link className="home-btn home-btn-primary" href="/create-advert">Start for £2.50</Link>
+          <Link className="home-btn home-btn-ghost" href="/browse">Browse private cars</Link>
         </div>
       </section>
 
-      <section className="vault-teaser">
-        <div className="section-heading">
-          <p className="eyebrow">THE OWNERCARS SECURE VAULT</p>
-          <h2>Share the details that matter — with the buyers who&apos;ve earned them</h2>
-          <p>Service history, MOT certificates, V5C, walk-around video. Every other platform asks you to send these over WhatsApp to someone you&apos;ve never met. OwnerCars gives you a secure, on-platform vault. You control who sees what. Every access is logged. You can revoke it at any time. Your documents never leave OwnerCars.</p>
-          <Link className="button primary" href="/seller-protection">See how the vault works</Link>
-        </div>
-      </section>
-
-      <section className="protection-teaser">
-        <div>
-          <p className="eyebrow">Protected private selling</p>
-          <h2>Sell your car without exposing your details too early</h2>
-          <p>
-            OwnerCars helps protect your phone number, address, vehicle
-            registration and identity by keeping buyer communication on-platform
-            and releasing sensitive information only when you choose.
-          </p>
-        </div>
-
-        <Link className="button primary" href="/seller-protection">
-          See how seller protection works
-        </Link>
-      </section>
-
-      <section className="steps-section">
-        <div className="section-heading">
-          <p className="eyebrow">How it works</p>
-          <h2>List your car in five simple steps</h2>
-        </div>
-
-        <div className="steps">
-          <div>
-            <span>1</span>
-            <p>Create your seller account</p>
+      {/* TRUST STRIP */}
+      <section className="home-trust-strip">
+        <div className="home-trust-inner">
+          <div className="home-trust-item">
+            <div className="home-trust-big">£2.50</div>
+            <div className="home-trust-small">until sold — no renewals</div>
           </div>
-          <div>
-            <span>2</span>
-            <p>Add vehicle details and description</p>
+          <div className="home-trust-item">
+            <div className="home-trust-big">0%</div>
+            <div className="home-trust-small">commission on your sale</div>
           </div>
-          <div>
-            <span>3</span>
-            <p>Upload up to 10 photos</p>
+          <div className="home-trust-item">
+            <div className="home-trust-big">Zero</div>
+            <div className="home-trust-small">personal details shown</div>
           </div>
-          <div>
-            <span>4</span>
-            <p>Pay £2.50 and publish instantly</p>
-          </div>
-          <div>
-            <span>5</span>
-            <p>Interact with buyers securely until sold</p>
+          <div className="home-trust-item">
+            <div className="home-trust-big">100%</div>
+            <div className="home-trust-small">private sellers only</div>
           </div>
         </div>
       </section>
 
-      <section className="cta-band">
-        <h2>Launch price: £2.50 until sold. Rising to £9.99.</h2>
-        <p>Join the private sellers who are selling smarter.</p>
-        <Link className="button light" href="/create-advert">
-          Start your advert
-        </Link>
+      {/* PRIVACY SPLIT */}
+      <section className="home-split-section">
+        <div className="home-split-heading">
+          <h2>Masked isn&apos;t private.</h2>
+          <p>Other marketplaces hide your number — until you return a call, reply to a text, or send a photo by WhatsApp. On OwnerCars there&apos;s no moment your details can leak, because buyers never leave the platform.</p>
+        </div>
+        <div className="home-split-grid">
+          <div className="home-split-card home-split-them">
+            <p className="home-split-label">Other marketplaces</p>
+            <div className="home-split-row">
+              <span className="home-split-icon">📞</span>
+              <span>Phone number</span>
+              <span className="home-split-val">Exposed when you reply</span>
+            </div>
+            <div className="home-split-row">
+              <span className="home-split-icon">✉️</span>
+              <span>Email address</span>
+              <span className="home-split-val">Exposed when you reply</span>
+            </div>
+            <div className="home-split-row">
+              <span className="home-split-icon">📄</span>
+              <span>Documents</span>
+              <span className="home-split-val">Sent by WhatsApp or email</span>
+            </div>
+            <div className="home-split-row">
+              <span className="home-split-icon">👤</span>
+              <span>Who&apos;s contacting you</span>
+              <span className="home-split-val">Anonymous callers</span>
+            </div>
+          </div>
+          <div className="home-split-card home-split-us">
+            <p className="home-split-label">OwnerCars</p>
+            <div className="home-split-row">
+              <span className="home-split-icon">📞</span>
+              <span>Phone number</span>
+              <span className="home-split-val">Stays on-platform</span>
+            </div>
+            <div className="home-split-row">
+              <span className="home-split-icon">✉️</span>
+              <span>Email address</span>
+              <span className="home-split-val">Stays on-platform</span>
+            </div>
+            <div className="home-split-row">
+              <span className="home-split-icon">📄</span>
+              <span>Documents</span>
+              <span className="home-split-val">Secure Vault, every share logged</span>
+            </div>
+            <div className="home-split-row">
+              <span className="home-split-icon">👤</span>
+              <span>Who&apos;s contacting you</span>
+              <span className="home-split-val">Registered, monitored buyers</span>
+            </div>
+          </div>
+        </div>
       </section>
+
+      {/* DARK VAULT SECTION */}
+      <section className="home-vault-section">
+        <div className="home-vault-inner">
+          <div className="home-vault-grid">
+            <div>
+              <p className="home-vault-eyebrow">Secure Vault</p>
+              <h2>Your documents never leave OwnerCars.</h2>
+              <p className="home-vault-lead">MOT certificate, service history, V5C — buyers request them, you decide who sees them. Every request is logged and monitored.</p>
+              <div className="home-vault-points">
+                <div className="home-vault-point">
+                  <span className="home-vault-dot">✓</span>
+                  Buyers request one document at a time — you approve each share
+                </div>
+                <div className="home-vault-point">
+                  <span className="home-vault-dot">✓</span>
+                  Links expire after 15 minutes
+                </div>
+                <div className="home-vault-point">
+                  <span className="home-vault-dot">✓</span>
+                  Document harvesting gets flagged and acted upon
+                </div>
+              </div>
+            </div>
+            <div className="home-vault-visual">
+              <div className="home-vault-doc">
+                <span className="home-vault-file">📄</span>
+                <span className="home-vault-meta">
+                  <div className="home-vault-name">MOT certificate</div>
+                  <div className="home-vault-state">Shared with 1 buyer · logged</div>
+                </span>
+                <span className="home-vault-lock">🔒</span>
+              </div>
+              <div className="home-vault-doc">
+                <span className="home-vault-file">📋</span>
+                <span className="home-vault-meta">
+                  <div className="home-vault-name">Service history</div>
+                  <div className="home-vault-state">2 requests pending your approval</div>
+                </span>
+                <span className="home-vault-lock">🔒</span>
+              </div>
+              <div className="home-vault-doc">
+                <span className="home-vault-file">🪪</span>
+                <span className="home-vault-meta">
+                  <div className="home-vault-name">Redacted V5C</div>
+                  <div className="home-vault-state">Private — not yet shared</div>
+                </span>
+                <span className="home-vault-lock">🔒</span>
+              </div>
+              <p className="home-vault-footnote">This only exists at OwnerCars.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section className="home-steps-section">
+        <div className="home-steps-heading">
+          <h2>Sold in three steps.</h2>
+        </div>
+        <div className="home-steps">
+          <div className="home-step">
+            <div className="home-step-num">1</div>
+            <h3>Create your advert</h3>
+            <p>Photos, price, history. Add your postcode — buyers only ever see your nearest town.</p>
+          </div>
+          <div className="home-step">
+            <div className="home-step-num">2</div>
+            <h3>Buyers message you here</h3>
+            <p>All contact happens through OwnerCars. Phone numbers and emails are automatically blocked.</p>
+          </div>
+          <div className="home-step">
+            <div className="home-step-num">3</div>
+            <h3>Share documents safely</h3>
+            <p>Approve vault requests one at a time. Meet, sell, done — your advert runs until the car is sold.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA BAND */}
+      <section className="home-cta-band">
+        <h2>Your car. Your sale. Your privacy.</h2>
+        <p>Advertise until sold for £2.50 — launch price for the first 500 adverts.</p>
+        <Link className="home-btn home-cta-btn" href="/create-advert">Start for £2.50</Link>
+      </section>
+
+      {/* Mobile sticky CTA */}
+      <div className="home-sticky-cta">
+        <Link className="home-btn home-btn-primary" href="/create-advert">Start for £2.50</Link>
+        <Link className="home-btn home-btn-ghost" href="/browse">Browse private cars</Link>
+      </div>
     </main>
   );
 }
