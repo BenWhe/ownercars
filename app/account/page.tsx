@@ -18,7 +18,34 @@ export default function AccountPage() {
       const res = await fetch("/api/account");
       const result = await res.json();
       setEmail(result.user?.email ?? null);
-      const existing = result.profile?.postcode ?? "";
+      let existing: string = result.profile?.postcode ?? "";
+
+      // Self-heal: postcode was stored in user_metadata at signup but never written to
+      // the profiles table (expected when email confirmation is enabled).
+      if (!existing) {
+        const metaPostcode: string | null = result.user?.user_metadata?.postcode ?? null;
+        if (metaPostcode) {
+          try {
+            const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(metaPostcode)}`);
+            if (geoRes.ok) {
+              const geo = await geoRes.json();
+              await fetch("/api/account", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  postcode: geo.postcode,
+                  latitude: geo.latitude,
+                  longitude: geo.longitude,
+                }),
+              });
+              existing = geo.postcode;
+            }
+          } catch {
+            // Non-blocking — user can always save manually
+          }
+        }
+      }
+
       setPostcode(existing);
       setPostcodeInput(existing);
       setLoading(false);
