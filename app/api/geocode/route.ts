@@ -26,11 +26,21 @@ export async function GET(request: NextRequest) {
   }
 
   const r = data.result;
-  const nearest_town =
-    r.admin_district ??
-    r.parliamentary_constituency ??
-    r.region ??
-    null;
+
+  function deriveTown(r: any): string | null {
+    const parish: string | null = r.parish ?? null;
+    if (parish && !/unparished/i.test(parish)) {
+      return parish;
+    }
+    const ward: string | null = r.admin_ward ?? null;
+    if (ward) {
+      // Take the first place name before any "&" or "," separator
+      return ward.split(/[&,]/)[0].trim();
+    }
+    return r.admin_district ?? r.parliamentary_constituency ?? r.region ?? null;
+  }
+
+  const nearest_town = deriveTown(r);
 
   return NextResponse.json({
     postcode: r.postcode,
