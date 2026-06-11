@@ -15,5 +15,5 @@ CREATE INDEX IF NOT EXISTS search_alerts_token_idx ON search_alerts (token);
 CREATE INDEX IF NOT EXISTS search_alerts_email_idx ON search_alerts (email);
 CREATE INDEX IF NOT EXISTS search_alerts_ip_idx ON search_alerts (ip);
 
--- Service role only — no user-facing RLS needed
-ALTER TABLE search_alerts DISABLE ROW LEVEL SECURITY;
+-- Enable RLS with no policies: service-role client bypasses RLS, anon key gets nothing
+ALTER TABLE search_alerts ENABLE ROW LEVEL SECURITY;

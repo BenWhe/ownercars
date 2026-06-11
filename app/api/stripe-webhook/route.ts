@@ -37,11 +37,22 @@ async function matchAndNotifyAlerts(supabaseAdmin: SupabaseClient, advertId: str
 
   const { data: advert } = await supabaseAdmin
     .from("adverts")
-    .select("id, year, make, model, price, mileage, body_type, fuel_type, colour, nearest_town, latitude, longitude")
+    .select("id, seller_id, year, make, model, price, mileage, body_type, fuel_type, colour, nearest_town, latitude, longitude")
     .eq("id", advertId)
     .maybeSingle();
 
   if (!advert) return;
+
+  // Fetch seller email to exclude them from their own alert notifications
+  let sellerEmail: string | null = null;
+  if (advert.seller_id) {
+    try {
+      const { data: { user: sellerUser } } = await supabaseAdmin.auth.admin.getUserById(advert.seller_id);
+      sellerEmail = sellerUser?.email?.toLowerCase() ?? null;
+    } catch {
+      // Non-blocking — proceed without exclusion if lookup fails
+    }
+  }
 
   const { data: alerts } = await supabaseAdmin
     .from("search_alerts")
@@ -56,6 +67,7 @@ async function matchAndNotifyAlerts(supabaseAdmin: SupabaseClient, advertId: str
   const sends: Promise<void>[] = [];
 
   for (const alert of alerts) {
+    if (sellerEmail && alert.email.toLowerCase() === sellerEmail) continue;
     if (!advertMatchesFilters(advert, alert.filters ?? {})) continue;
 
     const unsubscribeUrl = `https://www.ownercars.co.uk/api/alerts/unsubscribe?token=${encodeURIComponent(alert.token)}`;
