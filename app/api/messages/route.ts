@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
         const recipientEmail = userData?.email;
 
         if (recipientEmail) {
-          const threadId = messageThreadId(advert.id, advert.seller_id);
+          const threadId = messageThreadId(advert.id, user.id);
           const viewUrl = `https://www.ownercars.co.uk/messages/${threadId}`;
           const preview = body.length > 200 ? body.slice(0, 200) + "…" : body;
           const advertTitle = [advert.year, advert.make, advert.model]
