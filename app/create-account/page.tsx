@@ -44,6 +44,9 @@ export default function CreateAccountPage() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: { postcode: postcode.trim() || null },
+      },
     });
 
     if (error) {

@@ -47,7 +47,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    user: { id: user.id, email: user.email },
+    user: { id: user.id, email: user.email, user_metadata: user.user_metadata ?? {} },
     profile: profile ?? { postcode: null, latitude: null, longitude: null },
   });
 }

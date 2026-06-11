@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { ADVERT_STATUS } from "@/lib/adverts/lifecycle";
 import { messageThreadId } from "@/lib/messages/thread";
+import { geocodePostcode } from "@/lib/geocode/lookup";
 
 function createSupabase(cookieStore: Awaited<ReturnType<typeof cookies>>) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -143,10 +144,36 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (!profile?.postcode) {
-      return NextResponse.json(
-        { error: "Please add your postcode to your account before messaging sellers.", code: "POSTCODE_REQUIRED" },
-        { status: 403 }
-      );
+      // Self-heal: postcode may have been stored in user_metadata at signup but not yet
+      // written to the profiles table (happens when email confirmation is enabled and
+      // the session-based save path in create-account was never reached).
+      const metaPostcode: string | null = user.user_metadata?.postcode ?? null;
+      if (metaPostcode) {
+        const geo = await geocodePostcode(metaPostcode);
+        if (geo) {
+          await admin.from("profiles").upsert(
+            {
+              id: user.id,
+              postcode: geo.postcode,
+              latitude: geo.latitude,
+              longitude: geo.longitude,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "id" }
+          );
+          // Profile is now populated — allow the message to proceed
+        } else {
+          return NextResponse.json(
+            { error: "Please add your postcode to your account before messaging sellers.", code: "POSTCODE_REQUIRED" },
+            { status: 403 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { error: "Please add your postcode to your account before messaging sellers.", code: "POSTCODE_REQUIRED" },
+          { status: 403 }
+        );
+      }
     }
   }
 
