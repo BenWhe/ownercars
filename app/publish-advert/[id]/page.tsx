@@ -245,8 +245,8 @@ export default function PublishAdvertPage() {
         <p className="eyebrow">Publish advert</p>
         <h1>Publish your listing</h1>
         <p>
-          Upload up to 10 photos, then publish using the £2.50 launch offer or by
-          paying £9.99.
+          Upload up to 10 photos, then publish using the £9.99 launch offer or by
+          paying £24.99.
         </p>
       </section>
 

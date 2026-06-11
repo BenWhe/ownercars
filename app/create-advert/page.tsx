@@ -346,13 +346,13 @@ export default function CreateAdvertPage() {
         <p className="eyebrow">Create advert</p>
 
         <h1>
-          Sell your car privately for <span className="no-break">£9.99</span>
+          Sell your car privately for <span className="no-break">£9.99 — launch price</span>
         </h1>
 
         <p className="dashboard-subtitle">
           Create your draft advert, then publish it using our{" "}
-          <span className="price-highlight">£2.50</span>{" "}
-          <span className="price-label">launch offer</span>. Standard £9.99
+          <span className="price-highlight">£9.99</span>{" "}
+          <span className="price-label">launch offer</span>. Standard £24.99
           price.
         </p>
       </section>

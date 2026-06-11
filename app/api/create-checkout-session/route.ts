@@ -276,7 +276,7 @@ export async function POST(req: Request) {
         metadata: {
           ...paymentMetadata,
           priceVersion:
-            finalAmount === LISTING_PRICE_AMOUNT_PENCE ? "launch-250" : "promo",
+            finalAmount === LISTING_PRICE_AMOUNT_PENCE ? "launch-999" : "promo",
           promoId: promo?.id || "",
         },
         success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,

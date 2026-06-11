@@ -33,8 +33,8 @@ export default function HowItWorksPage() {
           <span>3</span>
           <h2>Publish your listing</h2>
           <p>
-            Use the launch offer to advertise until sold for £2.50. Standard
-            OwnerCars pricing is £9.99.
+            Use the launch offer to advertise until sold for £9.99. Standard
+            OwnerCars pricing is £24.99.
           </p>
         </div>
 
