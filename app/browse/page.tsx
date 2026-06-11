@@ -99,6 +99,21 @@ const EMPTY_FILTERS = {
   yearFrom: "",
 };
 
+function filtersToAlertParams(f: typeof EMPTY_FILTERS) {
+  const pp = priceParams(f.price);
+  return {
+    make: f.make || null,
+    model: f.model || null,
+    bodyType: f.bodyType || null,
+    fuelType: f.fuel || null,
+    colour: f.colour || null,
+    minYear: f.yearFrom ? Number(f.yearFrom) : null,
+    maxMileage: f.mileage ? Number(f.mileage) : null,
+    minPrice: pp.minPrice ? Number(pp.minPrice) : null,
+    maxPrice: pp.maxPrice ? Number(pp.maxPrice) : null,
+  };
+}
+
 export default function BrowsePage() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [makes, setMakes] = useState<string[]>([]);
@@ -114,6 +129,11 @@ export default function BrowsePage() {
   const [buyerTown, setBuyerTown] = useState("");
   const [mounted, setMounted] = useState(false);
   const [postcodeError, setPostcodeError] = useState("");
+
+  // Alert signup state
+  const [alertEmail, setAlertEmail] = useState("");
+  const [alertStatus, setAlertStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [alertError, setAlertError] = useState("");
 
   // On mount: try to load postcode from logged-in profile, then localStorage
   useEffect(() => {
@@ -263,6 +283,34 @@ export default function BrowsePage() {
     }
   }
 
+  async function handleAlertSignup(e: React.FormEvent) {
+    e.preventDefault();
+    setAlertStatus("sending");
+    setAlertError("");
+
+    try {
+      const res = await fetch("/api/alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: alertEmail,
+          filters: filtersToAlertParams(filters),
+          postcode: postcodeInput.trim() || undefined,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setAlertStatus("error");
+        setAlertError(result.error || "Could not save alert.");
+      } else {
+        setAlertStatus("sent");
+      }
+    } catch {
+      setAlertStatus("error");
+      setAlertError("Could not save alert. Please try again.");
+    }
+  }
+
   function clearPostcode() {
     setBuyerLat(null);
     setBuyerLng(null);
@@ -377,10 +425,39 @@ export default function BrowsePage() {
         {!loading && error && <p>{error}</p>}
 
         {!loading && !error && adverts.length === 0 && (
-          <p>No adverts match your filters.</p>
+          hasActiveFilters ? (
+            <div className="browse-alert-card">
+              <p className="browse-alert-heading">No matches yet</p>
+              <p className="browse-alert-sub">Get notified when a matching car is listed.</p>
+              {alertStatus === "sent" ? (
+                <p className="browse-alert-success">✓ We'll email you when a match is found.</p>
+              ) : (
+                <form onSubmit={handleAlertSignup} className="browse-alert-form">
+                  <input
+                    type="email"
+                    required
+                    placeholder="Your email address"
+                    value={alertEmail}
+                    onChange={(e) => { setAlertEmail(e.target.value); setAlertError(""); }}
+                    className="browse-alert-input"
+                  />
+                  <button
+                    type="submit"
+                    disabled={alertStatus === "sending"}
+                    className="browse-alert-btn"
+                  >
+                    {alertStatus === "sending" ? "Saving…" : "Notify me"}
+                  </button>
+                  {alertError && <p className="browse-alert-error">{alertError}</p>}
+                </form>
+              )}
+            </div>
+          ) : (
+            <p>No adverts listed yet.</p>
+          )
         )}
 
-        {!loading && !error && adverts.length > 0 && (
+        {!loading && !error && adverts.length >= 10 && (
           <p style={{ color: "var(--muted)", marginBottom: "20px" }}>
             Showing {adverts.length} private car{adverts.length === 1 ? "" : "s"}
           </p>
