@@ -147,28 +147,31 @@ export async function POST(request: NextRequest) {
       // Self-heal: postcode may have been stored in user_metadata at signup but not yet
       // written to the profiles table (happens when email confirmation is enabled and
       // the session-based save path in create-account was never reached).
-      const metaPostcode: string | null = user.user_metadata?.postcode ?? null;
-      if (metaPostcode) {
-        const geo = await geocodePostcode(metaPostcode);
-        if (geo) {
-          await admin.from("profiles").upsert(
-            {
-              id: user.id,
-              postcode: geo.postcode,
-              latitude: geo.latitude,
-              longitude: geo.longitude,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "id" }
-          );
-          // Profile is now populated — allow the message to proceed
-        } else {
-          return NextResponse.json(
-            { error: "Please add your postcode to your account before messaging sellers.", code: "POSTCODE_REQUIRED" },
-            { status: 403 }
-          );
+      let healed = false;
+      try {
+        const metaPostcode: string | null = user.user_metadata?.postcode ?? null;
+        if (metaPostcode) {
+          const geo = await geocodePostcode(metaPostcode);
+          if (geo) {
+            await admin.from("profiles").upsert(
+              {
+                id: user.id,
+                postcode: geo.postcode,
+                latitude: geo.latitude,
+                longitude: geo.longitude,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "id" }
+            );
+            healed = true;
+          }
         }
-      } else {
+      } catch (healErr) {
+        console.error("Postcode self-heal failed:", healErr);
+        // falls through to POSTCODE_REQUIRED below
+      }
+
+      if (!healed) {
         return NextResponse.json(
           { error: "Please add your postcode to your account before messaging sellers.", code: "POSTCODE_REQUIRED" },
           { status: 403 }
