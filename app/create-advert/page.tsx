@@ -63,6 +63,7 @@ export default function CreateAdvertPage() {
   const [confirmedPrivateSeller, setConfirmedPrivateSeller] = useState(false);
   const [postcode, setPostcode] = useState("");
   const [postcodeError, setPostcodeError] = useState("");
+  const [postcodePrefilled, setPostcodePrefilled] = useState(false);
 
   const currentDraft = useCallback((): AdvertDraft => {
     return {
@@ -197,6 +198,33 @@ export default function CreateAdvertPage() {
       window.clearTimeout(draftRestoreTimer);
       subscription.unsubscribe();
     };
+  }, []);
+
+  // Prefill postcode from seller's profile on mount.
+  // Uses /api/account (server-side auth) — never a direct client-side Supabase call,
+  // which hangs on Vercel preview deployments.
+  useEffect(() => {
+    async function prefillPostcode() {
+      try {
+        const res = await fetch("/api/account");
+        if (!res.ok) return;
+        const result = await res.json();
+
+        const profilePostcode: string | null = result.profile?.postcode ?? null;
+        const metaPostcode: string | null = result.user?.user_metadata?.postcode ?? null;
+        const source = profilePostcode || metaPostcode || null;
+
+        if (!source) return;
+
+        // Only fill if the field is still empty (draft doesn't include postcode,
+        // so this will always be true in practice on first load)
+        setPostcode((current) => current || source);
+        setPostcodePrefilled(true);
+      } catch {
+        // Non-blocking
+      }
+    }
+    prefillPostcode();
   }, []);
 
   const saveDraftToLocalStorage = useCallback(() => {
@@ -582,11 +610,15 @@ export default function CreateAdvertPage() {
             <input
               type="text"
               value={postcode}
-              onChange={(e) => { setPostcode(e.target.value); setPostcodeError(""); }}
+              onChange={(e) => { setPostcode(e.target.value); setPostcodeError(""); setPostcodePrefilled(false); }}
               placeholder="e.g. DT6 3NP"
               maxLength={8}
             />
-            <p className="field-hint">Enter the postcode where the car is kept. We show nearest town to buyers — your postcode is never visible.</p>
+            {postcodePrefilled ? (
+              <p className="field-hint">We've used your account postcode. Change it if the car is kept somewhere else.</p>
+            ) : (
+              <p className="field-hint">Enter the postcode where the car is kept. We show nearest town to buyers — your postcode is never visible.</p>
+            )}
             {postcodeError && <p className="field-error" role="alert">{postcodeError}</p>}
           </label>
 
