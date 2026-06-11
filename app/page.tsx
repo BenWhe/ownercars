@@ -14,12 +14,12 @@ export default function HomePage() {
           Advertise until sold. Buyers message you through OwnerCars — your phone number, email and address are never shown to anyone.
         </p>
         <div className="home-hero-price">
-          <span className="home-price-was">£9.99</span>
-          <span className="home-price-now">£2.50</span>
+          <span className="home-price-was">£24.99</span>
+          <span className="home-price-now">£9.99</span>
         </div>
         <p className="home-price-note">Launch price — first 500 adverts only</p>
         <div className="home-hero-ctas">
-          <Link className="home-btn home-btn-primary" href="/create-advert">Start for £2.50</Link>
+          <Link className="home-btn home-btn-primary" href="/create-advert">Start for £9.99</Link>
           <Link className="home-btn home-btn-ghost" href="/browse">Browse private cars</Link>
         </div>
       </section>
@@ -28,7 +28,7 @@ export default function HomePage() {
       <section className="home-trust-strip">
         <div className="home-trust-inner">
           <div className="home-trust-item">
-            <div className="home-trust-big">£2.50</div>
+            <div className="home-trust-big">£9.99</div>
             <div className="home-trust-small">until sold — no renewals</div>
           </div>
           <div className="home-trust-item">
@@ -183,13 +183,13 @@ export default function HomePage() {
       {/* CTA BAND */}
       <section className="home-cta-band">
         <h2>Your car. Your sale. Your privacy.</h2>
-        <p>Advertise until sold for £2.50 — launch price for the first 500 adverts.</p>
-        <Link className="home-btn home-cta-btn" href="/create-advert">Start for £2.50</Link>
+        <p>Advertise until sold for £9.99 — launch price for the first 500 adverts.</p>
+        <Link className="home-btn home-cta-btn" href="/create-advert">Start for £9.99</Link>
       </section>
 
       {/* Mobile sticky CTA */}
       <div className="home-sticky-cta">
-        <Link className="home-btn home-btn-primary" href="/create-advert">Start for £2.50</Link>
+        <Link className="home-btn home-btn-primary" href="/create-advert">Start for £9.99</Link>
         <Link className="home-btn home-btn-ghost" href="/browse">Browse private cars</Link>
       </div>
     </main>
