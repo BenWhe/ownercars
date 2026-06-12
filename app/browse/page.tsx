@@ -144,6 +144,8 @@ export default function BrowsePage() {
       localStorage.removeItem("buyer_postcode");
       localStorage.removeItem("buyer_town");
 
+      // Instant fast-path: seed the field from cache before any async work so
+      // returning same-account users see their location immediately.
       const storedPostcode = localStorage.getItem("buyer_postcode_v2") ?? "";
       const storedTown = localStorage.getItem("buyer_town_v2") ?? "";
       setPostcodeInput(storedPostcode);
@@ -157,40 +159,69 @@ export default function BrowsePage() {
       const noCache = !storedPostcode;
       if (noCache) setLocating(true);
 
+      // Geocode a postcode and apply all derived state + cache in one place.
+      // uid is written to buyer_cache_uid so stale cross-account caches can be
+      // detected on the next load. Pass null for logged-out callers.
+      async function applyPostcode(postcode: string, uid: string | null) {
+        const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(postcode)}`);
+        if (!geoRes.ok) return false;
+        const geo = await geoRes.json();
+        setBuyerLat(geo.latitude);
+        setBuyerLng(geo.longitude);
+        setBuyerTown(geo.nearest_town ?? "");
+        setPostcodeInput(geo.postcode ?? postcode);
+        localStorage.setItem("buyer_postcode_v2", geo.postcode ?? postcode);
+        localStorage.setItem("buyer_town_v2", geo.nearest_town ?? "");
+        if (uid) localStorage.setItem("buyer_cache_uid", uid);
+        return true;
+      }
+
       try {
-        // Try profile first
         const accountRes = await fetch("/api/account");
         if (accountRes.ok) {
           const accountResult = await accountRes.json();
-          if (accountResult.profile?.latitude && accountResult.profile?.longitude) {
-            setBuyerLat(accountResult.profile.latitude);
-            setBuyerLng(accountResult.profile.longitude);
-            setPostcodeInput(accountResult.profile.postcode ?? "");
-            const storedTown2 = localStorage.getItem("buyer_town_v2") ?? "";
-            if (!storedTown2 && accountResult.profile.postcode) {
-              const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(accountResult.profile.postcode)}`);
-              if (geoRes.ok) {
-                const geoResult = await geoRes.json();
-                setBuyerTown(geoResult.nearest_town ?? "");
-                localStorage.setItem("buyer_postcode_v2", accountResult.profile.postcode);
-                localStorage.setItem("buyer_town_v2", geoResult.nearest_town ?? "");
-              }
+          const uid: string | null = accountResult.user?.id ?? null;
+
+          // Bug 2 — stale cross-account cache: if the cache was written by a
+          // different user, clear it and reset the displayed values now so the
+          // previous user's town never lingers. Logged-out visitors (uid = null)
+          // are unaffected — clearing only happens when both sides are known.
+          if (uid) {
+            const cachedUid = localStorage.getItem("buyer_cache_uid");
+            if (cachedUid && cachedUid !== uid) {
+              localStorage.removeItem("buyer_postcode_v2");
+              localStorage.removeItem("buyer_town_v2");
+              localStorage.removeItem("buyer_cache_uid");
+              setPostcodeInput("");
+              setBuyerTown("");
             }
+          }
+
+          // Path 1 — profile has geocoded coords
+          const profile = accountResult.profile;
+          if (profile?.latitude && profile?.longitude && profile?.postcode) {
+            await applyPostcode(profile.postcode, uid);
+            return;
+          }
+
+          // Path 2 — profile empty but user signed up with a postcode; it lives
+          // in user_metadata until a profile row is geocoded and saved
+          const metaPostcode: string | null = accountResult.user?.user_metadata?.postcode ?? null;
+          if (metaPostcode) {
+            await applyPostcode(metaPostcode, uid);
             return;
           }
         }
-        // Fall back to localStorage
+
+        // Path 3 — not logged in or no postcode found anywhere; trust the
+        // localStorage cache (already seeded at the top), just resolve lat/lng
         const stored = localStorage.getItem("buyer_postcode_v2");
         if (stored) {
-          setPostcodeInput(stored);
-          const storedTown3 = localStorage.getItem("buyer_town_v2") ?? "";
-          setBuyerTown(storedTown3);
-          // Geocode silently for lat/lng (needed for distance calculation)
           const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(stored)}`);
           if (geoRes.ok) {
-            const geoResult = await geoRes.json();
-            setBuyerLat(geoResult.latitude);
-            setBuyerLng(geoResult.longitude);
+            const geo = await geoRes.json();
+            setBuyerLat(geo.latitude);
+            setBuyerLng(geo.longitude);
           }
         }
       } finally {
@@ -335,6 +366,7 @@ export default function BrowsePage() {
     setPostcodeInput("");
     localStorage.removeItem("buyer_postcode_v2");
     localStorage.removeItem("buyer_town_v2");
+    localStorage.removeItem("buyer_cache_uid");
   }
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
