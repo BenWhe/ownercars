@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
 import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
+import { notifyAdvertPublished } from "@/lib/admin/notifyPublished";
 
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 3958.8;
@@ -329,6 +330,15 @@ export async function POST(req: Request) {
           await matchAndNotifyAlerts(supabaseAdmin, session.metadata.advertId);
         } catch (alertErr) {
           console.error("Alert matching failed:", alertErr);
+        }
+        try {
+          const amountGbp =
+            session.amount_total != null
+              ? `£${(session.amount_total / 100).toFixed(2)}`
+              : "unknown";
+          await notifyAdvertPublished(supabaseAdmin, session.metadata.advertId, amountGbp);
+        } catch (e) {
+          console.error("Admin publish notification failed:", e);
         }
       }
     }

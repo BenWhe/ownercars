@@ -12,6 +12,7 @@ import {
   validatePromoRecord,
 } from "@/lib/payments/promos";
 import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
+import { notifyAdvertPublished } from "@/lib/admin/notifyPublished";
 
 export async function POST(req: Request) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -218,6 +219,13 @@ export async function POST(req: Request) {
         { error: "Could not publish advert" },
         { status: 500 }
       );
+    }
+
+    // Non-blocking — must never affect the publish response
+    try {
+      await notifyAdvertPublished(supabase, advertId, "free (promo)");
+    } catch (e) {
+      console.error("Admin publish notification failed:", e);
     }
 
     return NextResponse.json({ url: "/dashboard" });
