@@ -50,7 +50,16 @@ export default function CreateAccountPage() {
     });
 
     if (error) {
-      setMessage(error.message);
+      const msg = error.message?.toLowerCase() ?? "";
+      if (msg.includes("for security purposes") || msg.includes("after")) {
+        setMessage("Please wait a few seconds and try again.");
+      } else if (msg.includes("already registered") || msg.includes("already been registered")) {
+        setMessage("An account with this email already exists. Try logging in instead.");
+      } else if (msg.includes("password")) {
+        setMessage("Please choose a password with at least 6 characters.");
+      } else {
+        setMessage("Something went wrong creating your account. Please try again.");
+      }
     } else {
       // Save postcode to profile if user has a session (auto-confirm enabled)
       if (data.session && postcode.trim()) {
