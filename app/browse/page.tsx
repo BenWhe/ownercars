@@ -128,6 +128,7 @@ export default function BrowsePage() {
   const [buyerLng, setBuyerLng] = useState<number | null>(null);
   const [buyerTown, setBuyerTown] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [postcodeError, setPostcodeError] = useState("");
 
   // Alert signup state
@@ -149,40 +150,51 @@ export default function BrowsePage() {
       setBuyerTown(storedTown);
       setMounted(true);
 
-      // Try profile first
-      const accountRes = await fetch("/api/account");
-      if (accountRes.ok) {
-        const accountResult = await accountRes.json();
-        if (accountResult.profile?.latitude && accountResult.profile?.longitude) {
-          setBuyerLat(accountResult.profile.latitude);
-          setBuyerLng(accountResult.profile.longitude);
-          setPostcodeInput(accountResult.profile.postcode ?? "");
-          const storedTown2 = localStorage.getItem("buyer_town_v2") ?? "";
-          if (!storedTown2 && accountResult.profile.postcode) {
-            const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(accountResult.profile.postcode)}`);
-            if (geoRes.ok) {
-              const geoResult = await geoRes.json();
-              setBuyerTown(geoResult.nearest_town ?? "");
-              localStorage.setItem("buyer_postcode_v2", accountResult.profile.postcode);
-              localStorage.setItem("buyer_town_v2", geoResult.nearest_town ?? "");
+      // Only show "Locating…" when there is no cached postcode — the field would
+      // otherwise be blank while we wait for the profile fetch + geocode.
+      // When a cached value exists it's applied synchronously above, so the fast
+      // path is instant and must never trigger the placeholder.
+      const noCache = !storedPostcode;
+      if (noCache) setLocating(true);
+
+      try {
+        // Try profile first
+        const accountRes = await fetch("/api/account");
+        if (accountRes.ok) {
+          const accountResult = await accountRes.json();
+          if (accountResult.profile?.latitude && accountResult.profile?.longitude) {
+            setBuyerLat(accountResult.profile.latitude);
+            setBuyerLng(accountResult.profile.longitude);
+            setPostcodeInput(accountResult.profile.postcode ?? "");
+            const storedTown2 = localStorage.getItem("buyer_town_v2") ?? "";
+            if (!storedTown2 && accountResult.profile.postcode) {
+              const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(accountResult.profile.postcode)}`);
+              if (geoRes.ok) {
+                const geoResult = await geoRes.json();
+                setBuyerTown(geoResult.nearest_town ?? "");
+                localStorage.setItem("buyer_postcode_v2", accountResult.profile.postcode);
+                localStorage.setItem("buyer_town_v2", geoResult.nearest_town ?? "");
+              }
             }
+            return;
           }
-          return;
         }
-      }
-      // Fall back to localStorage
-      const stored = localStorage.getItem("buyer_postcode_v2");
-      if (stored) {
-        setPostcodeInput(stored);
-        const storedTown3 = localStorage.getItem("buyer_town_v2") ?? "";
-        setBuyerTown(storedTown3);
-        // Geocode silently for lat/lng (needed for distance calculation)
-        const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(stored)}`);
-        if (geoRes.ok) {
-          const geoResult = await geoRes.json();
-          setBuyerLat(geoResult.latitude);
-          setBuyerLng(geoResult.longitude);
+        // Fall back to localStorage
+        const stored = localStorage.getItem("buyer_postcode_v2");
+        if (stored) {
+          setPostcodeInput(stored);
+          const storedTown3 = localStorage.getItem("buyer_town_v2") ?? "";
+          setBuyerTown(storedTown3);
+          // Geocode silently for lat/lng (needed for distance calculation)
+          const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(stored)}`);
+          if (geoRes.ok) {
+            const geoResult = await geoRes.json();
+            setBuyerLat(geoResult.latitude);
+            setBuyerLng(geoResult.longitude);
+          }
         }
+      } finally {
+        if (noCache) setLocating(false);
       }
     }
     loadBuyerLocation();
@@ -403,7 +415,7 @@ export default function BrowsePage() {
               <input
                 type="text"
                 className="browse-postcode-input"
-                placeholder="Your postcode"
+                placeholder={locating ? "Locating…" : "Your postcode"}
                 value={postcodeInput}
                 onChange={(e) => { setPostcodeInput(e.target.value); setPostcodeError(""); }}
                 maxLength={8}
