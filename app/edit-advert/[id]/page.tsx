@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { LISTING_PRICE_GBP } from "@/lib/payments/config";
 import { DOCUMENT_DISPLAY_NAMES, type DocumentType } from "@/lib/vault/documents";
+import PhotoUploader from "@/app/components/PhotoUploader";
 
 export default function EditAdvertPage() {
   const supabase = createClient();
@@ -71,67 +72,6 @@ export default function EditAdvertPage() {
 
     if (params.id) fetchAdvert();
   }, [params.id]);
-
-  async function uploadPhotos(files: FileList | null) {
-    if (!files || !params.id) return;
-
-    const imageFiles = Array.from(files).filter((f) =>
-      f.type.startsWith("image/")
-    );
-
-    if (imageFiles.length === 0) return;
-
-    if (photos.length + imageFiles.length > 10) {
-      setMessage("You can upload up to 10 photos per advert.");
-      return;
-    }
-
-    setMessage("Uploading photos...");
-
-    let updatedPhotos: any[] = [...photos];
-
-    for (let i = 0; i < imageFiles.length; i++) {
-      const file = imageFiles[i];
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("advertId", params.id as string);
-      formData.append("sortOrder", String(photos.length + i));
-
-      const res = await fetch("/api/upload-photo", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        setMessage(result.error || "Photo upload failed. Please try again.");
-        return;
-      }
-
-      updatedPhotos = result.photos ?? updatedPhotos;
-    }
-
-    setPhotos(updatedPhotos);
-    setMessage("");
-  }
-
-  async function deletePhoto(photoId: string) {
-    const res = await fetch("/api/upload-photo", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ photoId }),
-    });
-
-    const result = await res.json();
-
-    if (!res.ok) {
-      setMessage(result.error || "Could not delete photo. Please try again.");
-      return;
-    }
-
-    setPhotos(result.photos ?? []);
-  }
 
   async function movePhoto(index: number, direction: "left" | "right") {
     const newIndex = direction === "left" ? index - 1 : index + 1;
@@ -390,47 +330,13 @@ export default function EditAdvertPage() {
 
             <h3 style={{ marginTop: "24px" }}>Photos</h3>
 
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => uploadPhotos(e.target.files)}
+            <PhotoUploader
+              advertId={params.id as string}
+              photos={photos}
+              onPhotosChange={setPhotos}
+              maxPhotos={10}
+              onMovePhoto={movePhoto}
             />
-
-            {photos.length === 0 && (
-              <p style={{ color: "var(--muted)" }}>
-                No photos uploaded yet.
-              </p>
-            )}
-
-            {photos.length > 0 && (
-              <div className="photo-manage-grid">
-                {photos.map((photo, index) => (
-                  <div className="photo-manage-card" key={photo.id}>
-                    <img src={photo.image_url} alt="Advert photo" />
-
-                    <div className="photo-manage-actions">
-                      {index !== 0 && (
-                        <button
-                          type="button"
-                          onClick={() => movePhoto(index, "left")}
-                        >
-                          Make main
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        className="remove-photo-button"
-                        onClick={() => deletePhoto(photo.id)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
 
             <button type="submit">Save changes</button>
           </form>
