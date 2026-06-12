@@ -16,6 +16,7 @@ export default function CreateAccountPage() {
   const [postcode, setPostcode] = useState("");
   const [postcodeError, setPostcodeError] = useState("");
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"error" | "success" | "notice">("error");
   const [nextPath, setNextPath] = useState<string | null>(null);
 
   useEffect(() => {
@@ -52,12 +53,16 @@ export default function CreateAccountPage() {
     if (error) {
       const msg = error.message?.toLowerCase() ?? "";
       if (msg.includes("for security purposes") || msg.includes("after")) {
+        setMessageType("notice");
         setMessage("Please wait a few seconds and try again.");
       } else if (msg.includes("already registered") || msg.includes("already been registered")) {
+        setMessageType("error");
         setMessage("An account with this email already exists. Try logging in instead.");
       } else if (msg.includes("password")) {
+        setMessageType("error");
         setMessage("Please choose a password with at least 6 characters.");
       } else {
+        setMessageType("error");
         setMessage("Something went wrong creating your account. Please try again.");
       }
     } else {
@@ -84,6 +89,7 @@ export default function CreateAccountPage() {
 
       const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
 
+      setMessageType("success");
       setMessage(
         next
           ? data.session
@@ -155,7 +161,7 @@ export default function CreateAccountPage() {
 
           <button type="submit">Create account</button>
 
-          {message && <p className="auth-message">{message}</p>}
+          {message && <p className={`auth-message${messageType !== "error" ? ` auth-message--${messageType}` : ""}`}>{message}</p>}
         </form>
 
         <div className="auth-divider">
