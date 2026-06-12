@@ -138,8 +138,13 @@ export default function BrowsePage() {
   // On mount: try to load postcode from logged-in profile, then localStorage
   useEffect(() => {
     async function loadBuyerLocation() {
-      const storedPostcode = localStorage.getItem("buyer_postcode") ?? "";
-      const storedTown = localStorage.getItem("buyer_town") ?? "";
+      // Remove stale v1 keys so old district values (e.g. "East Devon") don't
+      // linger in users' browsers after the geocode-town fix.
+      localStorage.removeItem("buyer_postcode");
+      localStorage.removeItem("buyer_town");
+
+      const storedPostcode = localStorage.getItem("buyer_postcode_v2") ?? "";
+      const storedTown = localStorage.getItem("buyer_town_v2") ?? "";
       setPostcodeInput(storedPostcode);
       setBuyerTown(storedTown);
       setMounted(true);
@@ -152,24 +157,24 @@ export default function BrowsePage() {
           setBuyerLat(accountResult.profile.latitude);
           setBuyerLng(accountResult.profile.longitude);
           setPostcodeInput(accountResult.profile.postcode ?? "");
-          const storedTown2 = localStorage.getItem("buyer_town") ?? "";
+          const storedTown2 = localStorage.getItem("buyer_town_v2") ?? "";
           if (!storedTown2 && accountResult.profile.postcode) {
             const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(accountResult.profile.postcode)}`);
             if (geoRes.ok) {
               const geoResult = await geoRes.json();
               setBuyerTown(geoResult.nearest_town ?? "");
-              localStorage.setItem("buyer_postcode", accountResult.profile.postcode);
-              localStorage.setItem("buyer_town", geoResult.nearest_town ?? "");
+              localStorage.setItem("buyer_postcode_v2", accountResult.profile.postcode);
+              localStorage.setItem("buyer_town_v2", geoResult.nearest_town ?? "");
             }
           }
           return;
         }
       }
       // Fall back to localStorage
-      const stored = localStorage.getItem("buyer_postcode");
+      const stored = localStorage.getItem("buyer_postcode_v2");
       if (stored) {
         setPostcodeInput(stored);
-        const storedTown3 = localStorage.getItem("buyer_town") ?? "";
+        const storedTown3 = localStorage.getItem("buyer_town_v2") ?? "";
         setBuyerTown(storedTown3);
         // Geocode silently for lat/lng (needed for distance calculation)
         const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(stored)}`);
@@ -258,8 +263,8 @@ export default function BrowsePage() {
     setBuyerLng(geoResult.longitude);
     setBuyerTown(geoResult.nearest_town ?? "");
     setPostcodeInput(geoResult.postcode);
-    localStorage.setItem("buyer_postcode", geoResult.postcode);
-    localStorage.setItem("buyer_town", geoResult.nearest_town ?? "");
+    localStorage.setItem("buyer_postcode_v2", geoResult.postcode);
+    localStorage.setItem("buyer_town_v2", geoResult.nearest_town ?? "");
 
     // Save to profile if logged in
     try {
@@ -316,8 +321,8 @@ export default function BrowsePage() {
     setBuyerLng(null);
     setBuyerTown("");
     setPostcodeInput("");
-    localStorage.removeItem("buyer_postcode");
-    localStorage.removeItem("buyer_town");
+    localStorage.removeItem("buyer_postcode_v2");
+    localStorage.removeItem("buyer_town_v2");
   }
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
