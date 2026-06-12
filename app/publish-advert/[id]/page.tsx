@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { LISTING_PRICE_GBP, STANDARD_LISTING_PRICE_GBP } from "@/lib/payments/config";
+import PhotoUploader from "@/app/components/PhotoUploader";
 
 export default function PublishAdvertPage() {
   const params = useParams();
@@ -10,8 +11,6 @@ export default function PublishAdvertPage() {
 
   const [advert, setAdvert] = useState<any>(null);
   const [photos, setPhotos] = useState<any[]>([]);
-  const [isDraggingPhotos, setIsDraggingPhotos] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromoCode, setAppliedPromoCode] = useState("");
@@ -66,73 +65,6 @@ export default function PublishAdvertPage() {
 
     if (advertId) fetchAdvert();
   }, [advertId]);
-
-  async function uploadPhotos(files: FileList | File[] | null) {
-    if (!files || !advertId) return;
-
-    const imageFiles = Array.from(files).filter((file) =>
-      file.type.startsWith("image/")
-    );
-
-    if (imageFiles.length === 0) {
-      setMessage("Please choose image files to upload.");
-      return;
-    }
-
-    if (photos.length + imageFiles.length > 10) {
-      setMessage("You can upload up to 10 photos per advert.");
-      return;
-    }
-
-    setMessage("Uploading photos...");
-
-    let updatedPhotos: any[] = [...photos];
-
-    for (let i = 0; i < imageFiles.length; i++) {
-      const file = imageFiles[i];
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("advertId", advertId);
-      formData.append("sortOrder", String(photos.length + i));
-
-      const res = await fetch("/api/upload-photo", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        setMessage(result.error || "Photo upload failed. Please try again.");
-        return;
-      }
-
-      // Use the server-returned photos list to keep state in sync without
-      // a separate browser-client fetchPhotos() call.
-      updatedPhotos = result.photos ?? updatedPhotos;
-    }
-
-    setPhotos(updatedPhotos);
-    setMessage("");
-  }
-
-  async function deletePhoto(photoId: string) {
-    const res = await fetch("/api/upload-photo", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ photoId }),
-    });
-
-    const result = await res.json();
-
-    if (!res.ok) {
-      setMessage(result.error || "Could not delete photo. Please try again.");
-      return;
-    }
-
-    // Server returns the remaining photos list.
-    setPhotos(result.photos ?? []);
-  }
 
   async function applyPromo() {
     const code = promoCode.trim().toUpperCase();
@@ -269,63 +201,12 @@ export default function PublishAdvertPage() {
               advert pages.
             </p>
 
-            <div
-              className={`photo-upload-zone ${
-                isDraggingPhotos ? "photo-upload-zone-active" : ""
-              }`}
-              role="button"
-              tabIndex={0}
-              onClick={() => fileInputRef.current?.click()}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  fileInputRef.current?.click();
-                }
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDraggingPhotos(true);
-              }}
-              onDragLeave={() => setIsDraggingPhotos(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setIsDraggingPhotos(false);
-                uploadPhotos(e.dataTransfer.files);
-              }}
-            >
-              <strong>Drag photos here or click to choose files.</strong>
-              <span>
-                The first photo appears on browse and advert pages.
-              </span>
-            </div>
-
-            <input
-              ref={fileInputRef}
-              className="photo-upload-input"
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => {
-                uploadPhotos(e.target.files);
-                e.target.value = "";
-              }}
+            <PhotoUploader
+              advertId={advertId ?? ""}
+              photos={photos}
+              onPhotosChange={setPhotos}
+              maxPhotos={10}
             />
-
-            {photos.length > 0 && (
-              <div className="photo-preview-grid">
-                {photos.map((photo) => (
-                  <div className="photo-preview-item" key={photo.id}>
-                    <img src={photo.image_url} alt="Advert photo" />
-                    <button
-                      type="button"
-                      onClick={() => deletePhoto(photo.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
 
             <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
 
