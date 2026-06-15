@@ -204,7 +204,7 @@ export default function PublishAdvertPage() {
 
             <hr style={{ margin: "24px 0", borderTop: "1px solid var(--line)" }} />
 
-            {locationError && (
+            {locationError ? (
               <p role="alert" className="auth-message" style={{ marginBottom: "20px" }}>
                 Please add the car&apos;s location before publishing.{" "}
                 <a href={`/edit-advert/${advertId}`} style={{ color: "inherit", textDecoration: "underline" }}>
@@ -212,7 +212,11 @@ export default function PublishAdvertPage() {
                 </a>{" "}
                 to add a postcode — we show the nearest town to buyers, never the full postcode.
               </p>
-            )}
+            ) : advert.nearest_town ? (
+              <p style={{ fontSize: "14px", color: "var(--muted)", marginBottom: "20px" }}>
+                📍 Location: Near {advert.nearest_town}
+              </p>
+            ) : null}
 
             <h3>Photos</h3>
             <p style={{ color: "var(--muted)" }}>
