@@ -80,6 +80,7 @@ export default function CreateAdvertPage() {
     engineSize: false,
   });
   const [mileageFromMot, setMileageFromMot] = useState(false);
+  const [noMotHistory, setNoMotHistory] = useState(false);
   const vehicleCardRef = useRef<HTMLDivElement | null>(null);
 
   const currentDraft = useCallback((): AdvertDraft => {
@@ -313,7 +314,19 @@ export default function CreateAdvertPage() {
         return;
       }
 
-      const nextPrefilled: PrefilledMarkers = { ...prefilled };
+      // Reset all lookup-owned fields before applying new data so a second
+      // lookup for a different car never retains values from the first.
+      setMake("");
+      setModel("");
+      setYear("");
+      setFuelType("");
+      setColour("");
+      setEngineSize("");
+      setMileage("");
+      setMileageFromMot(false);
+
+      const nextPrefilled: PrefilledMarkers = { make: false, model: false, colour: false, engineSize: false };
+      let hasMotMileage = false;
 
       if (result.make) {
         setMake(result.make);
@@ -350,9 +363,11 @@ export default function CreateAdvertPage() {
             : value;
         setMileage(String(miles));
         setMileageFromMot(true);
+        hasMotMileage = true;
         clearFieldError("mileage");
       }
 
+      setNoMotHistory(!hasMotMileage);
       setPrefilled(nextPrefilled);
       setLookupStatus("found");
       setLookupMessage("");
@@ -471,6 +486,7 @@ export default function CreateAdvertPage() {
                   if (lookupStatus !== "idle") {
                     setLookupStatus("idle");
                     setLookupMessage("");
+                    setNoMotHistory(false);
                   }
                 }}
                 aria-label="Vehicle registration"
@@ -567,6 +583,11 @@ export default function CreateAdvertPage() {
                   placeholder="e.g. 24,500"
                 />
                 {mileageFromMot && <div className="ca-hint">From last MOT — update to current</div>}
+                {noMotHistory && (
+                  <p className="auth-message auth-message--notice" role="status">
+                    This car has no MOT history yet, so we&apos;ve filled in what we can — please enter the current mileage yourself.
+                  </p>
+                )}
                 {fieldError("mileage")}
               </div>
 
