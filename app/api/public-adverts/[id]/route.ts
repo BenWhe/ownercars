@@ -40,5 +40,9 @@ export async function GET(req: NextRequest, context: Context) {
     return NextResponse.json({ error: "This advert isn’t live yet." }, { status: 404 });
   }
 
-  return NextResponse.json({ advert: data, userId: user?.id ?? null });
+  // PRIVACY: strip the registration and the raw DVSA lookup payload before
+  // returning — public advert pages only ever see derived display fields.
+  const { registration, lookup_data, ...advert } = data as any;
+
+  return NextResponse.json({ advert, userId: user?.id ?? null });
 }
