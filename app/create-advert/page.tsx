@@ -393,7 +393,12 @@ export default function CreateAdvertPage() {
     const validationErrors = validateDraft();
     setFieldErrors(validationErrors);
 
-    if (Object.keys(validationErrors).length > 0) {
+    // Postcode is not part of AdvertDraft so validated separately
+    if (!postcode.trim()) {
+      setPostcodeError("Enter the postcode where the car is kept.");
+    }
+
+    if (Object.keys(validationErrors).length > 0 || !postcode.trim()) {
       console.log(`${LOG_PREFIX} validation blocked submit`, validationErrors);
       setMessage("Please fix the highlighted fields. Your progress is still saved on this device.");
       return;

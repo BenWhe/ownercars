@@ -92,7 +92,7 @@ export async function POST(req: Request) {
   const { data: advert, error: advertError } = await supabase
     .from("adverts")
     .select(
-      "id, seller_id, status, paid, stripe_checkout_session_id, payment_status"
+      "id, seller_id, status, paid, stripe_checkout_session_id, payment_status, postcode, nearest_town"
     )
     .eq("id", advertId)
     .maybeSingle();
@@ -115,6 +115,13 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "This advert is already published." },
       { status: 409 }
+    );
+  }
+
+  if (!advert.postcode || !advert.nearest_town) {
+    return NextResponse.json(
+      { error: "Please add the car's location before publishing. Edit your advert to add a postcode." },
+      { status: 422 }
     );
   }
 

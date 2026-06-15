@@ -21,6 +21,7 @@ export default function PublishAdvertPage() {
   const [isStartingPayment, setIsStartingPayment] = useState(false);
 
   const [message, setMessage] = useState("Loading advert...");
+  const [locationError, setLocationError] = useState(false);
 
   useEffect(() => {
     async function fetchAdvert() {
@@ -46,6 +47,9 @@ export default function PublishAdvertPage() {
       setAdvert(result.advert);
       // Photos are included in the advert response — no separate browser-client call.
       setPhotos(result.advert?.advert_photos || []);
+      if (!result.advert?.postcode || !result.advert?.nearest_town) {
+        setLocationError(true);
+      }
       if (result.advert?.payment_status === "failed") {
         setPaymentMessage(
           result.advert.payment_failure_reason ||
@@ -112,6 +116,11 @@ export default function PublishAdvertPage() {
 
     if (!advertId) {
       setPaymentMessage("We couldn't find this advert. Please refresh and try again.");
+      return;
+    }
+
+    if (!advert?.postcode || !advert?.nearest_town) {
+      setPaymentMessage("Please add the car's location before publishing.");
       return;
     }
 
@@ -194,6 +203,20 @@ export default function PublishAdvertPage() {
             <p>{Number(advert.mileage).toLocaleString()} miles</p>
 
             <hr style={{ margin: "24px 0", borderTop: "1px solid var(--line)" }} />
+
+            {locationError ? (
+              <p role="alert" className="auth-message" style={{ marginBottom: "20px" }}>
+                Please add the car&apos;s location before publishing.{" "}
+                <a href={`/edit-advert/${advertId}`} style={{ color: "inherit", textDecoration: "underline" }}>
+                  Edit your advert
+                </a>{" "}
+                to add a postcode — we show the nearest town to buyers, never the full postcode.
+              </p>
+            ) : advert.nearest_town ? (
+              <p style={{ fontSize: "14px", color: "var(--muted)", marginBottom: "20px" }}>
+                📍 Location: Near {advert.nearest_town}
+              </p>
+            ) : null}
 
             <h3>Photos</h3>
             <p style={{ color: "var(--muted)" }}>
