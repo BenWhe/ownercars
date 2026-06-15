@@ -115,11 +115,15 @@ export async function GET(request: NextRequest) {
   }
 
   const adverts = (data ?? []).map((ad: any) => {
-    if (buyerLat !== null && buyerLng !== null && ad.latitude && ad.longitude) {
-      const dist = haversineDistance(buyerLat, buyerLng, ad.latitude, ad.longitude);
-      return { ...ad, distance_miles: Math.round(dist) };
+    // PRIVACY: never expose the registration or the raw DVSA lookup payload on
+    // public pages — only derived display fields (make/model/year/etc.).
+    const { registration, lookup_data, ...safe } = ad;
+
+    if (buyerLat !== null && buyerLng !== null && safe.latitude && safe.longitude) {
+      const dist = haversineDistance(buyerLat, buyerLng, safe.latitude, safe.longitude);
+      return { ...safe, distance_miles: Math.round(dist) };
     }
-    return ad;
+    return safe;
   });
 
   return NextResponse.json({ adverts });

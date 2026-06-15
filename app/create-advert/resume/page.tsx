@@ -24,6 +24,8 @@ type AdvertDraft = {
   colour: string;
   doors: string;
   seats: string;
+  engineSize: string;
+  registration: string;
   previouslyWrittenOff: string;
   confirmedPrivateSeller: boolean;
   description: string;

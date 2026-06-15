@@ -1,17 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
-
-function capitaliseWords(str: string) {
-  return str
-    ?.split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 const SAVED_ADVERT_DRAFT_KEY = "ownercars:create-advert-draft";
 const PENDING_ADVERT_SUBMIT_KEY = "ownercars_pending_advert_submit";
@@ -29,6 +22,8 @@ type AdvertDraft = {
   colour: string;
   doors: string;
   seats: string;
+  engineSize: string;
+  registration: string;
   previouslyWrittenOff: string;
   confirmedPrivateSeller: boolean;
   description: string;
@@ -37,10 +32,18 @@ type AdvertDraft = {
 type AdvertDraftField = keyof AdvertDraft;
 type FieldErrors = Partial<Record<AdvertDraftField, string>>;
 
+type LookupStatus = "idle" | "loading" | "found" | "notfound" | "error";
+
+type PrefilledMarkers = {
+  make: boolean;
+  model: boolean;
+  colour: boolean;
+  engineSize: boolean;
+};
+
 export default function CreateAdvertPage() {
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [hasLoadedSavedDraft, setHasLoadedSavedDraft] = useState(false);
   const [showSaveAdvertPrompt, setShowSaveAdvertPrompt] = useState(false);
 
@@ -59,11 +62,25 @@ export default function CreateAdvertPage() {
   const [doors, setDoors] = useState("");
   const [seats, setSeats] = useState("");
   const [fuelType, setFuelType] = useState("");
+  const [engineSize, setEngineSize] = useState("");
   const [previouslyWrittenOff, setPreviouslyWrittenOff] = useState("");
   const [confirmedPrivateSeller, setConfirmedPrivateSeller] = useState(false);
   const [postcode, setPostcode] = useState("");
   const [postcodeError, setPostcodeError] = useState("");
   const [postcodePrefilled, setPostcodePrefilled] = useState(false);
+
+  // Reg-lookup
+  const [registration, setRegistration] = useState("");
+  const [lookupStatus, setLookupStatus] = useState<LookupStatus>("idle");
+  const [lookupMessage, setLookupMessage] = useState("");
+  const [prefilled, setPrefilled] = useState<PrefilledMarkers>({
+    make: false,
+    model: false,
+    colour: false,
+    engineSize: false,
+  });
+  const [mileageFromMot, setMileageFromMot] = useState(false);
+  const vehicleCardRef = useRef<HTMLDivElement | null>(null);
 
   const currentDraft = useCallback((): AdvertDraft => {
     return {
@@ -78,6 +95,8 @@ export default function CreateAdvertPage() {
       colour,
       doors,
       seats,
+      engineSize,
+      registration,
       previouslyWrittenOff,
       confirmedPrivateSeller,
       description,
@@ -94,6 +113,8 @@ export default function CreateAdvertPage() {
     colour,
     doors,
     seats,
+    engineSize,
+    registration,
     previouslyWrittenOff,
     confirmedPrivateSeller,
     description,
@@ -111,6 +132,8 @@ export default function CreateAdvertPage() {
     setColour(draft.colour || "");
     setDoors(draft.doors || "");
     setSeats(draft.seats || "");
+    setEngineSize(draft.engineSize || "");
+    setRegistration(draft.registration || "");
     setPreviouslyWrittenOff(draft.previouslyWrittenOff || "");
     setConfirmedPrivateSeller(Boolean(draft.confirmedPrivateSeller));
     setDescription(draft.description || "");
@@ -126,53 +149,6 @@ export default function CreateAdvertPage() {
       window.localStorage.removeItem(SAVED_ADVERT_DRAFT_KEY);
       return null;
     }
-  }
-
-  function advertInsertPayload(sellerId: string, draft: AdvertDraft) {
-    return {
-      seller_id: sellerId,
-      seller_email: currentUser?.email,
-      title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
-      make: draft.make,
-      model: draft.model,
-      year: Number(draft.year),
-      mileage: Number(draft.mileage),
-      fuel_type: draft.fuelType,
-      gearbox: draft.gearbox,
-      price: Number(draft.price),
-      body_type: draft.bodyType,
-      colour: draft.colour,
-      doors: Number(draft.doors),
-      seats: Number(draft.seats),
-      previously_written_off: draft.previouslyWrittenOff,
-      description: draft.description,
-      status: "draft",
-      paid: false,
-      promo_code: null,
-    };
-  }
-
-  async function createAdvertForUser(sellerId: string, draft: AdvertDraft) {
-    const supabase = createClient();
-    const payload = advertInsertPayload(sellerId, draft);
-
-    console.log(`${LOG_PREFIX} Supabase insert call`, {
-      table: "adverts",
-      method: "insert(...).select().single()",
-      sellerId,
-      payload,
-    });
-
-    const response = await supabase.from("adverts").insert(payload).select().single();
-
-    console.log(`${LOG_PREFIX} Supabase insert response`, {
-      data: response.data,
-      error: response.error,
-      status: response.status,
-      statusText: response.statusText,
-    });
-
-    return response;
   }
 
   useEffect(() => {
@@ -191,7 +167,6 @@ export default function CreateAdvertPage() {
         userId: session?.user?.id ?? null,
       });
       setIsCheckingAuth(false);
-      setCurrentUser(session?.user ?? null);
     });
 
     return () => {
@@ -216,8 +191,6 @@ export default function CreateAdvertPage() {
 
         if (!source) return;
 
-        // Only fill if the field is still empty (draft doesn't include postcode,
-        // so this will always be true in practice on first load)
         setPostcode((current) => current || source);
         setPostcodePrefilled(true);
       } catch {
@@ -253,7 +226,7 @@ export default function CreateAdvertPage() {
     if (!fieldErrors[field]) return null;
 
     return (
-      <p className="field-error" role="alert">
+      <p className="ca-field-error" role="alert">
         {fieldErrors[field]}
       </p>
     );
@@ -300,6 +273,99 @@ export default function CreateAdvertPage() {
     }
 
     return errors;
+  }
+
+  async function handleRegLookup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const reg = registration.trim();
+    if (!reg) {
+      setLookupStatus("error");
+      setLookupMessage("Enter your registration to search.");
+      return;
+    }
+
+    setLookupStatus("loading");
+    setLookupMessage("");
+
+    try {
+      const res = await fetch("/api/vehicle-lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registration: reg }),
+      });
+      const result = await res.json();
+
+      if (!res.ok) {
+        setLookupStatus("error");
+        setLookupMessage(
+          result.error ||
+            "We couldn't look up that registration. Please enter your car's details manually below."
+        );
+        return;
+      }
+
+      if (!result.found) {
+        setLookupStatus("notfound");
+        setLookupMessage(
+          "We couldn't find that registration. Please enter your car's details manually below."
+        );
+        return;
+      }
+
+      const nextPrefilled: PrefilledMarkers = { ...prefilled };
+
+      if (result.make) {
+        setMake(result.make);
+        nextPrefilled.make = true;
+        clearFieldError("make");
+      }
+      if (result.model) {
+        setModel(result.model);
+        nextPrefilled.model = true;
+        clearFieldError("model");
+      }
+      if (result.year) {
+        setYear(String(result.year));
+        clearFieldError("year");
+      }
+      if (result.fuelType) {
+        setFuelType(result.fuelType);
+        clearFieldError("fuelType");
+      }
+      if (result.colour) {
+        setColour(result.colour);
+        nextPrefilled.colour = true;
+        clearFieldError("colour");
+      }
+      if (result.engineSize) {
+        setEngineSize(`${result.engineSize} cc`);
+        nextPrefilled.engineSize = true;
+      }
+      if (result.lastMileage && result.lastMileage.value) {
+        const { value, unit } = result.lastMileage;
+        const miles =
+          typeof unit === "string" && unit.toLowerCase() === "km"
+            ? Math.round(value * 0.621371)
+            : value;
+        setMileage(String(miles));
+        setMileageFromMot(true);
+        clearFieldError("mileage");
+      }
+
+      setPrefilled(nextPrefilled);
+      setLookupStatus("found");
+      setLookupMessage("");
+    } catch {
+      setLookupStatus("error");
+      setLookupMessage(
+        "We couldn't look up that registration right now. Please enter your car's details manually below."
+      );
+    }
+  }
+
+  function enterManually() {
+    vehicleCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function handleCreateAdvertSubmit(event: FormEvent<HTMLFormElement>) {
@@ -363,335 +429,399 @@ export default function CreateAdvertPage() {
       window.localStorage.removeItem(PENDING_ADVERT_SUBMIT_KEY);
       setShowSaveAdvertPrompt(false);
       router.push(`/publish-advert/${result.id}`);
-    } catch (err) {
+    } catch {
       setMessage("Something went wrong. Please try again.");
     }
   }
 
   return (
     <main>
-      <section className="dashboard-hero">
-        <p className="eyebrow">Create advert</p>
-
-        <h1>
-          Sell your car privately for <span className="no-break">£9.99 — launch price</span>
-        </h1>
-
-        <p className="dashboard-subtitle">
-          Create your draft advert, then publish it using our{" "}
-          <span className="price-highlight">£9.99</span>{" "}
-          <span className="price-label">launch offer</span>. Standard £24.99
-          price.
+      <div className="ca-wrap">
+        <p className="ca-eyebrow">Create advert</p>
+        <h1 className="ca-h1">Sell your car privately</h1>
+        <p className="ca-sub">
+          Start with your registration and we&apos;ll fill in the details. Publish for our{" "}
+          <span className="ca-b">£9.99</span> launch price — your advert runs until it sells.
         </p>
-      </section>
 
-      <section className="form-section">
-        {isCheckingAuth && <p className="auth-check-note">Checking your account quietly — you can keep creating your advert.</p>}
+        {isCheckingAuth && (
+          <p className="ca-reg-hint" style={{ color: "var(--muted)", marginTop: "14px" }}>
+            Checking your account quietly — you can keep creating your advert.
+          </p>
+        )}
 
-        <div className="preview-card">
-          <p className="preview-label">Advert preview</p>
+        {/* REG LOOKUP HERO */}
+        <div className="ca-reg-card">
+          <p className="ca-reg-label">Quick start</p>
+          <h2>Enter your registration</h2>
+          <p className="ca-reg-intro">
+            We&apos;ll pull your car&apos;s make, model, year and more — so you don&apos;t have to type it all in.
+          </p>
 
-          <h2 className="preview-title">
-            {make || model || year
-              ? `${year ? `${year} ` : ""}${capitaliseWords(make || "")}${
-                  make && model ? " " : ""
-                }${capitaliseWords(model || "")}`
-              : "Start by entering make, model and year"}
-          </h2>
+          <form className="ca-reg-row" onSubmit={handleRegLookup}>
+            <div className="ca-reg-plate">
+              <span className="ca-gb">GB</span>
+              <input
+                type="text"
+                placeholder="AB12 CDE"
+                value={registration}
+                maxLength={8}
+                onChange={(e) => {
+                  setRegistration(e.target.value.toUpperCase());
+                  if (lookupStatus !== "idle") {
+                    setLookupStatus("idle");
+                    setLookupMessage("");
+                  }
+                }}
+                aria-label="Vehicle registration"
+              />
+            </div>
+            <button type="submit" className="ca-reg-find" disabled={lookupStatus === "loading"}>
+              {lookupStatus === "loading" ? "Finding…" : "Find my car"}
+            </button>
+          </form>
 
-          <p className="preview-subtitle">
-            {mileage || fuelType || gearbox
-              ? `${
-                  mileage ? `${Number(mileage).toLocaleString()} miles` : "Mileage"
-                } · ${fuelType || "Fuel type"} · ${gearbox || "Gearbox"}`
-              : "Mileage · Fuel type · Gearbox"}
+          <p className="ca-reg-hint">
+            🔒 Your registration is used only to fetch details — it&apos;s never shown in your advert.
+          </p>
+
+          {(lookupStatus === "found" || lookupStatus === "notfound" || lookupStatus === "error") && (
+            <div
+              className={`ca-found${
+                lookupStatus === "notfound" || lookupStatus === "error" ? " ca-error" : ""
+              }`}
+              role="status"
+            >
+              {lookupStatus === "found"
+                ? "✓ Found it — we've filled in the details below. Check them over and adjust anything that's changed."
+                : lookupMessage}
+            </div>
+          )}
+
+          <p className="ca-reg-manual">
+            <button type="button" onClick={enterManually}>
+              Can&apos;t find it? Enter the details manually →
+            </button>
           </p>
         </div>
 
-        <form className="advert-form" onSubmit={handleCreateAdvertSubmit} noValidate>
-          <label>
-            Make
-            <input
-              value={make}
-              onChange={(e) => { clearFieldError("make"); setMake(e.target.value); }}
-              placeholder="BMW"
-            />
-            {fieldError("make")}
-          </label>
-
-          <label>
-            Model
-            <input
-              value={model}
-              onChange={(e) => { clearFieldError("model"); setModel(e.target.value); }}
-              placeholder="3 Series"
-            />
-            {fieldError("model")}
-          </label>
-
-          <label>
-            Year
-            <input
-              type="number"
-              value={year}
-              onChange={(e) => { clearFieldError("year"); setYear(e.target.value); }}
-              placeholder="2019"
-            />
-            {fieldError("year")}
-          </label>
-
-          <label>
-            Mileage
-            <input
-              required
-              type="number"
-              placeholder="24500"
-              value={mileage}
-              onChange={(e) => { clearFieldError("mileage"); setMileage(e.target.value); }}
-            />
-            {fieldError("mileage")}
-          </label>
-
-          <label>
-            Fuel type
-            <select
-              value={fuelType}
-              onChange={(e) => { clearFieldError("fuelType"); setFuelType(e.target.value); }}
-              className={!fuelType ? "select-placeholder" : ""}
-            >
-              <option value="" disabled>
-                Select fuel type
-              </option>
-              <option value="Petrol">Petrol</option>
-              <option value="Diesel">Diesel</option>
-              <option value="Electric">Electric</option>
-              <option value="Hybrid">Hybrid</option>
-            </select>
-            {fieldError("fuelType")}
-          </label>
-
-          <label>
-            Gearbox
-            <select
-              value={gearbox}
-              onChange={(e) => { clearFieldError("gearbox"); setGearbox(e.target.value); }}
-              className={!gearbox ? "select-placeholder" : ""}
-            >
-              <option value="" disabled>
-                Select gearbox
-              </option>
-              <option value="Manual">Manual</option>
-              <option value="Automatic">Automatic</option>
-              <option value="Semi-automatic">Semi-automatic</option>
-            </select>
-            {fieldError("gearbox")}
-          </label>
-
-          <label>
-            Price
-            <input
-              required
-              type="number"
-              placeholder="39995"
-              value={price}
-              onChange={(e) => { clearFieldError("price"); setPrice(e.target.value); }}
-            />
-            {fieldError("price")}
-          </label>
-
-          <label>
-            Body type
-            <select
-              value={bodyType}
-              onChange={(e) => { clearFieldError("bodyType"); setBodyType(e.target.value); }}
-              className={!bodyType ? "select-placeholder" : ""}
-            >
-              <option value="" disabled>
-                Select body type
-              </option>
-              <option value="Hatchback">Hatchback</option>
-              <option value="Saloon">Saloon</option>
-              <option value="SUV">SUV</option>
-              <option value="Estate">Estate</option>
-              <option value="Coupe">Coupe</option>
-              <option value="Convertible">Convertible</option>
-              <option value="MPV">MPV</option>
-              <option value="Pickup">Pickup</option>
-              <option value="Van">Van</option>
-              <option value="Other">Other</option>
-            </select>
-            {fieldError("bodyType")}
-          </label>
-
-          <label>
-            Colour
-            <input
-              value={colour}
-              onChange={(e) => { clearFieldError("colour"); setColour(e.target.value); }}
-              placeholder="Blue"
-            />
-            {fieldError("colour")}
-          </label>
-
-          <label>
-            Doors
-            <input
-              type="number"
-              value={doors}
-              onChange={(e) => { clearFieldError("doors"); setDoors(e.target.value); }}
-              placeholder="5"
-            />
-            {fieldError("doors")}
-          </label>
-
-          <label>
-            Seats
-            <input
-              type="number"
-              value={seats}
-              onChange={(e) => { clearFieldError("seats"); setSeats(e.target.value); }}
-              placeholder="5"
-            />
-            {fieldError("seats")}
-          </label>
-
-          <label>
-            Previously written off?
-            <select
-              value={previouslyWrittenOff}
-              onChange={(e) => { clearFieldError("previouslyWrittenOff"); setPreviouslyWrittenOff(e.target.value); }}
-              className={!previouslyWrittenOff ? "select-placeholder" : ""}
-            >
-              <option value="" disabled>
-                Select
-              </option>
-              <option value="No">No</option>
-              <option value="Yes">Yes</option>
-            </select>
-            {fieldError("previouslyWrittenOff")}
-          </label>
-
-          <label>
-            Note from the seller
-            <textarea
-              required
-              maxLength={800}
-              placeholder="Tell buyers what makes your car a great choice; condition, history, extras or anything worth highlighting."
-              value={description}
-              onChange={(e) => {
-                clearFieldError("description");
-                const cleaned = e.target.value.replace(/\n{3,}/g, "\n\n");
-                setDescription(cleaned);
-              }}
-            />
-
-            <div className="field-meta">
-              <p className="field-hint">
-                This is the only free-form part of your advert — make it count.
-              </p>
-
-              <p
-                className={`char-count ${
-                  description.length > 720
-                    ? "char-count-danger"
-                    : description.length > 600
-                    ? "char-count-warning"
-                    : ""
-                }`}
-              >
-                {description.length}/800
-              </p>
-            </div>
-            {fieldError("description")}
-          </label>
-
-          <label>
-            Where is the car located?
-            <input
-              type="text"
-              value={postcode}
-              onChange={(e) => { setPostcode(e.target.value); setPostcodeError(""); setPostcodePrefilled(false); }}
-              placeholder="e.g. DT6 3NP"
-              maxLength={8}
-            />
-            {postcodePrefilled ? (
-              <p className="field-hint">We've used your account postcode. Change it if the car is kept somewhere else.</p>
-            ) : (
-              <p className="field-hint">Enter the postcode where the car is kept. We show nearest town to buyers — your postcode is never visible.</p>
-            )}
-            {postcodeError && <p className="field-error" role="alert">{postcodeError}</p>}
-          </label>
-
-          <label className="checkbox-row">
-            <input
-              required
-              type="checkbox"
-              checked={confirmedPrivateSeller}
-              onChange={(e) => { clearFieldError("confirmedPrivateSeller"); setConfirmedPrivateSeller(e.target.checked); }}
-            />
-            <span>
-              I confirm I am a private seller and the information in this advert
-              is accurate.
-            </span>
-            {fieldError("confirmedPrivateSeller")}
-          </label>
-
-          <p className="submit-reassurance">
-            We’ll save your advert to your account before you publish.
-          </p>
-
-          <button type="submit">
-            Create draft advert
-          </button>
-
-          {message && (
-            <p role="alert" style={{ marginTop: "18px" }}>
-              {message}
+        <form onSubmit={handleCreateAdvertSubmit} noValidate>
+          {/* VEHICLE DETAILS */}
+          <div className="ca-card" ref={vehicleCardRef}>
+            <h3>Your vehicle</h3>
+            <p className="ca-card-sub">
+              Pre-filled from your registration where we can — edit anything that&apos;s not right.
             </p>
-          )}
-        </form>
-
-        {showSaveAdvertPrompt && (
-          <div
-            className="save-advert-modal-backdrop"
-            role="presentation"
-            onClick={() => setShowSaveAdvertPrompt(false)}
-          >
-            <div
-              className="save-advert-modal"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="save-advert-title"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <p className="eyebrow">Almost there</p>
-              <h2 id="save-advert-title">Save your advert</h2>
-              <p>
-                Create or sign in to your OwnerCars account so your advert is
-                saved safely and only you can manage it.
-              </p>
-              <div className="save-advert-actions">
-                <Link className="button primary" href="/login?next=/create-advert/resume">
-                  Sign in and continue
-                </Link>
-                <Link
-                  className="button secondary"
-                  href="/create-account?next=/create-advert/resume"
-                >
-                  Create account and continue
-                </Link>
+            <div className="ca-grid">
+              <div className="ca-field ca-full">
+                <label>Make</label>
+                <input
+                  value={make}
+                  onChange={(e) => {
+                    clearFieldError("make");
+                    setMake(e.target.value);
+                    setPrefilled((p) => ({ ...p, make: false }));
+                  }}
+                  placeholder="BMW"
+                />
+                {prefilled.make && <div className="ca-prefilled">✓ From your registration</div>}
+                {fieldError("make")}
               </div>
-              <button
-                className="save-advert-close"
-                type="button"
-                onClick={() => setShowSaveAdvertPrompt(false)}
-              >
-                Keep editing
-              </button>
+
+              <div className="ca-field ca-full">
+                <label>Model</label>
+                <input
+                  value={model}
+                  onChange={(e) => {
+                    clearFieldError("model");
+                    setModel(e.target.value);
+                    setPrefilled((p) => ({ ...p, model: false }));
+                  }}
+                  placeholder="3 Series"
+                />
+                {prefilled.model && <div className="ca-prefilled">✓ From your registration</div>}
+                {fieldError("model")}
+              </div>
+
+              <div className="ca-field">
+                <label>Year</label>
+                <input
+                  type="number"
+                  value={year}
+                  onChange={(e) => { clearFieldError("year"); setYear(e.target.value); }}
+                  placeholder="2019"
+                />
+                {fieldError("year")}
+              </div>
+
+              <div className="ca-field">
+                <label>Mileage</label>
+                <input
+                  type="number"
+                  value={mileage}
+                  onChange={(e) => {
+                    clearFieldError("mileage");
+                    setMileage(e.target.value);
+                    setMileageFromMot(false);
+                  }}
+                  placeholder="e.g. 24,500"
+                />
+                {mileageFromMot && <div className="ca-hint">From last MOT — update to current</div>}
+                {fieldError("mileage")}
+              </div>
+
+              <div className="ca-field">
+                <label>Fuel type</label>
+                <select
+                  value={fuelType}
+                  onChange={(e) => { clearFieldError("fuelType"); setFuelType(e.target.value); }}
+                >
+                  <option value="" disabled>Select fuel type</option>
+                  <option value="Petrol">Petrol</option>
+                  <option value="Diesel">Diesel</option>
+                  <option value="Electric">Electric</option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+                {fieldError("fuelType")}
+              </div>
+
+              <div className="ca-field">
+                <label>Gearbox</label>
+                <select
+                  value={gearbox}
+                  onChange={(e) => { clearFieldError("gearbox"); setGearbox(e.target.value); }}
+                >
+                  <option value="" disabled>Select gearbox</option>
+                  <option value="Manual">Manual</option>
+                  <option value="Automatic">Automatic</option>
+                  <option value="Semi-automatic">Semi-automatic</option>
+                </select>
+                {fieldError("gearbox")}
+              </div>
+
+              <div className="ca-field">
+                <label>Body type</label>
+                <select
+                  value={bodyType}
+                  onChange={(e) => { clearFieldError("bodyType"); setBodyType(e.target.value); }}
+                >
+                  <option value="" disabled>Select body type</option>
+                  <option value="Hatchback">Hatchback</option>
+                  <option value="Saloon">Saloon</option>
+                  <option value="SUV">SUV</option>
+                  <option value="Estate">Estate</option>
+                  <option value="Coupe">Coupe</option>
+                  <option value="Convertible">Convertible</option>
+                  <option value="MPV">MPV</option>
+                  <option value="Pickup">Pickup</option>
+                  <option value="Van">Van</option>
+                  <option value="Other">Other</option>
+                </select>
+                {fieldError("bodyType")}
+              </div>
+
+              <div className="ca-field">
+                <label>Colour</label>
+                <input
+                  value={colour}
+                  onChange={(e) => {
+                    clearFieldError("colour");
+                    setColour(e.target.value);
+                    setPrefilled((p) => ({ ...p, colour: false }));
+                  }}
+                  placeholder="Blue"
+                />
+                {prefilled.colour && <div className="ca-prefilled">✓ From your registration</div>}
+                {fieldError("colour")}
+              </div>
+
+              <div className="ca-field">
+                <label>Doors</label>
+                <input
+                  type="number"
+                  value={doors}
+                  onChange={(e) => { clearFieldError("doors"); setDoors(e.target.value); }}
+                  placeholder="5"
+                />
+                {fieldError("doors")}
+              </div>
+
+              <div className="ca-field">
+                <label>Seats</label>
+                <input
+                  type="number"
+                  value={seats}
+                  onChange={(e) => { clearFieldError("seats"); setSeats(e.target.value); }}
+                  placeholder="5"
+                />
+                {fieldError("seats")}
+              </div>
+
+              <div className="ca-field ca-full">
+                <label>Engine size</label>
+                <input
+                  value={engineSize}
+                  onChange={(e) => {
+                    setEngineSize(e.target.value);
+                    setPrefilled((p) => ({ ...p, engineSize: false }));
+                  }}
+                  placeholder="e.g. 1998 cc"
+                />
+                {prefilled.engineSize && <div className="ca-prefilled">✓ From your registration</div>}
+              </div>
+
+              <div className="ca-field ca-full">
+                <label>Previously written off?</label>
+                <select
+                  value={previouslyWrittenOff}
+                  onChange={(e) => { clearFieldError("previouslyWrittenOff"); setPreviouslyWrittenOff(e.target.value); }}
+                >
+                  <option value="" disabled>Select</option>
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+                {fieldError("previouslyWrittenOff")}
+              </div>
             </div>
           </div>
-        )}
-      </section>
+
+          {/* PRICE */}
+          <div className="ca-card">
+            <h3>Price</h3>
+            <p className="ca-card-sub">What you&apos;d like to sell it for.</p>
+            <div className="ca-field ca-price-wrap">
+              <span className="ca-sym">£</span>
+              <input
+                type="number"
+                value={price}
+                onChange={(e) => { clearFieldError("price"); setPrice(e.target.value); }}
+                placeholder="39,995"
+              />
+              {fieldError("price")}
+            </div>
+          </div>
+
+          {/* DESCRIPTION */}
+          <div className="ca-card">
+            <h3>Note from the seller</h3>
+            <p className="ca-card-sub">The only free-form part of your advert — make it count.</p>
+            <div className="ca-field">
+              <textarea
+                maxLength={800}
+                placeholder="Tell buyers what makes your car a great choice; condition, history, extras or anything worth highlighting."
+                value={description}
+                onChange={(e) => {
+                  clearFieldError("description");
+                  const cleaned = e.target.value.replace(/\n{3,}/g, "\n\n");
+                  setDescription(cleaned);
+                }}
+              />
+              <div className="ca-hint">{description.length} / 800</div>
+              {fieldError("description")}
+            </div>
+          </div>
+
+          {/* LOCATION */}
+          <div className="ca-card">
+            <h3>Where is the car located?</h3>
+            <p className="ca-card-sub">
+              We show buyers the nearest town only — your postcode is never visible.
+            </p>
+            <div className="ca-field">
+              <input
+                type="text"
+                value={postcode}
+                onChange={(e) => { setPostcode(e.target.value); setPostcodeError(""); setPostcodePrefilled(false); }}
+                placeholder="e.g. DT6 3NP"
+                maxLength={8}
+              />
+              {postcodePrefilled ? (
+                <div className="ca-hint">
+                  We&apos;ve used your account postcode. Change it if the car is kept somewhere else.
+                </div>
+              ) : (
+                <div className="ca-hint">
+                  Enter the postcode where the car is kept. We show nearest town to buyers — your postcode is never visible.
+                </div>
+              )}
+              {postcodeError && <div className="ca-field-error" role="alert">{postcodeError}</div>}
+            </div>
+          </div>
+
+          {/* PHOTOS */}
+          <div className="ca-card">
+            <h3>Photos</h3>
+            <p className="ca-card-sub">Up to 10. The first photo is your main image.</p>
+            <div className="ca-photo-drop">
+              <strong>Photos are added in the next step</strong>
+              As soon as we save your draft we&apos;ll take you to the photo uploader — JPG, PNG or HEIC straight from your phone is fine.
+            </div>
+          </div>
+
+          {/* CONFIRM + SUBMIT */}
+          <div className="ca-card">
+            <label className="ca-confirm">
+              <input
+                type="checkbox"
+                checked={confirmedPrivateSeller}
+                onChange={(e) => { clearFieldError("confirmedPrivateSeller"); setConfirmedPrivateSeller(e.target.checked); }}
+              />
+              <span>I confirm I am a private seller and the information in this advert is accurate.</span>
+            </label>
+            {fieldError("confirmedPrivateSeller")}
+
+            <div className="ca-submit-row">
+              <button type="submit" className="ca-btn-submit">Create draft advert</button>
+              <p className="ca-save-note">We&apos;ll save your advert to your account before you publish.</p>
+            </div>
+
+            {message && (
+              <p role="alert" className="ca-form-message">{message}</p>
+            )}
+          </div>
+        </form>
+      </div>
+
+      {showSaveAdvertPrompt && (
+        <div
+          className="save-advert-modal-backdrop"
+          role="presentation"
+          onClick={() => setShowSaveAdvertPrompt(false)}
+        >
+          <div
+            className="save-advert-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="save-advert-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="eyebrow">Almost there</p>
+            <h2 id="save-advert-title">Save your advert</h2>
+            <p>
+              Create or sign in to your OwnerCars account so your advert is
+              saved safely and only you can manage it.
+            </p>
+            <div className="save-advert-actions">
+              <Link className="button primary" href="/login?next=/create-advert/resume">
+                Sign in and continue
+              </Link>
+              <Link
+                className="button secondary"
+                href="/create-account?next=/create-advert/resume"
+              >
+                Create account and continue
+              </Link>
+            </div>
+            <button
+              className="save-advert-close"
+              type="button"
+              onClick={() => setShowSaveAdvertPrompt(false)}
+            >
+              Keep editing
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

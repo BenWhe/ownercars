@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
+import { lookupVehicle, normaliseReg } from "@/lib/mot/client";
 
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -38,6 +39,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
+  // If the seller used reg-lookup, persist the normalised registration plus the
+  // full raw DVSA response. We re-fetch the raw record here (server-side) rather
+  // than accepting it from the client, so the motTests history never transits
+  // the browser. registration + lookup_data are PRIVATE and are stripped from
+  // the public browse/advert APIs.
+  const registration = draft.registration
+    ? normaliseReg(String(draft.registration))
+    : null;
+  let lookupData: unknown = null;
+  if (registration) {
+    try {
+      lookupData = await lookupVehicle(registration);
+    } catch {
+      // Non-blocking — a lookup hiccup at save time must not stop draft creation.
+      lookupData = null;
+    }
+  }
+
   const payload = {
     seller_id: user.id,
     seller_email: user.email,
@@ -55,6 +74,9 @@ export async function POST(request: Request) {
     seats: Number(draft.seats),
     previously_written_off: draft.previouslyWrittenOff,
     description: draft.description,
+    registration,
+    engine_size: draft.engineSize || null,
+    lookup_data: lookupData,
     postcode: draft.postcode ?? null,
     latitude: draft.latitude ?? null,
     longitude: draft.longitude ?? null,
