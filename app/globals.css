@@ -4170,3 +4170,28 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   .ca-reg-find { padding: 15px; }
   .ca-card { padding: 22px; }
 }
+
+/* ── Legal pages (Privacy Policy, Terms of Service) ───────────────────── */
+.legal-page { max-width: 720px; margin: 0 auto; padding: 48px 24px 80px; }
+.legal-page h1 { font-size: 28px; font-weight: 700; letter-spacing: -.03em; margin: 0 0 6px; }
+.legal-page h2 { font-size: 18px; font-weight: 650; margin: 36px 0 10px; }
+.legal-page h3 { font-size: 16px; font-weight: 600; margin: 24px 0 8px; }
+.legal-page p { font-size: 15px; line-height: 1.75; margin-bottom: 14px; }
+.legal-page p strong { font-weight: 600; }
+.legal-page ul, .legal-page ol { padding-left: 22px; margin-bottom: 16px; }
+.legal-page li { font-size: 15px; line-height: 1.7; margin-bottom: 6px; }
+.legal-page hr { border: none; border-top: 1px solid var(--line); margin: 28px 0; }
+.legal-page a { color: inherit; text-decoration: underline; }
+.legal-page table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+.legal-page th { background: #f9fafb; font-weight: 600; text-align: left; padding: 10px 14px; border: 1px solid var(--line); }
+.legal-page td { padding: 10px 14px; border: 1px solid var(--line); line-height: 1.6; vertical-align: top; }
+@media (max-width: 640px) {
+  .legal-page { padding: 32px 18px 64px; }
+  .legal-page h1 { font-size: 24px; }
+  .legal-page table { font-size: 13px; display: block; overflow-x: auto; }
+  .legal-page th, .legal-page td { padding: 8px 10px; }
+}
+
+/* ── Signup acceptance notice ─────────────────────────────────────────── */
+.auth-legal-notice { font-size: 13px; color: var(--muted); text-align: center; margin-top: 10px; line-height: 1.5; }
+.auth-legal-notice a { color: var(--muted); text-decoration: underline; }
