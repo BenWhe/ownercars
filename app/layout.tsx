@@ -55,6 +55,8 @@ export default function RootLayout({
           <div>
             <Link href="/safety-advice">Safety advice</Link>
             <Link href="/contact">Contact</Link>
+            <Link href="/privacy">Privacy Policy</Link>
+            <Link href="/terms">Terms</Link>
           </div>
         </footer>
 
