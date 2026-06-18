@@ -161,6 +161,12 @@ export default function CreateAccountPage() {
 
           <button type="submit">Create account</button>
 
+          <p className="auth-legal-notice">
+            By creating an account you agree to our{" "}
+            <a href="/terms">Terms of Service</a> and{" "}
+            <a href="/privacy">Privacy Policy</a>.
+          </p>
+
           {message && <p className={`auth-message${messageType !== "error" ? ` auth-message--${messageType}` : ""}`}>{message}</p>}
         </form>
 
