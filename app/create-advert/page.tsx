@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
+import PhotoUploader from "@/app/components/PhotoUploader";
 
 const SAVED_ADVERT_DRAFT_KEY = "ownercars:create-advert-draft";
 const PENDING_ADVERT_SUBMIT_KEY = "ownercars_pending_advert_submit";
@@ -42,7 +42,6 @@ type PrefilledMarkers = {
 };
 
 export default function CreateAdvertPage() {
-  const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [hasLoadedSavedDraft, setHasLoadedSavedDraft] = useState(false);
   const [showSaveAdvertPrompt, setShowSaveAdvertPrompt] = useState(false);
@@ -82,6 +81,11 @@ export default function CreateAdvertPage() {
   const [mileageFromMot, setMileageFromMot] = useState(false);
   const [noMotHistory, setNoMotHistory] = useState(false);
   const vehicleCardRef = useRef<HTMLDivElement | null>(null);
+
+  // Set after a successful draft-save so the photo uploader can attach to the advert
+  const [savedAdvertId, setSavedAdvertId] = useState<string | null>(null);
+  const [savedPhotos, setSavedPhotos] = useState<any[]>([]);
+  const photoCardRef = useRef<HTMLDivElement | null>(null);
 
   const currentDraft = useCallback((): AdvertDraft => {
     return {
@@ -448,7 +452,11 @@ export default function CreateAdvertPage() {
       window.localStorage.removeItem(SAVED_ADVERT_DRAFT_KEY);
       window.localStorage.removeItem(PENDING_ADVERT_SUBMIT_KEY);
       setShowSaveAdvertPrompt(false);
-      router.push(`/publish-advert/${result.id}`);
+      setSavedAdvertId(result.id);
+      // Scroll to the photos section so the uploader is immediately visible
+      setTimeout(() => {
+        photoCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
     } catch {
       setMessage("Something went wrong. Please try again.");
     }
@@ -774,37 +782,47 @@ export default function CreateAdvertPage() {
             </div>
           </div>
 
-          {/* PHOTOS */}
-          <div className="ca-card">
-            <h3>Photos</h3>
-            <p className="ca-card-sub">Up to 10. The first photo is your main image.</p>
-            <div className="ca-photo-drop">
-              <strong>Photos are added in the next step</strong>
-              As soon as we save your draft we&apos;ll take you to the photo uploader — JPG, PNG or HEIC straight from your phone is fine.
-            </div>
-          </div>
+          {/* CONFIRM + SUBMIT — hidden after draft is saved */}
+          {!savedAdvertId && (
+            <div className="ca-card">
+              <label className="ca-confirm">
+                <input
+                  type="checkbox"
+                  checked={confirmedPrivateSeller}
+                  onChange={(e) => { clearFieldError("confirmedPrivateSeller"); setConfirmedPrivateSeller(e.target.checked); }}
+                />
+                <span>I confirm I am a private seller and the information in this advert is accurate.</span>
+              </label>
+              {fieldError("confirmedPrivateSeller")}
 
-          {/* CONFIRM + SUBMIT */}
-          <div className="ca-card">
-            <label className="ca-confirm">
-              <input
-                type="checkbox"
-                checked={confirmedPrivateSeller}
-                onChange={(e) => { clearFieldError("confirmedPrivateSeller"); setConfirmedPrivateSeller(e.target.checked); }}
+              <div className="ca-submit-row">
+                <button type="submit" className="ca-btn-submit">Create draft advert</button>
+                <p className="ca-save-note">You&apos;ll add photos in the next step.</p>
+              </div>
+
+              {message && (
+                <p role="alert" className="ca-form-message">{message}</p>
+              )}
+            </div>
+          )}
+
+          {/* PHOTOS + PUBLISH CTA — revealed after draft is saved */}
+          {savedAdvertId && (
+            <div className="ca-card ca-publish-cta" ref={photoCardRef}>
+              <p className="ca-publish-cta-msg">✓ Advert saved</p>
+              <h3>Now add your photos</h3>
+              <p className="ca-card-sub">Up to 10. The first photo is your main image.</p>
+              <PhotoUploader
+                advertId={savedAdvertId}
+                photos={savedPhotos}
+                onPhotosChange={setSavedPhotos}
+                maxPhotos={10}
               />
-              <span>I confirm I am a private seller and the information in this advert is accurate.</span>
-            </label>
-            {fieldError("confirmedPrivateSeller")}
-
-            <div className="ca-submit-row">
-              <button type="submit" className="ca-btn-submit">Create draft advert</button>
-              <p className="ca-save-note">We&apos;ll save your advert to your account before you publish.</p>
+              <Link href={`/publish-advert/${savedAdvertId}`} className="ca-btn-submit">
+                Continue to publish →
+              </Link>
             </div>
-
-            {message && (
-              <p role="alert" className="ca-form-message">{message}</p>
-            )}
-          </div>
+          )}
         </form>
       </div>
 

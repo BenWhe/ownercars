@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { lookupVehicle, normaliseReg } from "@/lib/mot/client";
+import { geocodePostcode } from "@/lib/geocode/lookup";
 
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -57,6 +58,27 @@ export async function POST(request: Request) {
     }
   }
 
+  // Resolve location. The normal authenticated path sends pre-geocoded
+  // coordinates from the client. The resume path (unauthenticated submit →
+  // sign up → /create-advert/resume) replays the localStorage draft which
+  // only has the raw postcode string — lat/lng and nearest_town are missing.
+  // Geocode server-side whenever coordinates are absent so the advert always
+  // saves with a full location and never hits the publish-time location gate.
+  let postcode: string | null = draft.postcode ?? null;
+  let latitude: number | null = draft.latitude ?? null;
+  let longitude: number | null = draft.longitude ?? null;
+  let nearest_town: string | null = draft.nearest_town ?? null;
+
+  if (postcode && (latitude == null || longitude == null || nearest_town == null)) {
+    const geo = await geocodePostcode(postcode);
+    if (geo) {
+      postcode = geo.postcode;
+      latitude = geo.latitude;
+      longitude = geo.longitude;
+      nearest_town = geo.nearest_town;
+    }
+  }
+
   const payload = {
     seller_id: user.id,
     seller_email: user.email,
@@ -77,10 +99,10 @@ export async function POST(request: Request) {
     registration,
     engine_size: draft.engineSize || null,
     lookup_data: lookupData,
-    postcode: draft.postcode ?? null,
-    latitude: draft.latitude ?? null,
-    longitude: draft.longitude ?? null,
-    nearest_town: draft.nearest_town ?? null,
+    postcode,
+    latitude,
+    longitude,
+    nearest_town,
     status: "draft",
     paid: false,
     promo_code: null,

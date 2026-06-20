@@ -4192,6 +4192,10 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   .legal-page th, .legal-page td { padding: 8px 10px; }
 }
 
+/* ── Create-advert post-save publish CTA ─────────────────────────────── */
+.ca-publish-cta { display: flex; flex-direction: column; gap: 16px; }
+.ca-publish-cta-msg { font-size: 15px; color: #166534; font-weight: 500; margin: 0; }
+
 /* ── Signup acceptance notice ─────────────────────────────────────────── */
 .auth-legal-notice { font-size: 13px; color: var(--muted); text-align: center; margin-top: 10px; line-height: 1.5; }
 .auth-legal-notice a { color: var(--muted); text-decoration: underline; }
