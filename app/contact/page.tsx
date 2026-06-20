@@ -28,14 +28,8 @@ export default function ContactPage() {
             </p>
 
             <p>
-              <strong>WhatsApp</strong>
-              <a href="https://wa.me/447960034969">07960 034969</a>
-            </p>
-
-            <p>
               <strong>Address</strong>
               <span>
-                c/o Truckers Market Ltd.<br />
                 128 City Road<br />
                 London<br />
                 EC1V 2NX
