@@ -70,6 +70,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Sellers cannot request their own documents." }, { status: 403 });
   }
 
+  // Require an existing message thread — buyer must have messaged the seller
+  // first. Guards against thread injection by unrelated authenticated users.
+  const { count: threadCount } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("advert_id", advert_id)
+    .or(
+      `and(sender_id.eq.${user.id},recipient_id.eq.${advert.seller_id}),` +
+      `and(sender_id.eq.${advert.seller_id},recipient_id.eq.${user.id})`
+    );
+
+  if (!threadCount || threadCount === 0) {
+    return NextResponse.json(
+      { error: "Please message the seller before requesting documents." },
+      { status: 403 }
+    );
+  }
+
   const displayName = DOCUMENT_DISPLAY_NAMES[document_type];
   const buyerLabel = user.email?.split("@")[0] ?? "A buyer";
 
