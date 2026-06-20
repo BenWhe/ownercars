@@ -52,6 +52,45 @@ function downloadFileName(advert: ForSaleCardAdvert) {
   return `ownercars-${filePart(advert.make, "car")}-${filePart(advert.model, "advert")}.png`;
 }
 
+// Pre-rasterize a photo URL to a cover-cropped canvas at the exact canvas
+// pixel dimensions. Returns a data URL, or null if the image can't be loaded.
+// This is used so html2canvas draws the photo 1:1 rather than upscaling a
+// CSS-pixel-size background image — the root cause of the soft/low-res photo.
+async function rasterizePhoto(
+  src: string,
+  targetW: number,
+  targetH: number
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(null); return; }
+
+      // Cover crop: scale to fill targetW×targetH, center
+      const scale = Math.max(targetW / img.naturalWidth, targetH / img.naturalHeight);
+      const drawW = img.naturalWidth * scale;
+      const drawH = img.naturalHeight * scale;
+      const offsetX = (targetW - drawW) / 2;
+      const offsetY = (targetH - drawH) / 2;
+
+      try {
+        ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+        resolve(canvas.toDataURL("image/jpeg", 0.95));
+      } catch {
+        // Canvas tainted (CORS) — fall back to null so the original URL is kept
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
 export function ForSaleCard({ advert }: ForSaleCardProps) {
   const photoUrl = advert.advert_photos?.[0]?.image_url;
   const advertUrl = `https://www.ownercars.co.uk/advert/${advert.id}`;
@@ -80,11 +119,12 @@ export function ForSaleCard({ advert }: ForSaleCardProps) {
         flexDirection: "column",
       }}
     >
-      {/* Photo area — backgroundImage+backgroundSize:cover is used instead of
-          <img objectFit:cover> because html2canvas does not support object-fit */}
+      {/* Photo area. data-photo-bg targets this div so DownloadForSaleCardButton
+          can swap in a pre-rasterized data URL before html2canvas capture. */}
       <div style={{ position: "relative", height: 202, minHeight: 202, maxHeight: 202, width: "100%", overflow: "hidden", background: "#E5E7EB", flexShrink: 0 }}>
         {photoUrl ? (
           <div
+            data-photo-bg="true"
             style={{
               position: "absolute",
               top: 0,
@@ -230,22 +270,32 @@ export function DownloadForSaleCardButton({ advert }: ForSaleCardProps) {
     try {
       await document.fonts?.ready;
 
-      // Preload the photo before capture — html2canvas captures the off-screen
-      // card immediately on click and may race the browser's image load.
+      const captureScale = window.devicePixelRatio * 2;
       const photoUrl = advert.advert_photos?.[0]?.image_url;
-      if (photoUrl) {
-        await new Promise<void>((resolve) => {
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-          img.src = photoUrl;
-        });
+
+      // Pre-rasterize the photo to the exact canvas pixel dimensions so
+      // html2canvas draws it 1:1. Without this, html2canvas renders the
+      // background-image at CSS-pixel size (360×202) then the scale transform
+      // upscales that raster to device pixels — making the photo soft even
+      // though the source image is up to 1920px. Text/QR stay sharp because
+      // they are re-drawn as vectors at scale; only raster images are affected.
+      if (photoUrl && cardRef.current) {
+        const dataUrl = await rasterizePhoto(
+          photoUrl,
+          Math.round(360 * captureScale),
+          Math.round(202 * captureScale)
+        );
+        if (dataUrl) {
+          const photoDiv = cardRef.current.querySelector("[data-photo-bg]") as HTMLElement | null;
+          if (photoDiv) {
+            photoDiv.style.backgroundImage = `url(${dataUrl})`;
+          }
+        }
       }
 
       const canvas = await html2canvas(cardRef.current, {
         backgroundColor: "#ffffff",
-        scale: window.devicePixelRatio * 2,
+        scale: captureScale,
         useCORS: true,
         width: 360,
         height: 640,
