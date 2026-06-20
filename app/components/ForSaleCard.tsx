@@ -80,17 +80,21 @@ export function ForSaleCard({ advert }: ForSaleCardProps) {
         flexDirection: "column",
       }}
     >
-      {/* 16:9 photo area — hard min/max/height locks the container so flex
-          cannot expand or compress it; img is absolutely positioned so
-          html2canvas renders object-fit cover reliably */}
+      {/* Photo area — backgroundImage+backgroundSize:cover is used instead of
+          <img objectFit:cover> because html2canvas does not support object-fit */}
       <div style={{ position: "relative", height: 202, minHeight: 202, maxHeight: 202, width: "100%", overflow: "hidden", background: "#E5E7EB", flexShrink: 0 }}>
         {photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={photoUrl}
-            alt={title || "OwnerCars advert"}
-            crossOrigin="anonymous"
-            style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              backgroundImage: `url(${photoUrl})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
           />
         ) : null}
         <div
@@ -225,9 +229,23 @@ export function DownloadForSaleCardButton({ advert }: ForSaleCardProps) {
 
     try {
       await document.fonts?.ready;
+
+      // Preload the photo before capture — html2canvas captures the off-screen
+      // card immediately on click and may race the browser's image load.
+      const photoUrl = advert.advert_photos?.[0]?.image_url;
+      if (photoUrl) {
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          img.src = photoUrl;
+        });
+      }
+
       const canvas = await html2canvas(cardRef.current, {
         backgroundColor: "#ffffff",
-        scale: 2,
+        scale: window.devicePixelRatio * 2,
         useCORS: true,
         width: 360,
         height: 640,
