@@ -782,25 +782,6 @@ export default function CreateAdvertPage() {
             </div>
           </div>
 
-          {/* PHOTOS */}
-          <div className="ca-card" ref={photoCardRef}>
-            <h3>Photos</h3>
-            <p className="ca-card-sub">Up to 10. The first photo is your main image.</p>
-            {savedAdvertId ? (
-              <PhotoUploader
-                advertId={savedAdvertId}
-                photos={savedPhotos}
-                onPhotosChange={setSavedPhotos}
-                maxPhotos={10}
-              />
-            ) : (
-              <div className="ca-photo-drop">
-                <strong>Save your advert details to unlock photo upload</strong>
-                Once you hit &ldquo;Create draft advert&rdquo; below, the photo uploader will appear here — JPG, PNG or HEIC straight from your phone.
-              </div>
-            )}
-          </div>
-
           {/* CONFIRM + SUBMIT — hidden after draft is saved */}
           {!savedAdvertId && (
             <div className="ca-card">
@@ -816,7 +797,7 @@ export default function CreateAdvertPage() {
 
               <div className="ca-submit-row">
                 <button type="submit" className="ca-btn-submit">Create draft advert</button>
-                <p className="ca-save-note">We&apos;ll save your advert to your account before you publish.</p>
+                <p className="ca-save-note">You&apos;ll add photos in the next step.</p>
               </div>
 
               {message && (
@@ -825,10 +806,18 @@ export default function CreateAdvertPage() {
             </div>
           )}
 
-          {/* PUBLISH CTA — shown after draft is saved */}
+          {/* PHOTOS + PUBLISH CTA — revealed after draft is saved */}
           {savedAdvertId && (
-            <div className="ca-card ca-publish-cta">
-              <p className="ca-publish-cta-msg">✓ Advert saved — add your photos above, then continue to publish.</p>
+            <div className="ca-card ca-publish-cta" ref={photoCardRef}>
+              <p className="ca-publish-cta-msg">✓ Advert saved</p>
+              <h3>Now add your photos</h3>
+              <p className="ca-card-sub">Up to 10. The first photo is your main image.</p>
+              <PhotoUploader
+                advertId={savedAdvertId}
+                photos={savedPhotos}
+                onPhotosChange={setSavedPhotos}
+                maxPhotos={10}
+              />
               <Link href={`/publish-advert/${savedAdvertId}`} className="ca-btn-submit">
                 Continue to publish →
               </Link>
