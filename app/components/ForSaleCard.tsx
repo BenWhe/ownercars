@@ -245,7 +245,7 @@ export function DownloadForSaleCardButton({ advert }: ForSaleCardProps) {
 
       const canvas = await html2canvas(cardRef.current, {
         backgroundColor: "#ffffff",
-        scale: 2,
+        scale: window.devicePixelRatio * 2,
         useCORS: true,
         width: 360,
         height: 640,
