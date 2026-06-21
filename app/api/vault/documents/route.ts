@@ -35,6 +35,35 @@ export async function GET(request: NextRequest) {
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+  // Fetch advert to determine seller and enforce access control.
+  const { data: advert } = await supabase
+    .from("adverts")
+    .select("seller_id")
+    .eq("id", advert_id)
+    .maybeSingle();
+
+  if (!advert) {
+    return NextResponse.json({ documents: [] });
+  }
+
+  // Caller must be the seller OR a buyer who has an existing message thread
+  // with the seller for this advert. Return empty (not 403) so unrelated users
+  // learn nothing about what documents exist.
+  if (user.id !== advert.seller_id) {
+    const { count } = await supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("advert_id", advert_id)
+      .or(
+        `and(sender_id.eq.${user.id},recipient_id.eq.${advert.seller_id}),` +
+        `and(sender_id.eq.${advert.seller_id},recipient_id.eq.${user.id})`
+      );
+
+    if (!count || count === 0) {
+      return NextResponse.json({ documents: [] });
+    }
+  }
+
   const { data, error } = await supabase
     .from("vault_documents")
     .select("document_type, display_name, updated_at")
