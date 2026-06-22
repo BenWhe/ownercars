@@ -92,9 +92,16 @@ export async function GET(request: NextRequest) {
   const colour = searchParams.get("colour")?.trim();
   const minYear = searchParams.get("minYear");
 
+  // Select only the columns the browse card needs. Latitude/longitude are
+  // fetched for server-side distance calc only — never included in the response.
+  const BROWSE_SELECT =
+    "id, title, make, model, year, price, mileage, description, " +
+    "nearest_town, is_example, latitude, longitude, " +
+    "advert_photos(id, advert_id, image_url, sort_order)";
+
   let query = supabase
     .from("adverts")
-    .select("*, advert_photos(*)")
+    .select(BROWSE_SELECT)
     .eq("status", "published")
     .order("published_at", { ascending: false });
 
@@ -115,14 +122,28 @@ export async function GET(request: NextRequest) {
   }
 
   const adverts = (data ?? []).map((ad: any) => {
-    // PRIVACY: never expose the registration or the raw DVSA lookup payload on
-    // public pages — only derived display fields (make/model/year/etc.).
-    const { registration, lookup_data, ...safe } = ad;
+    // Build response from explicit allowlist — latitude/longitude are local
+    // variables only, used for haversine calc, never returned.
+    const { latitude, longitude, advert_photos, ...rest } = ad;
+    const safe: Record<string, unknown> = {
+      id: rest.id,
+      title: rest.title,
+      make: rest.make,
+      model: rest.model,
+      year: rest.year,
+      price: rest.price,
+      mileage: rest.mileage,
+      description: rest.description,
+      nearest_town: rest.nearest_town,
+      is_example: rest.is_example,
+      advert_photos: advert_photos ?? [],
+    };
 
-    if (buyerLat !== null && buyerLng !== null && safe.latitude && safe.longitude) {
-      const dist = haversineDistance(buyerLat, buyerLng, safe.latitude, safe.longitude);
-      return { ...safe, distance_miles: Math.round(dist) };
+    if (buyerLat !== null && buyerLng !== null && latitude && longitude) {
+      const dist = haversineDistance(buyerLat, buyerLng, latitude, longitude);
+      safe.distance_miles = Math.round(dist);
     }
+
     return safe;
   });
 
