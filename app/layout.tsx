@@ -53,6 +53,7 @@ export default function RootLayout({
         <footer className="site-footer">
           <p>© OwnerCars.co.uk</p>
           <div>
+            <Link href="/how-it-works">How it works</Link>
             <Link href="/safety-advice">Safety advice</Link>
             <Link href="/contact">Contact</Link>
             <Link href="/privacy">Privacy Policy</Link>
