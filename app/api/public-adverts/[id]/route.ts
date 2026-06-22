@@ -25,9 +25,17 @@ export async function GET(req: NextRequest, context: Context) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Select only the columns the public advert detail page needs.
+  // All internal, payment, and PII fields are excluded at the query level.
+  const ADVERT_SELECT =
+    "id, title, make, model, year, price, mileage, description, " +
+    "gearbox, body_type, colour, doors, seats, fuel_type, engine_size, " +
+    "previously_written_off, nearest_town, is_example, seller_id, " +
+    "advert_photos(id, advert_id, image_url, sort_order)";
+
   const { data, error } = await supabase
     .from("adverts")
-    .select("*, advert_photos(*)")
+    .select(ADVERT_SELECT)
     .eq("id", id)
     .eq("status", ADVERT_STATUS.PUBLISHED)
     .maybeSingle();
@@ -40,9 +48,31 @@ export async function GET(req: NextRequest, context: Context) {
     return NextResponse.json({ error: "This advert isn’t live yet." }, { status: 404 });
   }
 
-  // PRIVACY: strip the registration and the raw DVSA lookup payload before
-  // returning — public advert pages only ever see derived display fields.
-  const { registration, lookup_data, ...advert } = data as any;
+  // Build response from explicit allowlist — any field not listed here is
+  // excluded by construction (we only selected the allowed columns above).
+  const row = data as any;
+  const advert = {
+    id: row.id,
+    title: row.title,
+    make: row.make,
+    model: row.model,
+    year: row.year,
+    price: row.price,
+    mileage: row.mileage,
+    description: row.description,
+    gearbox: row.gearbox,
+    body_type: row.body_type,
+    colour: row.colour,
+    doors: row.doors,
+    seats: row.seats,
+    fuel_type: row.fuel_type,
+    engine_size: row.engine_size,
+    previously_written_off: row.previously_written_off,
+    nearest_town: row.nearest_town,
+    is_example: row.is_example,
+    seller_id: row.seller_id,
+    advert_photos: row.advert_photos ?? [],
+  };
 
   return NextResponse.json({ advert, userId: user?.id ?? null });
 }
