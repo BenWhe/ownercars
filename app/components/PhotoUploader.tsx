@@ -139,6 +139,10 @@ export default function PhotoUploader({
         <span>The first photo appears on browse and advert pages.</span>
       </div>
 
+      <p className="photo-upload-plate-notice">
+        Tip: photograph your car with the number plate out of shot where you can — OwnerCars never displays your registration, and keeping plates out of photos keeps it that way.
+      </p>
+
       <input
         ref={fileInputRef}
         className="photo-upload-input"
