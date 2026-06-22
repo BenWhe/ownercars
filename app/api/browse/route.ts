@@ -115,12 +115,14 @@ export async function GET(request: NextRequest) {
   }
 
   const adverts = (data ?? []).map((ad: any) => {
-    // PRIVACY: never expose the registration or the raw DVSA lookup payload on
-    // public pages — only derived display fields (make/model/year/etc.).
-    const { registration, lookup_data, ...safe } = ad;
+    // PRIVACY: strip registration, raw DVSA payload, and exact location fields.
+    // postcode and coordinates are kept as local variables so the server can
+    // compute a distance result — only the rounded distance_miles is returned,
+    // never the raw postcode or exact coordinates.
+    const { registration, lookup_data, postcode, latitude, longitude, ...safe } = ad;
 
-    if (buyerLat !== null && buyerLng !== null && safe.latitude && safe.longitude) {
-      const dist = haversineDistance(buyerLat, buyerLng, safe.latitude, safe.longitude);
+    if (buyerLat !== null && buyerLng !== null && latitude && longitude) {
+      const dist = haversineDistance(buyerLat, buyerLng, latitude, longitude);
       return { ...safe, distance_miles: Math.round(dist) };
     }
     return safe;

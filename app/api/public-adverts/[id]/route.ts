@@ -40,9 +40,10 @@ export async function GET(req: NextRequest, context: Context) {
     return NextResponse.json({ error: "This advert isn’t live yet." }, { status: 404 });
   }
 
-  // PRIVACY: strip the registration and the raw DVSA lookup payload before
-  // returning — public advert pages only ever see derived display fields.
-  const { registration, lookup_data, ...advert } = data as any;
+  // PRIVACY: strip registration, raw DVSA payload, and exact location fields
+  // before returning. Public advert pages show nearest_town only — the raw
+  // postcode and coordinates must never reach the browser.
+  const { registration, lookup_data, postcode, latitude, longitude, ...advert } = data as any;
 
   return NextResponse.json({ advert, userId: user?.id ?? null });
 }
