@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { DOCUMENT_DISPLAY_NAMES, isValidDocumentType } from "@/lib/vault/documents";
@@ -9,16 +11,30 @@ export const maxDuration = 30;
 // Two modes:
 //   1. File document: JSON { advert_id, document_type, file_path }
 //      Called after the browser has already PUT the file to Supabase storage
-//      via the signed URL from /api/vault/presign. Records the DB entry only.
-//      Ownership was already verified by /api/vault/presign.
+//      via the signed URL from /api/vault/presign.
 //   2. Video link:   JSON { advert_id, document_type: 'video_link', url }
 //      Stores the URL directly (no storage upload needed).
 export async function POST(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     return NextResponse.json({ error: "Server configuration error." }, { status: 500 });
+  }
+
+  // Auth: caller must be a logged-in user
+  const cookieStore = await cookies();
+  const supabaseAuth = createServerClient(supabaseUrl, anonKey, {
+    cookies: {
+      getAll() { return cookieStore.getAll(); },
+      setAll() {},
+    },
+  });
+
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
 
   let body: { advert_id?: string; document_type?: string; file_path?: string; url?: string };
@@ -38,12 +54,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid document_type." }, { status: 400 });
   }
 
-  // Sanity check: file_path must belong to this advert
+  // File path must belong to this advert
   if (file_path && !file_path.startsWith(`${advert_id}/`)) {
     return NextResponse.json({ error: "Invalid file_path." }, { status: 400 });
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  // Authorization: caller must own the advert. Look up seller_id from the DB
+  // (never trust the client to supply it). Single ownership check covers both
+  // video_link and file-document paths.
+  const { data: advert } = await supabase
+    .from("adverts")
+    .select("id, seller_id")
+    .eq("id", advert_id)
+    .maybeSingle();
+
+  if (!advert || advert.seller_id !== user.id) {
+    return NextResponse.json({ error: "Not authorised to upload to this advert." }, { status: 403 });
+  }
 
   // video_link: store URL directly
   if (document_type === "video_link") {
@@ -54,16 +83,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid URL." }, { status: 400 });
     }
 
-    const { data: advert } = await supabase
-      .from("adverts")
-      .select("seller_id")
-      .eq("id", advert_id)
-      .maybeSingle();
-
     const { error } = await supabase.from("vault_documents").upsert(
       {
         advert_id,
-        seller_id: advert?.seller_id,
+        seller_id: advert.seller_id,
         document_type: "video_link",
         file_url: url,
         display_name: DOCUMENT_DISPLAY_NAMES["video_link"],
@@ -85,17 +108,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing file_path." }, { status: 400 });
   }
 
-  // Fetch seller_id from adverts so the vault_documents row is correctly attributed
-  const { data: advert } = await supabase
-    .from("adverts")
-    .select("seller_id")
-    .eq("id", advert_id)
-    .maybeSingle();
-
   const { error: dbError } = await supabase.from("vault_documents").upsert(
     {
       advert_id,
-      seller_id: advert?.seller_id,
+      seller_id: advert.seller_id,
       document_type,
       file_url: file_path,
       display_name: DOCUMENT_DISPLAY_NAMES[document_type],
