@@ -40,9 +40,12 @@ export async function GET(req: NextRequest, context: Context) {
     return NextResponse.json({ error: "This advert isn’t live yet." }, { status: 404 });
   }
 
-  // PRIVACY: strip the registration and the raw DVSA lookup payload before
-  // returning — public advert pages only ever see derived display fields.
-  const { registration, lookup_data, ...advert } = data as any;
+  // PRIVACY: strip internal fields before returning. seller_id is excluded and
+  // replaced with a server-computed isOwner flag — the page needs to know if
+  // the viewer is the owner, but it must not receive a raw user UUID that
+  // enables unauthenticated DoS attacks (e.g. cancel-checkout with a known ID).
+  const { registration, lookup_data, seller_id, ...advert } = data as any;
+  const isOwner = user?.id != null && user.id === seller_id;
 
-  return NextResponse.json({ advert, userId: user?.id ?? null });
+  return NextResponse.json({ advert, isOwner, userId: user?.id ?? null });
 }
