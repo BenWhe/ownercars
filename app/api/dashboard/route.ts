@@ -24,15 +24,41 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
+  // Select only the columns the dashboard UI renders. Excludes
+  // availability_confirmation_token, stripe_*, payment_*, checkout_*, and all
+  // other internal/token fields that must not reach the browser.
+  const DASHBOARD_SELECT =
+    "id, title, make, model, year, price, mileage, " +
+    "fuel_type, gearbox, colour, status, is_example, created_at, " +
+    "advert_photos(id, image_url, sort_order)";
+
   const { data, error } = await supabase
     .from("adverts")
-    .select("*, advert_photos(*)")
+    .select(DASHBOARD_SELECT)
     .eq("seller_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  // Build response from explicit allowlist — any column not named above is
+  // excluded by construction.
+  const adverts = (data ?? []).map((ad: any) => ({
+    id: ad.id,
+    title: ad.title,
+    make: ad.make,
+    model: ad.model,
+    year: ad.year,
+    price: ad.price,
+    mileage: ad.mileage,
+    fuel_type: ad.fuel_type,
+    gearbox: ad.gearbox,
+    colour: ad.colour,
+    status: ad.status,
+    is_example: ad.is_example,
+    advert_photos: ad.advert_photos ?? [],
+  }));
 
   const { count: unreadCount, error: unreadError } = await supabase
     .from("messages")
@@ -44,5 +70,5 @@ export async function GET() {
     return NextResponse.json({ error: unreadError.message }, { status: 400 });
   }
 
-  return NextResponse.json({ adverts: data || [], userId: user.id, unreadCount: unreadCount || 0 });
+  return NextResponse.json({ adverts, userId: user.id, unreadCount: unreadCount || 0 });
 }
