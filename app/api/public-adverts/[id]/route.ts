@@ -25,9 +25,18 @@ export async function GET(req: NextRequest, context: Context) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Select only the columns the public advert detail page needs.
+  // seller_id is fetched to compute isOwner server-side but is never returned.
+  // All internal, payment, and PII fields are excluded at the query level.
+  const ADVERT_SELECT =
+    "id, title, make, model, year, price, mileage, description, " +
+    "gearbox, body_type, colour, doors, seats, fuel_type, engine_size, " +
+    "previously_written_off, nearest_town, is_example, seller_id, " +
+    "advert_photos(id, advert_id, image_url, sort_order)";
+
   const { data, error } = await supabase
     .from("adverts")
-    .select("*, advert_photos(*)")
+    .select(ADVERT_SELECT)
     .eq("id", id)
     .eq("status", ADVERT_STATUS.PUBLISHED)
     .maybeSingle();
@@ -37,15 +46,39 @@ export async function GET(req: NextRequest, context: Context) {
   }
 
   if (!data) {
-    return NextResponse.json({ error: "This advert isn’t live yet." }, { status: 404 });
+    return NextResponse.json({ error: "This advert isn't live yet." }, { status: 404 });
   }
 
-  // PRIVACY: strip internal fields before returning. seller_id is excluded and
-  // replaced with a server-computed isOwner flag — the page needs to know if
-  // the viewer is the owner, but it must not receive a raw user UUID that
-  // enables unauthenticated DoS attacks (e.g. cancel-checkout with a known ID).
-  const { registration, lookup_data, seller_id, ...advert } = data as any;
-  const isOwner = user?.id != null && user.id === seller_id;
+  const row = data as any;
+
+  // Compute ownership server-side. seller_id is used here and then excluded
+  // from the response — the page receives only the boolean result.
+  const isOwner = user?.id != null && user.id === row.seller_id;
+
+  // Build response from explicit allowlist. seller_id is intentionally absent —
+  // exposing a raw user UUID in the public response enabled unauthenticated DoS
+  // (cancel-checkout with a known advertId + sellerId pair).
+  const advert = {
+    id: row.id,
+    title: row.title,
+    make: row.make,
+    model: row.model,
+    year: row.year,
+    price: row.price,
+    mileage: row.mileage,
+    description: row.description,
+    gearbox: row.gearbox,
+    body_type: row.body_type,
+    colour: row.colour,
+    doors: row.doors,
+    seats: row.seats,
+    fuel_type: row.fuel_type,
+    engine_size: row.engine_size,
+    previously_written_off: row.previously_written_off,
+    nearest_town: row.nearest_town,
+    is_example: row.is_example,
+    advert_photos: row.advert_photos ?? [],
+  };
 
   return NextResponse.json({ advert, isOwner, userId: user?.id ?? null });
 }

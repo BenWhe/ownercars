@@ -9,7 +9,7 @@ import { sendReconfirmationEmail } from "@/lib/email/reconfirmation";
 
 function cronAuthorised(req: Request) {
   const expected = process.env.CRON_SECRET;
-  if (!expected) return true;
+  if (!expected) return false;
 
   const auth = req.headers.get("authorization") || "";
   return auth === `Bearer ${expected}`;
