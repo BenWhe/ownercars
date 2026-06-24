@@ -29,7 +29,7 @@ export default function AdvertPage() {
 
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [advert, setAdvert] = useState<any>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isAdvertOwner, setIsAdvertOwner] = useState<boolean>(false);
   const [message, setMessage] = useState("Loading advert...");
   const [loading, setLoading] = useState(true);
   const [sellerMessageBody, setSellerMessageBody] = useState("");
@@ -48,7 +48,7 @@ export default function AdvertPage() {
       }
 
       setAdvert(result.advert);
-      setCurrentUserId(result.userId ?? null);
+      setIsAdvertOwner(result.isOwner ?? false);
       setMessage("");
       setLoading(false);
     }
@@ -144,7 +144,6 @@ export default function AdvertPage() {
   }
 
   const displayTitle = advertDisplayTitle(advert);
-  const isAdvertOwner = currentUserId === advert.seller_id;
 
   return (
     <main>

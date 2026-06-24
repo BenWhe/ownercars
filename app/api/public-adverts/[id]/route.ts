@@ -26,6 +26,7 @@ export async function GET(req: NextRequest, context: Context) {
   const { data: { user } } = await supabase.auth.getUser();
 
   // Select only the columns the public advert detail page needs.
+  // seller_id is fetched to compute isOwner server-side but is never returned.
   // All internal, payment, and PII fields are excluded at the query level.
   const ADVERT_SELECT =
     "id, title, make, model, year, price, mileage, description, " +
@@ -45,12 +46,18 @@ export async function GET(req: NextRequest, context: Context) {
   }
 
   if (!data) {
-    return NextResponse.json({ error: "This advert isn’t live yet." }, { status: 404 });
+    return NextResponse.json({ error: "This advert isn't live yet." }, { status: 404 });
   }
 
-  // Build response from explicit allowlist — any field not listed here is
-  // excluded by construction (we only selected the allowed columns above).
   const row = data as any;
+
+  // Compute ownership server-side. seller_id is used here and then excluded
+  // from the response — the page receives only the boolean result.
+  const isOwner = user?.id != null && user.id === row.seller_id;
+
+  // Build response from explicit allowlist. seller_id is intentionally absent —
+  // exposing a raw user UUID in the public response enabled unauthenticated DoS
+  // (cancel-checkout with a known advertId + sellerId pair).
   const advert = {
     id: row.id,
     title: row.title,
@@ -70,9 +77,8 @@ export async function GET(req: NextRequest, context: Context) {
     previously_written_off: row.previously_written_off,
     nearest_town: row.nearest_town,
     is_example: row.is_example,
-    seller_id: row.seller_id,
     advert_photos: row.advert_photos ?? [],
   };
 
-  return NextResponse.json({ advert, userId: user?.id ?? null });
+  return NextResponse.json({ advert, isOwner, userId: user?.id ?? null });
 }
