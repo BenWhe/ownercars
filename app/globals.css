@@ -560,6 +560,20 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   padding: 0 24px;
 }
 
+.dashboard-guide-link {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0 0 24px;
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dashboard-guide-link:hover {
+  text-decoration: underline;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
@@ -894,6 +908,53 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   font-weight: 900;
   line-height: 1;
   margin: -4px 0 0;
+}
+
+/* For Sale card promo (advert detail page, owner view) */
+.forsale-promo {
+  display: grid;
+  gap: 16px;
+  margin: 28px 0;
+  padding: 24px;
+  border: 1px solid rgba(20, 92, 255, 0.14);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at top right, rgba(20, 92, 255, 0.12), transparent 34%),
+    linear-gradient(135deg, #ffffff, #f8fafc);
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.08);
+}
+
+.forsale-promo-copy h3 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  letter-spacing: -.04em;
+}
+
+.forsale-promo-copy p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.forsale-promo button {
+  justify-self: start;
+  min-height: 54px;
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 24px;
+  font-size: 15px;
+  font-weight: 950;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 10px 26px rgba(20, 92, 255, 0.22);
+  cursor: pointer;
+}
+
+.forsale-promo button:disabled {
+  opacity: 0.7;
+  cursor: default;
 }
 
 @media (max-width: 560px) {
@@ -1817,6 +1878,33 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   color: var(--muted);
   line-height: 1.6;
   margin: 0;
+}
+
+/* Bullet lists inside seller-guide cards */
+.guide-bullets {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.guide-bullets li {
+  position: relative;
+  padding-left: 26px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.guide-bullets li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
 }
 
 @media (max-width: 860px) {
