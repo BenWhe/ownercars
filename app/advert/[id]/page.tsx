@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
+import { DownloadForSaleCardButton } from "@/app/components/ForSaleCard";
 import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
 
 function capitaliseWords(str?: string) {
@@ -226,6 +227,21 @@ export default function AdvertPage() {
               </form>
             )}
           </div>
+
+          {isAdvertOwner && (
+            <div className="forsale-promo">
+              <div className="forsale-promo-copy">
+                <p className="promote-kicker">Your For Sale card</p>
+                <h3>Share your advert anywhere</h3>
+                <p>
+                  Download your branded For Sale card to share on social media
+                  and WhatsApp, or print it for the windscreen. The QR code links
+                  straight back to this secure listing.
+                </p>
+              </div>
+              <DownloadForSaleCardButton advert={advert} />
+            </div>
+          )}
 
           {isAdvertOwner && (
             <PromoteAdvertTools advertId={advert.id} title={displayTitle} />

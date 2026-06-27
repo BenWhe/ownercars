@@ -101,6 +101,12 @@ export default function DashboardPage() {
       <section className="dashboard-section">
         {message && <p>{message}</p>}
 
+        {adverts.some((ad) => ad.status === ADVERT_STATUS.PUBLISHED) && (
+          <Link className="dashboard-guide-link" href="/seller-guide">
+            Get the most from your advert →
+          </Link>
+        )}
+
         {!message && adverts.length === 0 && (
           <div className="empty-state">
             <h2>No adverts yet</h2>
