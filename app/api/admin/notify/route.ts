@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildFromHeader } from "@/lib/email/welcomePublished";
 
 /**
  * POST /api/admin/notify
@@ -48,19 +49,29 @@ export async function POST(req: NextRequest) {
 
   if (resendApiKey && from) {
     try {
-      await fetch("https://api.resend.com/emails", {
+      const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${resendApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from,
+          // Normalise to a clean "Display Name" <address> header rather than
+          // sending the env value verbatim, which Resend may reject.
+          from: buildFromHeader(from, "OwnerCars"),
           to: "contact@ownercars.co.uk",
           subject,
           text,
         }),
       });
+
+      // Surface Resend HTTP errors — a non-2xx does NOT throw, so without this
+      // check failures were silently dropped. We still return 200 below so
+      // Supabase doesn't retry-storm, but the reason is now visible in logs.
+      if (!response.ok) {
+        const body = await response.text();
+        console.error(`Admin notify email failed: ${response.status} ${body}`);
+      }
     } catch (e) {
       console.error("Admin notify email failed:", e);
     }

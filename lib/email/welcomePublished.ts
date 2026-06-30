@@ -47,14 +47,15 @@ export async function fetchProfileFullName(
 }
 
 /**
- * Build the From header with a personal display name while reusing the
- * verified sending address from RECONFIRMATION_EMAIL_FROM (which may be a
- * bare address or already in "Name <addr>" form).
+ * Build a From header with the given display name while reusing the verified
+ * sending address from RECONFIRMATION_EMAIL_FROM (which may be a bare address
+ * or already in "Name <addr>" form). Always emits a clean, Resend-valid
+ * "Display Name" <address> header rather than passing the env value verbatim.
  */
-function buildFromHeader(envFrom: string): string {
+export function buildFromHeader(envFrom: string, displayName: string): string {
   const match = envFrom.match(/<([^>]+)>/);
   const address = (match ? match[1] : envFrom).trim();
-  return `"Ben Wheeler, OwnerCars" <${address}>`;
+  return `"${displayName}" <${address}>`;
 }
 
 /**
@@ -214,7 +215,7 @@ Founder, OwnerCars`;
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: buildFromHeader(envFrom),
+      from: buildFromHeader(envFrom, "Ben Wheeler, OwnerCars"),
       to,
       bcc: WELCOME_EMAIL_BCC,
       subject,
