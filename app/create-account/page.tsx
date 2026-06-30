@@ -11,6 +11,8 @@ function safeNextPath(next: string | null) {
 export default function CreateAccountPage() {
   const router = useRouter();
 
+  const [fullName, setFullName] = useState("");
+  const [nameError, setNameError] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [postcode, setPostcode] = useState("");
@@ -30,6 +32,13 @@ export default function CreateAccountPage() {
   async function handleCreateAccount(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPostcodeError("");
+    setNameError("");
+
+    // Name is required
+    if (!fullName.trim()) {
+      setNameError("Please enter your name.");
+      return;
+    }
 
     // Validate postcode before signup
     if (postcode.trim()) {
@@ -46,7 +55,7 @@ export default function CreateAccountPage() {
       email,
       password,
       options: {
-        data: { postcode: postcode.trim() || null },
+        data: { postcode: postcode.trim() || null, full_name: fullName.trim() },
       },
     });
 
@@ -66,24 +75,35 @@ export default function CreateAccountPage() {
         setMessage("Something went wrong creating your account. Please try again.");
       }
     } else {
-      // Save postcode to profile if user has a session (auto-confirm enabled)
-      if (data.session && postcode.trim()) {
+      // Save name (and postcode, if given) to the profile when the user has a
+      // session (auto-confirm enabled). Without a session the values are still
+      // captured in user_metadata at signup above and can be synced later.
+      if (data.session) {
         try {
-          const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(postcode.trim())}`);
-          const geoResult = await geoRes.json();
-          if (geoRes.ok) {
-            await fetch("/api/account", {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                postcode: geoResult.postcode,
-                latitude: geoResult.latitude,
-                longitude: geoResult.longitude,
-              }),
-            });
+          const profileUpdate: {
+            full_name: string;
+            postcode?: string;
+            latitude?: number;
+            longitude?: number;
+          } = { full_name: fullName.trim() };
+
+          if (postcode.trim()) {
+            const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(postcode.trim())}`);
+            const geoResult = await geoRes.json();
+            if (geoRes.ok) {
+              profileUpdate.postcode = geoResult.postcode;
+              profileUpdate.latitude = geoResult.latitude;
+              profileUpdate.longitude = geoResult.longitude;
+            }
           }
+
+          await fetch("/api/account", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(profileUpdate),
+          });
         } catch {
-          // Non-blocking — postcode can be set from account page
+          // Non-blocking — name/postcode can be set from the account page
         }
       }
 
@@ -126,6 +146,18 @@ export default function CreateAccountPage() {
         </p>
 
         <form onSubmit={handleCreateAccount} className="auth-form">
+          <label>
+            Your name
+            <input
+              type="text"
+              placeholder="e.g. Jane Smith"
+              value={fullName}
+              onChange={(e) => { setFullName(e.target.value); setNameError(""); }}
+              autoComplete="name"
+            />
+            {nameError && <p className="field-error" role="alert">{nameError}</p>}
+          </label>
+
           <label>
             Email address
             <input

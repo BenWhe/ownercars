@@ -1,3 +1,9 @@
+import { SupabaseClient } from "@supabase/supabase-js";
+
+// Welcome email is always blind-copied here so support has a record of every
+// send without it being visible to the seller.
+const WELCOME_EMAIL_BCC = "support@ownercars.co.uk";
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -12,15 +18,32 @@ function cap(s: string | null | undefined): string {
 }
 
 /**
- * First name for the greeting. We have no reliable name source today
- * (profiles has no full_name column and signup only collects a postcode),
- * so this reads defensively from auth user_metadata and falls back to
- * "there" — which is what every seller gets until a name is captured.
+ * First name for the greeting. The resolved full name comes from
+ * profiles.full_name (collected at signup), with auth user_metadata as a
+ * fallback for accounts created before name collection existed. Falls back to
+ * "there" when neither is present.
  */
 function greetingFirstName(fullName: string | null | undefined): string {
   const name = (fullName ?? "").trim();
   if (!name) return "there";
   return name.split(/\s+/)[0];
+}
+
+/**
+ * Reads a seller's name from profiles.full_name (the primary source, populated
+ * at signup). Best-effort — returns null if the row or column has no value.
+ */
+export async function fetchProfileFullName(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", userId)
+    .maybeSingle();
+  const name = (data?.full_name ?? "").trim();
+  return name || null;
 }
 
 /**
@@ -35,11 +58,13 @@ function buildFromHeader(envFrom: string): string {
 }
 
 /**
- * Look up a seller's email and (best-effort) name from the auth admin API,
- * the same source used by the message-notification route. Returns null if
- * the lookup fails or no email is on file.
+ * Look up a seller's email (from the auth admin API, the same source used by
+ * the message-notification route) and resolved name. The name prefers
+ * profiles.full_name, falling back to auth user_metadata, then null. Returns
+ * null if the lookup fails or no email is on file.
  */
 export async function fetchSellerContact(
+  supabase: SupabaseClient,
   sellerId: string
 ): Promise<{ email: string; fullName: string | null } | null> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -60,9 +85,17 @@ export async function fetchSellerContact(
   if (!email) return null;
 
   const meta = data?.user_metadata ?? {};
-  const fullName: string | null = meta.full_name ?? meta.name ?? null;
+  const metaName: string | null = meta.full_name ?? meta.name ?? null;
 
-  return { email, fullName };
+  // profiles.full_name is the primary source; metadata is the fallback.
+  let profileName: string | null = null;
+  try {
+    profileName = await fetchProfileFullName(supabase, sellerId);
+  } catch {
+    // Best-effort — fall back to metadata if the profiles lookup fails.
+  }
+
+  return { email, fullName: profileName ?? metaName ?? null };
 }
 
 type WelcomeEmailParams = {
@@ -183,6 +216,7 @@ Founder, OwnerCars`;
     body: JSON.stringify({
       from: buildFromHeader(envFrom),
       to,
+      bcc: WELCOME_EMAIL_BCC,
       subject,
       html,
       text,

@@ -378,7 +378,7 @@ export async function POST(req: Request) {
         // Customer-facing welcome email to the seller. Non-blocking.
         try {
           if (publishedAdvert.seller_id) {
-            const contact = await fetchSellerContact(publishedAdvert.seller_id);
+            const contact = await fetchSellerContact(supabaseAdmin, publishedAdvert.seller_id);
             if (contact) {
               await sendAdvertPublishedWelcomeEmail({
                 to: contact.email,

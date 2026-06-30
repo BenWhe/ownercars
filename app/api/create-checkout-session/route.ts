@@ -15,6 +15,7 @@ import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
 import { notifyAdvertPublished } from "@/lib/admin/notifyPublished";
 import {
   advertDisplayTitle,
+  fetchProfileFullName,
   sendAdvertPublishedWelcomeEmail,
 } from "@/lib/email/welcomePublished";
 
@@ -247,10 +248,14 @@ export async function POST(req: Request) {
     // once — only when this request actually published the advert.
     if (publishedAdvert && user.email) {
       try {
+        // profiles.full_name is the primary name source; metadata is the fallback.
+        const profileName = await fetchProfileFullName(supabase, user.id).catch(
+          () => null
+        );
         const meta = user.user_metadata ?? {};
         await sendAdvertPublishedWelcomeEmail({
           to: user.email,
-          fullName: meta.full_name ?? meta.name ?? null,
+          fullName: profileName ?? meta.full_name ?? meta.name ?? null,
           advertId,
           advertTitle: advertDisplayTitle(publishedAdvert),
         });
