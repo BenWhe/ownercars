@@ -4,6 +4,11 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
 import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
 import { notifyAdvertPublished } from "@/lib/admin/notifyPublished";
+import {
+  advertDisplayTitle,
+  fetchSellerContact,
+  sendAdvertPublishedWelcomeEmail,
+} from "@/lib/email/welcomePublished";
 
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 3958.8;
@@ -146,21 +151,39 @@ async function matchAndNotifyAlerts(supabaseAdmin: SupabaseClient, advertId: str
   await Promise.all(sends);
 }
 
+type PublishedAdvert = {
+  seller_id: string | null;
+  year: number | string | null;
+  make: string | null;
+  model: string | null;
+};
+
+type PublishResult = {
+  error: string | null;
+  // The advert row IFF this invocation actually transitioned it to published.
+  // Null on a no-op (e.g. webhook retry where the advert is already live), which
+  // is the signal used to fire publish side-effects exactly once.
+  published: PublishedAdvert | null;
+};
+
 async function publishPaidAdvert(
   supabaseAdmin: SupabaseClient,
   session: Stripe.Checkout.Session
-) {
+): Promise<PublishResult> {
   const advertId = session.metadata?.advertId;
   const expectedAmount = Number(session.metadata?.expectedAmount || NaN);
 
   if (!Number.isFinite(expectedAmount) || session.amount_total !== expectedAmount) {
-    return "Paid checkout amount did not match the expected listing price";
+    return {
+      error: "Paid checkout amount did not match the expected listing price",
+      published: null,
+    };
   }
 
-  if (!advertId) return null;
+  if (!advertId) return { error: null, published: null };
 
   const publishedAt = new Date();
-  const { error } = await supabaseAdmin
+  const { data: updatedRows, error } = await supabaseAdmin
     .from("adverts")
     .update({
       paid: true,
@@ -177,9 +200,13 @@ async function publishPaidAdvert(
       next_availability_check_at: nextConfirmationDueDate(publishedAt),
     })
     .eq("id", advertId)
-    .neq("status", ADVERT_STATUS.PUBLISHED);
+    .neq("status", ADVERT_STATUS.PUBLISHED)
+    .select("seller_id, year, make, model");
 
-  if (error) return error.message;
+  if (error) return { error: error.message, published: null };
+
+  // Exactly one row transitions on first publish; a retry matches 0 rows.
+  const published = (updatedRows && updatedRows[0]) || null;
 
   // Increment promo code uses now that payment is confirmed.
   // Kept here (not at checkout session creation) so abandoned checkouts
@@ -200,7 +227,7 @@ async function publishPaidAdvert(
     }
   }
 
-  return null;
+  return { error: null, published };
 }
 
 async function markCheckoutNotPaid(
@@ -323,11 +350,19 @@ export async function POST(req: Request) {
     const session = event.data.object as Stripe.Checkout.Session;
 
     if (session.payment_status === "paid") {
-      processingError = await publishPaidAdvert(supabaseAdmin, session);
-      if (!processingError && session.metadata?.advertId) {
+      const publishResult = await publishPaidAdvert(supabaseAdmin, session);
+      processingError = publishResult.error;
+
+      // Side-effects fire only when THIS invocation actually published the
+      // advert. publishResult.published is null on webhook retries (the advert
+      // is already live), so nothing here double-fires.
+      if (!processingError && publishResult.published && session.metadata?.advertId) {
+        const advertId = session.metadata.advertId;
+        const publishedAdvert = publishResult.published;
+
         // Non-blocking — must never break payment processing
         try {
-          await matchAndNotifyAlerts(supabaseAdmin, session.metadata.advertId);
+          await matchAndNotifyAlerts(supabaseAdmin, advertId);
         } catch (alertErr) {
           console.error("Alert matching failed:", alertErr);
         }
@@ -336,9 +371,25 @@ export async function POST(req: Request) {
             session.amount_total != null
               ? `£${(session.amount_total / 100).toFixed(2)}`
               : "unknown";
-          await notifyAdvertPublished(supabaseAdmin, session.metadata.advertId, amountGbp);
+          await notifyAdvertPublished(supabaseAdmin, advertId, amountGbp);
         } catch (e) {
           console.error("Admin publish notification failed:", e);
+        }
+        // Customer-facing welcome email to the seller. Non-blocking.
+        try {
+          if (publishedAdvert.seller_id) {
+            const contact = await fetchSellerContact(publishedAdvert.seller_id);
+            if (contact) {
+              await sendAdvertPublishedWelcomeEmail({
+                to: contact.email,
+                fullName: contact.fullName,
+                advertId,
+                advertTitle: advertDisplayTitle(publishedAdvert),
+              });
+            }
+          }
+        } catch (e) {
+          console.error("Seller welcome email failed:", e);
         }
       }
     }
