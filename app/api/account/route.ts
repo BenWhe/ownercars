@@ -69,24 +69,41 @@ export async function PATCH(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
 
-  let body: { postcode?: string; latitude?: number; longitude?: number };
+  let body: {
+    postcode?: string;
+    latitude?: number;
+    longitude?: number;
+    full_name?: string | null;
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
+  // Build the upsert from only the fields the caller actually sent, so a
+  // partial update (e.g. name only) never nulls out postcode/location and
+  // vice-versa. onConflict updates just the provided columns.
+  const updates: Record<string, unknown> = {
+    id: user.id,
+    updated_at: new Date().toISOString(),
+  };
+
+  if ("postcode" in body || "latitude" in body || "longitude" in body) {
+    updates.postcode = body.postcode ?? null;
+    updates.latitude = body.latitude ?? null;
+    updates.longitude = body.longitude ?? null;
+  }
+
+  if ("full_name" in body) {
+    const trimmed = typeof body.full_name === "string" ? body.full_name.trim() : "";
+    updates.full_name = trimmed || null;
+  }
+
   const admin = createClient(supabaseUrl, serviceRoleKey);
-  const { error } = await admin.from("profiles").upsert(
-    {
-      id: user.id,
-      postcode: body.postcode ?? null,
-      latitude: body.latitude ?? null,
-      longitude: body.longitude ?? null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "id" }
-  );
+  const { error } = await admin
+    .from("profiles")
+    .upsert(updates, { onConflict: "id" });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });

@@ -13,6 +13,11 @@ import {
 } from "@/lib/payments/promos";
 import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
 import { notifyAdvertPublished } from "@/lib/admin/notifyPublished";
+import {
+  advertDisplayTitle,
+  fetchProfileFullName,
+  sendAdvertPublishedWelcomeEmail,
+} from "@/lib/email/welcomePublished";
 
 export async function POST(req: Request) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -202,7 +207,7 @@ export async function POST(req: Request) {
     if (promoError) return promoError;
 
     const publishedAt = new Date();
-    const { error } = await supabase
+    const { data: publishedRows, error } = await supabase
       .from("adverts")
       .update({
         status: ADVERT_STATUS.PUBLISHED,
@@ -219,7 +224,8 @@ export async function POST(req: Request) {
       })
       .eq("id", advertId)
       .eq("seller_id", user.id)
-      .neq("status", ADVERT_STATUS.PUBLISHED);
+      .neq("status", ADVERT_STATUS.PUBLISHED)
+      .select("year, make, model");
 
     if (error) {
       return NextResponse.json(
@@ -228,11 +234,34 @@ export async function POST(req: Request) {
       );
     }
 
+    // Only true on the invocation that actually transitioned the advert.
+    const publishedAdvert = (publishedRows && publishedRows[0]) || null;
+
     // Non-blocking — must never affect the publish response
     try {
       await notifyAdvertPublished(supabase, advertId, "free (promo)");
     } catch (e) {
       console.error("Admin publish notification failed:", e);
+    }
+
+    // Customer-facing welcome email to the seller. Non-blocking, sent exactly
+    // once — only when this request actually published the advert.
+    if (publishedAdvert && user.email) {
+      try {
+        // profiles.full_name is the primary name source; metadata is the fallback.
+        const profileName = await fetchProfileFullName(supabase, user.id).catch(
+          () => null
+        );
+        const meta = user.user_metadata ?? {};
+        await sendAdvertPublishedWelcomeEmail({
+          to: user.email,
+          fullName: profileName ?? meta.full_name ?? meta.name ?? null,
+          advertId,
+          advertTitle: advertDisplayTitle(publishedAdvert),
+        });
+      } catch (e) {
+        console.error("Seller welcome email failed:", e);
+      }
     }
 
     return NextResponse.json({ url: "/dashboard" });
