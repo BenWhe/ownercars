@@ -59,6 +59,11 @@ export function calculatePromoAmountPence(
     return Math.max(0, baseAmountPence - Math.round(promo.discount_value * 100));
   }
 
+  if (promo.discount_type === "percentage" && promo.discount_value != null) {
+    const clampedPercent = Math.min(100, Math.max(0, promo.discount_value));
+    return Math.max(0, Math.round(baseAmountPence * (1 - clampedPercent / 100)));
+  }
+
   return baseAmountPence;
 }
 

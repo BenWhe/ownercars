@@ -1,5 +1,41 @@
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { buildFromHeader } from "@/lib/email/welcomePublished";
+
+/** Constant-time secret comparison — avoids leaking match progress via timing. */
+function secretsMatch(provided: string, expected: string): boolean {
+  const providedBuf = Buffer.from(provided);
+  const expectedBuf = Buffer.from(expected);
+  if (providedBuf.length !== expectedBuf.length) return false;
+  return timingSafeEqual(providedBuf, expectedBuf);
+}
+
+/** Trims a string field to a sane length; rejects non-strings and empties. */
+function safeString(value: unknown, maxLen = 200): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.length > maxLen ? `${trimmed.slice(0, maxLen)}…` : trimmed;
+}
+
+function safeEmail(value: unknown): string | null {
+  const s = safeString(value, 254);
+  return s && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : null;
+}
+
+/** Parses to a real date and re-serialises, rather than trusting the raw string. */
+function safeDate(value: unknown): string | null {
+  const s = safeString(value, 64);
+  if (!s) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/** Loose id validator — record ids are UUIDs, but stay permissive on shape. */
+function safeId(value: unknown): string | null {
+  const s = safeString(value, 64);
+  return s && /^[0-9a-zA-Z-]+$/.test(s) ? s : null;
+}
 
 /**
  * POST /api/admin/notify
@@ -15,7 +51,8 @@ import { buildFromHeader } from "@/lib/email/welcomePublished";
  */
 export async function POST(req: NextRequest) {
   const secret = process.env.ADMIN_NOTIFY_SECRET;
-  if (!secret || req.headers.get("x-admin-secret") !== secret) {
+  const provided = req.headers.get("x-admin-secret");
+  if (!secret || !provided || !secretsMatch(provided, secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -35,13 +72,20 @@ export async function POST(req: NextRequest) {
   let text = "";
 
   if (table === "users" && type === "INSERT") {
+    const email = safeEmail(record?.email) ?? "unknown";
+    const createdAt = safeDate(record?.created_at) ?? "unknown";
     subject = "New OwnerCars account";
-    text = `A new account was created.\n\nEmail: ${record?.email ?? "unknown"}\nCreated: ${record?.created_at ?? "unknown"}`;
+    text = `A new account was created.\n\nEmail: ${email}\nCreated: ${createdAt}`;
   } else if (table === "adverts" && type === "INSERT" && record?.status === "draft") {
-    const parts = [record?.year, record?.make, record?.model].filter(Boolean);
+    const parts = [
+      safeString(record?.year, 8),
+      safeString(record?.make, 80),
+      safeString(record?.model, 80),
+    ].filter((v): v is string => Boolean(v));
     const title = parts.length > 0 ? parts.join(" ") : "details not yet entered";
+    const advertId = safeId(record?.id) ?? "unknown";
     subject = "New draft advert started";
-    text = `A seller started a new advert.\n\n${title}\nAdvert ID: ${record?.id ?? "unknown"}`;
+    text = `A seller started a new advert.\n\n${title}\nAdvert ID: ${advertId}`;
   } else {
     // Unrecognised table/type combination — return 200 so Supabase doesn't retry
     return NextResponse.json({ ok: true });

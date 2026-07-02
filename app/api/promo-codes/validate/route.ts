@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -9,13 +11,30 @@ import {
 
 export async function POST(req: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     return NextResponse.json(
       { error: "Missing Supabase server environment variables" },
       { status: 500 }
     );
+  }
+
+  // Auth required — this is the live route called by /publish-advert/[id],
+  // an authenticated page. Prevents anonymous brute-forcing of the promo
+  // code namespace (M-1).
+  const cookieStore = await cookies();
+  const supabaseAuth = createServerClient(supabaseUrl, anonKey, {
+    cookies: {
+      getAll() { return cookieStore.getAll(); },
+      setAll() {},
+    },
+  });
+
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "You must be logged in." }, { status: 401 });
   }
 
   let normalizedCode = "";
