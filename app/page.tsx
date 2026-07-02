@@ -1,6 +1,73 @@
 import Link from "next/link";
+import { createClient } from "@supabase/supabase-js";
 
-export default function HomePage() {
+// Featured cars are refreshed periodically rather than on every request.
+export const revalidate = 300;
+
+type FeaturedAdvert = {
+  id: string;
+  make: string | null;
+  model: string | null;
+  year: number | string | null;
+  price: number | string | null;
+  mileage: number | string | null;
+  nearest_town: string | null;
+  advert_photos?: Array<{ image_url: string | null; sort_order: number | null }>;
+};
+
+function capitaliseWords(str?: string | null) {
+  if (!str) return "";
+  return str
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function featuredTitle(ad: FeaturedAdvert) {
+  const title = `${ad.year || ""} ${capitaliseWords(ad.make)} ${capitaliseWords(ad.model)}`.trim();
+  return title || "Private car advert";
+}
+
+function firstPhotoUrl(ad: FeaturedAdvert): string | null {
+  const photos = [...(ad.advert_photos ?? [])].sort(
+    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+  );
+  return photos[0]?.image_url ?? null;
+}
+
+// Fetch up to 6 most-recently-published adverts server-side, selecting only
+// the public allowlist fields the browse API exposes (display fields +
+// nearest_town + first photo). No postcode, coordinates, seller or payment
+// fields are ever requested. Returns [] on any error so the section hides.
+async function getFeaturedAdverts(): Promise<FeaturedAdvert[]> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return [];
+
+  try {
+    const supabase = createClient(url, anonKey);
+    const { data, error } = await supabase
+      .from("adverts")
+      .select(
+        "id, make, model, year, price, mileage, nearest_town, " +
+          "advert_photos(image_url, sort_order)"
+      )
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .limit(6);
+
+    if (error || !data) return [];
+    return data as unknown as FeaturedAdvert[];
+  } catch {
+    return [];
+  }
+}
+
+export default async function HomePage() {
+  const featured = await getFeaturedAdverts();
+
   return (
     <main>
       {/* HERO */}
@@ -45,6 +112,44 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* FEATURED CARS */}
+      {featured.length > 0 && (
+        <section className="home-cars-section">
+          <div className="home-cars-heading">
+            <h2>On the market now.</h2>
+            <p>A few of the private cars currently listed on OwnerCars.</p>
+          </div>
+          <div className="home-cars-grid">
+            {featured.map((ad) => {
+              const title = featuredTitle(ad);
+              const photo = firstPhotoUrl(ad);
+              return (
+                <Link className="home-car-card" href={`/advert/${ad.id}`} key={ad.id}>
+                  {photo ? (
+                    <img className="home-car-photo" src={photo} alt={title} />
+                  ) : (
+                    <div className="home-car-photo home-car-photo-empty" />
+                  )}
+                  <div className="home-car-body">
+                    <h3 className="home-car-title">{title}</h3>
+                    <p className="home-car-price">£{Number(ad.price).toLocaleString()}</p>
+                    <p className="home-car-meta">{Number(ad.mileage).toLocaleString()} miles</p>
+                    {ad.nearest_town && (
+                      <p className="home-car-location">Near {ad.nearest_town}</p>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+          <div className="home-cars-footer">
+            <Link className="home-cars-browse" href="/browse">
+              Browse all private cars →
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* PRIVACY SPLIT */}
       <section className="home-split-section">
@@ -91,12 +196,12 @@ export default function HomePage() {
             <div className="home-split-row">
               <span className="home-split-icon">📄</span>
               <span>Documents</span>
-              <span className="home-split-val">Secure Vault, every share logged</span>
+              <span className="home-split-val">Secure Vault, shared on your terms</span>
             </div>
             <div className="home-split-row">
               <span className="home-split-icon">👤</span>
               <span>Who&apos;s contacting you</span>
-              <span className="home-split-val">Registered, monitored buyers</span>
+              <span className="home-split-val">Registered buyers only</span>
             </div>
           </div>
         </div>
@@ -109,7 +214,7 @@ export default function HomePage() {
             <div>
               <p className="home-vault-eyebrow">Secure Vault</p>
               <h2>Your documents never leave OwnerCars.</h2>
-              <p className="home-vault-lead">MOT certificate, service history, V5C — buyers request them, you decide who sees them. Every request is logged and monitored.</p>
+              <p className="home-vault-lead">MOT certificate, service history, V5C — buyers request them through the platform, and you decide who sees each one.</p>
               <div className="home-vault-points">
                 <div className="home-vault-point">
                   <span className="home-vault-dot">✓</span>
@@ -121,7 +226,7 @@ export default function HomePage() {
                 </div>
                 <div className="home-vault-point">
                   <span className="home-vault-dot">✓</span>
-                  Document harvesting gets flagged and acted upon
+                  Your documents are never sent by email or WhatsApp
                 </div>
               </div>
             </div>
@@ -130,7 +235,7 @@ export default function HomePage() {
                 <span className="home-vault-file">📄</span>
                 <span className="home-vault-meta">
                   <div className="home-vault-name">MOT certificate</div>
-                  <div className="home-vault-state">Shared with 1 buyer · logged</div>
+                  <div className="home-vault-state">Shared with 1 buyer</div>
                 </span>
                 <span className="home-vault-lock">🔒</span>
               </div>
