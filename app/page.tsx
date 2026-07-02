@@ -214,7 +214,7 @@ export default async function HomePage() {
             <div>
               <p className="home-vault-eyebrow">Secure Vault</p>
               <h2>Your documents never leave OwnerCars.</h2>
-              <p className="home-vault-lead">MOT certificate, service history, V5C — buyers request them, you decide who sees them. Buyers request them through the platform, and you decide who sees them.</p>
+              <p className="home-vault-lead">MOT certificate, service history, V5C — buyers request them through the platform, and you decide who sees each one.</p>
               <div className="home-vault-points">
                 <div className="home-vault-point">
                   <span className="home-vault-dot">✓</span>
