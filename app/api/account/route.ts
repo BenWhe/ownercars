@@ -34,13 +34,18 @@ export async function GET() {
     return NextResponse.json({ user: null });
   }
 
-  // Fetch profile (postcode/location) using service role to avoid RLS complexity
-  let profile: { postcode: string | null; latitude: number | null; longitude: number | null } | null = null;
+  // Fetch profile (postcode/location/name) using service role to avoid RLS complexity
+  let profile: {
+    postcode: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    full_name: string | null;
+  } | null = null;
   if (serviceRoleKey) {
     const admin = createClient(supabaseUrl, serviceRoleKey);
     const { data } = await admin
       .from("profiles")
-      .select("postcode, latitude, longitude")
+      .select("postcode, latitude, longitude, full_name")
       .eq("id", user.id)
       .maybeSingle();
     profile = data ?? null;
@@ -48,7 +53,7 @@ export async function GET() {
 
   return NextResponse.json({
     user: { id: user.id, email: user.email, user_metadata: user.user_metadata ?? {} },
-    profile: profile ?? { postcode: null, latitude: null, longitude: null },
+    profile: profile ?? { postcode: null, latitude: null, longitude: null, full_name: null },
   });
 }
 
