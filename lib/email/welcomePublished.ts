@@ -155,7 +155,7 @@ export async function sendAdvertPublishedWelcomeEmail({
                 <div style="background:#f9fafb;border-left:4px solid #2563EB;border-radius:4px;padding:18px 20px;margin:16px 0 8px;">
                   <p style="margin:0 0 14px;"><strong style="color:#111827;">Add all your photos</strong> — up to 10, and the first one is your main image. More photos mean more confident buyers. You can add and reorder them from your dashboard any time.</p>
                   <p style="margin:0 0 14px;"><strong style="color:#111827;">Set up your Secure Vault</strong> — this is where you upload your MOT certificate, service history, and V5C. Buyers can request documents through the platform, and you decide who sees what. Sellers who set up their Vault get more serious enquiries. Find it in Edit advert.</p>
-                  <p style="margin:0;"><strong style="color:#111827;">Share your For Sale card</strong> — open your advert and download your branded For Sale card. Post it in Facebook car groups, send it on WhatsApp, or put it in the windscreen. The QR code takes buyers straight to your listing without exposing your details.</p>
+                  <p style="margin:0;"><strong style="color:#111827;">Share your For Sale card</strong> — open your advert and download your branded For Sale card. Post it in Facebook car groups, send it on WhatsApp, or put it in the windscreen. The QR code takes buyers straight to your listing without exposing your details.<br/><a href="${advertUrl}" style="color:#2563EB;text-decoration:none;font-weight:600;">Download your shareable For Sale card here →</a></p>
                 </div>
 
                 <p style="margin:16px 0;">You'll be emailed when a buyer messages — so you won't miss anything. Reply promptly and keep the conversation on OwnerCars to protect your privacy.</p>
@@ -195,6 +195,7 @@ Add all your photos — up to 10, and the first one is your main image. More pho
 Set up your Secure Vault — this is where you upload your MOT certificate, service history, and V5C. Buyers can request documents through the platform, and you decide who sees what. Sellers who set up their Vault get more serious enquiries. Find it in Edit advert.
 
 Share your For Sale card — open your advert and download your branded For Sale card. Post it in Facebook car groups, send it on WhatsApp, or put it in the windscreen. The QR code takes buyers straight to your listing without exposing your details.
+Download your shareable For Sale card here: ${advertUrl}
 
 You'll be emailed when a buyer messages — so you won't miss anything. Reply promptly and keep the conversation on OwnerCars to protect your privacy.
 

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
 import { DownloadForSaleCardButton } from "@/app/components/ForSaleCard";
 import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
+import ShareAdvertButton from "@/app/components/ShareAdvertButton";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -211,6 +212,11 @@ export default function AdvertClient() {
               )}
             </div>
 
+            <ShareAdvertButton
+              advertId={advert.id}
+              shareText={`${displayTitle} — £${Number(advert.price).toLocaleString()} on OwnerCars`}
+            />
+
             {!isAdvertOwner && (
               <form className="advert-message-form" onSubmit={handleMessageSeller}>
                 <label htmlFor="seller-message">Message seller</label>
@@ -228,20 +234,18 @@ export default function AdvertClient() {
             )}
           </div>
 
-          {isAdvertOwner && (
-            <div className="forsale-promo">
-              <div className="forsale-promo-copy">
-                <p className="promote-kicker">Your For Sale card</p>
-                <h3>Share your advert anywhere</h3>
-                <p>
-                  Download your branded For Sale card to share on social media
-                  and WhatsApp, or print it for the windscreen. The QR code links
-                  straight back to this secure listing.
-                </p>
-              </div>
-              <DownloadForSaleCardButton advert={advert} />
+          <div className="forsale-promo">
+            <div className="forsale-promo-copy">
+              <p className="promote-kicker">For Sale card</p>
+              <h3>Download the branded For Sale card</h3>
+              <p>
+                Share this branded card on social media and WhatsApp, or print
+                it for the windscreen. The QR code links straight back to this
+                secure listing.
+              </p>
             </div>
-          )}
+            <DownloadForSaleCardButton advert={advert} />
+          </div>
 
           {isAdvertOwner && (
             <PromoteAdvertTools advertId={advert.id} title={displayTitle} />
