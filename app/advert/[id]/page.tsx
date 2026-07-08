@@ -1,12 +1,18 @@
-"use client";
+import type { Metadata } from "next";
+import { createClient } from "@supabase/supabase-js";
+import AdvertClient from "./AdvertClient";
 
-import { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
-import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
-import { DownloadForSaleCardButton } from "@/app/components/ForSaleCard";
-import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
+type MetaAdvert = {
+  make: string | null;
+  model: string | null;
+  year: number | string | null;
+  price: number | string | null;
+  mileage: number | string | null;
+  nearest_town: string | null;
+  advert_photos?: Array<{ image_url: string | null; sort_order: number | null }>;
+};
 
-function capitaliseWords(str?: string) {
+function capitaliseWords(str?: string | null) {
   if (!str) return "";
   return str
     .trim()
@@ -16,366 +22,95 @@ function capitaliseWords(str?: string) {
     .join(" ");
 }
 
-function advertDisplayTitle(advert: any) {
-  const title = `${advert.year || ""} ${capitaliseWords(
-    advert.make
-  )} ${capitaliseWords(advert.model)}`.trim();
+function firstPhotoUrl(ad: MetaAdvert): string | null {
+  const photos = [...(ad.advert_photos ?? [])].sort(
+    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+  );
+  return photos[0]?.image_url ?? null;
+}
 
-  return title || advert.title || "Private car advert";
+// Fetch only the public-safe fields needed for metadata/OG — same allowlist
+// discipline as /api/public-adverts/[id]: no seller_id, postcode, coordinates,
+// registration, or payment fields. Only published adverts are returned.
+async function getMetaAdvert(id: string): Promise<MetaAdvert | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return null;
+
+  try {
+    const supabase = createClient(url, anonKey);
+    const { data, error } = await supabase
+      .from("adverts")
+      .select(
+        "make, model, year, price, mileage, nearest_town, " +
+          "advert_photos(image_url, sort_order)"
+      )
+      .eq("id", id)
+      .eq("status", "published")
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data as unknown as MetaAdvert;
+  } catch {
+    return null;
+  }
+}
+
+type Props = { params: Promise<{ id: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const ad = await getMetaAdvert(id);
+
+  // Unpublished/missing advert — fall back to the site's generic metadata,
+  // no error.
+  if (!ad) return {};
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.ownercars.co.uk";
+  const upperTitle = `${ad.year || ""} ${capitaliseWords(ad.make).toUpperCase()} ${capitaliseWords(
+    ad.model
+  ).toUpperCase()}`.trim();
+  const price = ad.price != null ? `£${Number(ad.price).toLocaleString()}` : null;
+
+  // Title template in the root layout appends " | OwnerCars".
+  const title = price ? `${upperTitle} — ${price}` : upperTitle;
+
+  const naturalTitle = `${ad.year || ""} ${capitaliseWords(ad.make)} ${capitaliseWords(
+    ad.model
+  )}`.trim();
+  const mileageStr =
+    ad.mileage != null ? `${Number(ad.mileage).toLocaleString()} miles` : null;
+  const locationStr = ad.nearest_town ? ` near ${ad.nearest_town}` : "";
+
+  const descriptionParts = [
+    `${naturalTitle} for sale privately${locationStr}.`,
+    [mileageStr, price].filter(Boolean).join(", ") + ".",
+    "Contact the seller securely on OwnerCars — no details exposed.",
+  ];
+  const description = descriptionParts.filter(Boolean).join(" ");
+
+  const photoUrl = firstPhotoUrl(ad);
+  const ogImage = photoUrl || `${siteUrl}/opengraph-image.png`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `${siteUrl}/advert/${id}`,
+      type: "website",
+      images: [{ url: ogImage }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImage],
+    },
+  };
 }
 
 export default function AdvertPage() {
-  const params = useParams();
-  const router = useRouter();
-
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [advert, setAdvert] = useState<any>(null);
-  const [isAdvertOwner, setIsAdvertOwner] = useState<boolean>(false);
-  const [message, setMessage] = useState("Loading advert...");
-  const [loading, setLoading] = useState(true);
-  const [sellerMessageBody, setSellerMessageBody] = useState("");
-  const [sellerMessageStatus, setSellerMessageStatus] = useState("");
-  const touchStartX = useRef<number | null>(null);
-
-  useEffect(() => {
-    async function fetchAdvert() {
-      const res = await fetch(`/api/public-adverts/${params.id}`);
-      const result = await res.json();
-
-      if (!res.ok) {
-        setMessage(result.error || "This advert isn’t live yet.");
-        setLoading(false);
-        return;
-      }
-
-      setAdvert(result.advert);
-      setIsAdvertOwner(result.isOwner ?? false);
-      setMessage("");
-      setLoading(false);
-    }
-
-    if (params.id) fetchAdvert();
-  }, [params.id]);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (activeIndex === null || !advert?.advert_photos?.length) return;
-
-      if (e.key === "Escape") {
-        setActiveIndex(null);
-      }
-
-      if (e.key === "ArrowLeft") {
-        setActiveIndex(
-          (activeIndex - 1 + advert.advert_photos.length) %
-            advert.advert_photos.length
-        );
-      }
-
-      if (e.key === "ArrowRight") {
-        setActiveIndex((activeIndex + 1) % advert.advert_photos.length);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeIndex, advert]);
-
-  async function handleMessageSeller(e: React.FormEvent) {
-    e.preventDefault();
-
-    const cleanBody = sellerMessageBody.trim();
-    if (!cleanBody) {
-      setSellerMessageStatus("Please enter a message before sending.");
-      return;
-    }
-    if (!advert?.id) return;
-
-    setSellerMessageStatus("Sending message...");
-
-    const res = await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ advertId: advert.id, body: cleanBody }),
-    });
-
-    const result = await res.json();
-
-    if (res.status === 401) {
-      router.push(`/login?next=/advert/${advert.id}`);
-      return;
-    }
-
-    if (!res.ok) {
-      setSellerMessageStatus(result.error || "Could not send message.");
-      return;
-    }
-
-    setSellerMessageBody("");
-    router.push(`/messages/${result.threadId}`);
-  }
-
-  if (loading) {
-    return null;
-  }
-
-  if (message) {
-    return (
-      <main className="auth-page">
-        <section className="auth-card">
-          <p className="eyebrow">Advert unavailable</p>
-          <h1>{message}</h1>
-          <p className="auth-sub">This advert has not been published yet.</p>
-
-          <div style={{ display: "grid", gap: "10px", marginTop: "20px" }}>
-            <a
-              href={`/publish-advert/${params.id}`}
-              className="auth-secondary-link"
-            >
-              Continue publishing
-            </a>
-
-            <a href="/dashboard" className="auth-secondary-link">
-              Go to dashboard
-            </a>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
-  const displayTitle = advertDisplayTitle(advert);
-
-  return (
-    <main>
-      <section className="form-section">
-        <div className="advert-form">
-          {advert.is_example && (
-            <div className="example-banner">
-              This is an example listing created to show how OwnerCars works. It is not a real car for sale.
-            </div>
-          )}
-
-          {advert.advert_photos?.[0]?.image_url ? (
-            <img
-              className="advert-photo-main-img"
-              src={advert.advert_photos[0].image_url}
-              alt={displayTitle}
-              onClick={() => {
-                touchStartX.current = null;
-                setActiveIndex(0);
-              }}
-              style={{ cursor: "zoom-in" }}
-            />
-          ) : advert.is_example ? (
-            <ExampleAdvertPlaceholder className="advert-photo-main" />
-          ) : (
-            <div className="advert-photo-main"></div>
-          )}
-
-          {advert.advert_photos?.length > 1 && (
-            <div className="advert-thumbs">
-              {advert.advert_photos.slice(1, 5).map((photo: any, i: number) => (
-                <img
-                  key={photo.id}
-                  src={photo.image_url}
-                  alt={`${displayTitle} thumbnail ${i + 2}`}
-                  onClick={() => setActiveIndex(i + 1)}
-                  style={{ cursor: "zoom-in" }}
-                />
-              ))}
-            </div>
-          )}
-
-          <div className="advert-heading-block">
-            <p className="advert-kicker">Private seller advert</p>
-            {advert.is_example && (
-              <span className="example-badge" style={{ display: "inline-block", marginBottom: 10 }}>
-                Example listing
-              </span>
-            )}
-
-            <h1 className="advert-title">{displayTitle}</h1>
-
-            <div className="advert-summary-row">
-              <span className="advert-price">
-                £{Number(advert.price).toLocaleString()}
-              </span>
-
-              <span className="advert-mileage">
-                {Number(advert.mileage).toLocaleString()} miles
-              </span>
-
-              {advert.nearest_town && (
-                <span className="advert-location">Near {advert.nearest_town}</span>
-              )}
-            </div>
-
-            {!isAdvertOwner && (
-              <form className="advert-message-form" onSubmit={handleMessageSeller}>
-                <label htmlFor="seller-message">Message seller</label>
-                <textarea
-                  id="seller-message"
-                  value={sellerMessageBody}
-                  onChange={(e) => setSellerMessageBody(e.target.value)}
-                  placeholder="Ask about the car, viewing availability, or history..."
-                />
-                {sellerMessageStatus && <p className="message-notice">{sellerMessageStatus}</p>}
-                <button className="secure-message-button" type="submit">
-                  Send message
-                </button>
-              </form>
-            )}
-          </div>
-
-          {isAdvertOwner && (
-            <div className="forsale-promo">
-              <div className="forsale-promo-copy">
-                <p className="promote-kicker">Your For Sale card</p>
-                <h3>Share your advert anywhere</h3>
-                <p>
-                  Download your branded For Sale card to share on social media
-                  and WhatsApp, or print it for the windscreen. The QR code links
-                  straight back to this secure listing.
-                </p>
-              </div>
-              <DownloadForSaleCardButton advert={advert} />
-            </div>
-          )}
-
-          {isAdvertOwner && (
-            <PromoteAdvertTools advertId={advert.id} title={displayTitle} />
-          )}
-
-          <div className="spec-grid">
-            <div>
-              <strong>Make</strong>
-              <span>{advert.make ? capitaliseWords(advert.make) : "—"}</span>
-            </div>
-
-            <div>
-              <strong>Model</strong>
-              <span>{advert.model ? capitaliseWords(advert.model) : "—"}</span>
-            </div>
-
-            <div>
-              <strong>Year</strong>
-              <span>{advert.year || "—"}</span>
-            </div>
-
-            <div>
-              <strong>Gearbox</strong>
-              <span>{advert.gearbox || "—"}</span>
-            </div>
-
-            <div>
-              <strong>Body type</strong>
-              <span>{advert.body_type || "—"}</span>
-            </div>
-
-            <div>
-              <strong>Colour</strong>
-              <span>{advert.colour ? capitaliseWords(advert.colour) : "—"}</span>
-            </div>
-
-            <div>
-              <strong>Doors</strong>
-              <span>{advert.doors || "—"}</span>
-            </div>
-
-            <div>
-              <strong>Seats</strong>
-              <span>{advert.seats || "—"}</span>
-            </div>
-
-            <div>
-              <strong>Fuel type</strong>
-              <span>{advert.fuel_type || "—"}</span>
-            </div>
-
-            <div>
-              <strong>Written off?</strong>
-              <span>{advert.previously_written_off || "—"}</span>
-            </div>
-          </div>
-
-          <div className="advert-description">
-            {advert.description
-              ?.replace(/\n{3,}/g, "\n\n")
-              .split("\n")
-              .map((line: string, i: number) =>
-                line.trim() === "" ? (
-                  <div key={i} className="advert-description-gap" />
-                ) : (
-                  <p key={i}>{line}</p>
-                )
-              )}
-          </div>
-        </div>
-      </section>
-
-      {activeIndex !== null && (
-        <div
-          className="lightbox"
-          onTouchStart={(e) => {
-            touchStartX.current = e.touches[0].clientX;
-          }}
-          onTouchEnd={(e) => {
-            if (touchStartX.current === null) return;
-
-            const touchEndX = e.changedTouches[0].clientX;
-            const diff = touchStartX.current - touchEndX;
-
-            if (Math.abs(diff) > 80) {
-              if (diff > 0) {
-                setActiveIndex((activeIndex + 1) % advert.advert_photos.length);
-              } else {
-                setActiveIndex(
-                  (activeIndex - 1 + advert.advert_photos.length) %
-                    advert.advert_photos.length
-                );
-              }
-            }
-
-            touchStartX.current = null;
-          }}
-        >
-          <button className="lightbox-close" onClick={() => setActiveIndex(null)}>
-            ✕
-          </button>
-
-          <div className="lightbox-counter">
-            {activeIndex + 1} / {advert.advert_photos.length}
-          </div>
-
-          <button
-            className="lightbox-prev"
-            onClick={() =>
-              setActiveIndex(
-                (activeIndex - 1 + advert.advert_photos.length) %
-                  advert.advert_photos.length
-              )
-            }
-          >
-            ‹
-          </button>
-
-          <img
-            src={advert.advert_photos[activeIndex].image_url}
-            className="lightbox-image"
-            alt={displayTitle}
-          />
-
-          <button
-            className="lightbox-next"
-            onClick={() =>
-              setActiveIndex((activeIndex + 1) % advert.advert_photos.length)
-            }
-          >
-            ›
-          </button>
-        </div>
-      )}
-    </main>
-  );
+  return <AdvertClient />;
 }
