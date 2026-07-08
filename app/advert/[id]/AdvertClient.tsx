@@ -212,11 +212,6 @@ export default function AdvertClient() {
               )}
             </div>
 
-            <ShareAdvertButton
-              advertId={advert.id}
-              shareText={`${displayTitle} — £${Number(advert.price).toLocaleString()} on OwnerCars`}
-            />
-
             {!isAdvertOwner && (
               <form className="advert-message-form" onSubmit={handleMessageSeller}>
                 <label htmlFor="seller-message">Message seller</label>
@@ -232,6 +227,22 @@ export default function AdvertClient() {
                 </button>
               </form>
             )}
+          </div>
+
+          <div className="forsale-promo">
+            <div className="forsale-promo-copy">
+              <p className="promote-kicker">Share</p>
+              <h3>Share this vehicle</h3>
+              <p>
+                Send this listing to anyone who might be interested — by
+                WhatsApp, email or social media. Their details and yours stay
+                private.
+              </p>
+            </div>
+            <ShareAdvertButton
+              advertId={advert.id}
+              shareText={`${displayTitle} — £${Number(advert.price).toLocaleString()} on OwnerCars`}
+            />
           </div>
 
           <div className="forsale-promo">

@@ -1795,26 +1795,12 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   max-width: 720px;
 }
 
-/* Share this vehicle */
+/* Share this vehicle — sits inside a .forsale-promo box, so the trigger
+   button is styled entirely by the shared ".forsale-promo button" rule
+   (matching the For Sale card button exactly). */
 .share-advert-wrap {
   position: relative;
-  margin-top: 16px;
-}
-
-.share-advert-button {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: white;
-  color: var(--text);
-  padding: 12px 22px;
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.share-advert-button:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  justify-self: start;
 }
 
 .share-advert-menu {
