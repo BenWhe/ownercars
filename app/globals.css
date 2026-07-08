@@ -910,6 +910,32 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   margin: -4px 0 0;
 }
 
+/* Message-seller box — same card treatment as .forsale-promo (border,
+   background, padding, radius, shadow) so the two read as a matched set,
+   with a stronger border since this is the primary action on the page.
+   Deliberately NOT sharing .forsale-promo itself: that class's "button"
+   descendant rule would leak into .secure-message-button and dilute its
+   existing prominent solid-blue treatment. */
+.message-seller-box {
+  display: grid;
+  gap: 16px;
+  margin: 28px 0;
+  padding: 24px;
+  border: 1px solid rgba(20, 92, 255, 0.28);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at top right, rgba(20, 92, 255, 0.12), transparent 34%),
+    linear-gradient(135deg, #ffffff, #f8fafc);
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.08);
+}
+
+/* The form already carries its own margin-top for the standalone layout
+   this box replaces — zero it here so the copy-to-form gap matches the
+   16px grid gap used in the Share/For Sale card boxes. */
+.message-seller-box .advert-message-form {
+  margin-top: 0;
+}
+
 /* For Sale card promo (advert detail page, owner view) */
 .forsale-promo {
   display: grid;

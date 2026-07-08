@@ -211,8 +211,14 @@ export default function AdvertClient() {
                 <span className="advert-location">Near {advert.nearest_town}</span>
               )}
             </div>
+          </div>
 
-            {!isAdvertOwner && (
+          {!isAdvertOwner && (
+            <div className="message-seller-box">
+              <div className="forsale-promo-copy">
+                <p className="promote-kicker">Contact</p>
+                <h3>Have a question about this car?</h3>
+              </div>
               <form className="advert-message-form" onSubmit={handleMessageSeller}>
                 <label htmlFor="seller-message">Message seller</label>
                 <textarea
@@ -226,8 +232,8 @@ export default function AdvertClient() {
                   Send message
                 </button>
               </form>
-            )}
-          </div>
+            </div>
+          )}
 
           <div className="forsale-promo">
             <div className="forsale-promo-copy">
