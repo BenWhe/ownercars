@@ -13,6 +13,7 @@ import {
 } from "@/lib/payments/promos";
 import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
 import { notifyAdvertPublished } from "@/lib/admin/notifyPublished";
+import { matchAndNotifyAlerts } from "@/lib/alerts/matchAndNotify";
 import {
   advertDisplayTitle,
   fetchProfileFullName,
@@ -236,6 +237,17 @@ export async function POST(req: Request) {
 
     // Only true on the invocation that actually transitioned the advert.
     const publishedAdvert = (publishedRows && publishedRows[0]) || null;
+
+    // Search-alert matching — gated on publishedAdvert (not unconditional)
+    // so a retried/duplicate request can't re-send alert emails. Matches
+    // the same call the paid webhook path makes on confirmed publish.
+    if (publishedAdvert) {
+      try {
+        await matchAndNotifyAlerts(supabase, advertId);
+      } catch (alertErr) {
+        console.error("Alert matching failed:", alertErr);
+      }
+    }
 
     // Non-blocking — must never affect the publish response
     try {
