@@ -17,6 +17,7 @@ export default function AccountPage() {
   const [fullNameError, setFullNameError] = useState("");
   const [fullNameSaving, setFullNameSaving] = useState(false);
   const [fullNameSaved, setFullNameSaved] = useState(false);
+  const [publishCredits, setPublishCredits] = useState(0);
 
   useEffect(() => {
     async function loadUser() {
@@ -77,6 +78,7 @@ export default function AccountPage() {
 
       setFullName(existingName);
       setFullNameInput(existingName);
+      setPublishCredits(result.profile?.publish_credits ?? 0);
       setLoading(false);
     }
 
@@ -271,6 +273,14 @@ export default function AccountPage() {
               {postcodeSaved && (
                 <p className="account-success">✓ Postcode saved — {postcode}</p>
               )}
+            </div>
+
+            {/* Publish credits */}
+            <div className="account-card">
+              <p className="eyebrow" style={{ marginBottom: "6px" }}>PUBLISH CREDITS</p>
+              <p className="account-value">
+                You have {publishCredits} publish credit{publishCredits === 1 ? "" : "s"}.
+              </p>
             </div>
 
             {/* Actions */}

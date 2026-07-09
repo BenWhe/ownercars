@@ -20,6 +20,10 @@ export default function PublishAdvertPage() {
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [isStartingPayment, setIsStartingPayment] = useState(false);
 
+  const [publishCredits, setPublishCredits] = useState(0);
+  const [creditMessage, setCreditMessage] = useState("");
+  const [isPublishingWithCredit, setIsPublishingWithCredit] = useState(false);
+
   const [message, setMessage] = useState("Loading advert...");
   const [locationError, setLocationError] = useState(false);
 
@@ -69,6 +73,21 @@ export default function PublishAdvertPage() {
 
     if (advertId) fetchAdvert();
   }, [advertId]);
+
+  useEffect(() => {
+    async function fetchCredits() {
+      try {
+        const res = await fetch("/api/account");
+        if (!res.ok) return;
+        const result = await res.json();
+        setPublishCredits(result.profile?.publish_credits ?? 0);
+      } catch {
+        // Non-blocking — if this fails, the credit option just won't show
+      }
+    }
+
+    fetchCredits();
+  }, []);
 
   async function applyPromo() {
     const code = promoCode.trim().toUpperCase();
@@ -180,6 +199,59 @@ export default function PublishAdvertPage() {
     }
   }
 
+  async function publishWithCredit() {
+    if (!advertId) {
+      setCreditMessage("We couldn't find this advert. Please refresh and try again.");
+      return;
+    }
+
+    if (!advert?.postcode || !advert?.nearest_town) {
+      setCreditMessage("Please add the car's location before publishing.");
+      return;
+    }
+
+    setIsPublishingWithCredit(true);
+    setMessage("");
+    setCreditMessage("Publishing with your credit...");
+
+    try {
+      const res = await fetch("/api/publish-with-credit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ advertId }),
+      });
+
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : null;
+
+      if (!res.ok) {
+        setCreditMessage(
+          data?.error ||
+            "We couldn't publish with a credit just now. Please try again."
+        );
+        return;
+      }
+
+      if (data?.url) {
+        setCreditMessage("Success — redirecting you now...");
+        window.location.href = data.url;
+        return;
+      }
+
+      setCreditMessage(
+        "Publishing did not return a redirect. Please try again in a moment."
+      );
+    } catch {
+      setCreditMessage(
+        "We couldn't reach the server. Please check your connection and try again."
+      );
+    } finally {
+      setIsPublishingWithCredit(false);
+    }
+  }
+
   return (
     <main>
       <section className="dashboard-hero">
@@ -261,7 +333,7 @@ export default function PublishAdvertPage() {
             <button
               type="button"
               onClick={applyPromo}
-              disabled={isApplyingPromo || isStartingPayment}
+              disabled={isApplyingPromo || isStartingPayment || isPublishingWithCredit}
             >
               {isApplyingPromo ? "Checking promo code..." : "Apply promo code"}
             </button>
@@ -286,6 +358,46 @@ export default function PublishAdvertPage() {
               </p>
             )}
 
+            {publishCredits >= 1 && (
+              <>
+                <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
+
+                <h3>Publish with a credit</h3>
+                <p style={{ color: "var(--muted)" }}>
+                  You have {publishCredits} publish credit{publishCredits === 1 ? "" : "s"}.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={publishWithCredit}
+                  disabled={isPublishingWithCredit || isStartingPayment || isApplyingPromo}
+                  style={{ background: "#111827", marginTop: "8px" }}
+                >
+                  {isPublishingWithCredit ? "Publishing..." : "Publish with 1 credit"}
+                </button>
+
+                {creditMessage && (
+                  <p
+                    role="status"
+                    aria-live="polite"
+                    style={{
+                      marginTop: "14px",
+                      padding: "14px 16px",
+                      borderRadius: "16px",
+                      border: "1px solid rgba(17, 24, 39, 0.12)",
+                      background:
+                        "linear-gradient(135deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92))",
+                      boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+                      color: "#111827",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {creditMessage}
+                  </p>
+                )}
+              </>
+            )}
+
             <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
 
             <h3>Pay £{discountedPrice.toFixed(2)}</h3>
@@ -297,7 +409,7 @@ export default function PublishAdvertPage() {
             <button
               type="button"
               onClick={startPayment}
-              disabled={isStartingPayment || isApplyingPromo}
+              disabled={isStartingPayment || isApplyingPromo || isPublishingWithCredit}
               style={{ background: "#111827", marginTop: "8px" }}
             >
               {isStartingPayment
