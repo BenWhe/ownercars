@@ -13,7 +13,7 @@ import {
 } from "@/lib/payments/promos";
 import { assertStripeKeyMatchesExpectedMode } from "@/lib/payments/stripe";
 import { notifyAdvertPublished } from "@/lib/admin/notifyPublished";
-import { matchAndNotifyAlerts } from "@/app/api/stripe-webhook/route";
+import { matchAndNotifyAlerts } from "@/lib/alerts/matchAndNotify";
 import {
   advertDisplayTitle,
   fetchProfileFullName,
