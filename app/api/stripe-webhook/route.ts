@@ -36,7 +36,7 @@ function advertMatchesFilters(advert: any, filters: any): boolean {
   return true;
 }
 
-async function matchAndNotifyAlerts(supabaseAdmin: SupabaseClient, advertId: string) {
+export async function matchAndNotifyAlerts(supabaseAdmin: SupabaseClient, advertId: string) {
   const resendApiKey = process.env.RESEND_API_KEY;
   const from = process.env.RECONFIRMATION_EMAIL_FROM;
   if (!resendApiKey || !from) return;
