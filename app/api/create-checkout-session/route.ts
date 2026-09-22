@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
-import { LISTING_PRICE_AMOUNT_PENCE } from "@/lib/payments/config";
+import { LAUNCH_FREE_LISTING, LISTING_PRICE_AMOUNT_PENCE } from "@/lib/payments/config";
 import {
   escapePostgrestLikePattern,
   normalizePromoCode,
@@ -176,7 +176,13 @@ export async function POST(req: Request) {
     );
   }
 
-  if (promoCode) {
+  if (LAUNCH_FREE_LISTING) {
+    // Launch offer: every listing is free. Ignore any promo code the client
+    // sent — no promo lookup, no validation, no use consumption. This must
+    // stay server-side only: it does not depend on anything in the request.
+    finalAmount = 0;
+    promoCode = "";
+  } else if (promoCode) {
     const { data, error } = await supabase
       .from("promo_codes")
       .select("*")
@@ -251,7 +257,11 @@ export async function POST(req: Request) {
 
     // Non-blocking — must never affect the publish response
     try {
-      await notifyAdvertPublished(supabase, advertId, "free (promo)");
+      await notifyAdvertPublished(
+        supabase,
+        advertId,
+        LAUNCH_FREE_LISTING ? "free (launch)" : "free (promo)"
+      );
     } catch (e) {
       console.error("Admin publish notification failed:", e);
     }

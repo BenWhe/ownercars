@@ -67,9 +67,12 @@ export default function Header() {
 
   return (
     <header className="site-header">
-      <Link href="/" className="site-logo" onClick={() => setMenuOpen(false)}>
-        OwnerCars<span>.co.uk</span>
-      </Link>
+      <div className="site-brand">
+        <Link href="/" className="site-logo" onClick={() => setMenuOpen(false)}>
+          OwnerCars<span>.co.uk</span>
+        </Link>
+        <p className="site-tagline">Free to list. Private by design.</p>
+      </div>
 
       <nav className="site-nav">
         <Link href="/browse">Browse cars</Link>

@@ -31,7 +31,7 @@ Depending on how you use OwnerCars, we may collect:
 
 **Documents** — files you choose to upload and share through our Secure Vault feature.
 
-**Payment information** — when you pay to publish an advert, payment is processed by our payment provider, Stripe. We do not collect or store your full card details; these are handled directly by Stripe. We retain a record that a payment was made.
+**Payment information** — if you pay a listing fee to publish an advert, payment is processed by our payment provider, Stripe. We do not collect or store your full card details; these are handled directly by Stripe. We retain a record that a payment was made.
 
 **Technical information** — your IP address, browser type, and similar technical data, including for security purposes such as preventing abuse and rate-limiting.
 
@@ -46,7 +46,7 @@ Under UK GDPR, we must have a lawful basis for processing your data. We use your
 | Show nearest town / distance | To make listings useful while protecting your address | Legitimate interests |
 | Enable buyer–seller messaging | To let you communicate about a sale | Performance of a contract |
 | Retrieve vehicle/MOT data via DVSA | To help you complete your advert accurately | Legitimate interests / your request |
-| Process payments | To take payment for publishing | Performance of a contract |
+| Process payments | If you pay a listing fee for publishing | Performance of a contract |
 | Send service emails (confirmations, password resets, notifications) | To operate your account | Performance of a contract |
 | Prevent fraud, abuse and secure the platform | To keep the Service safe | Legitimate interests / legal obligation |
 | Keep financial records | Tax and accounting | Legal obligation |

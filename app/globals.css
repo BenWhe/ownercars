@@ -2311,8 +2311,8 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   color: var(--accent);
 }
 .site-header {
-  height: 76px;
-  padding: 0 52px;
+  min-height: 76px;
+  padding: 10px 52px;
   border-bottom: 1px solid rgba(17, 24, 39, 0.08);
   display: flex;
   align-items: center;
@@ -2322,6 +2322,13 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
   position: sticky;
   top: 0;
   z-index: 80;
+}
+
+.site-brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
 }
 
 .site-logo {
@@ -2334,6 +2341,25 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 
 .site-logo span {
   color: var(--accent);
+}
+
+.site-tagline {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--muted);
+  white-space: nowrap;
+  margin: 0;
+}
+
+/* The mobile header (<=760px) is laid out by several overlapping legacy
+   @media blocks further down this file that already fight for space at
+   375px width. Rather than risk the tagline colliding with that, it only
+   shows on wider screens. */
+@media (max-width: 760px) {
+  .site-tagline {
+    display: none;
+  }
 }
 
 .site-nav {
