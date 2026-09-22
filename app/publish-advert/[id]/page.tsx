@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { LISTING_PRICE_GBP, STANDARD_LISTING_PRICE_GBP } from "@/lib/payments/config";
+import {
+  LAUNCH_FREE_LISTING,
+  LISTING_PRICE_GBP,
+  STANDARD_LISTING_PRICE_GBP,
+} from "@/lib/payments/config";
 import PhotoUploader from "@/app/components/PhotoUploader";
 
 export default function PublishAdvertPage() {
@@ -258,8 +262,9 @@ export default function PublishAdvertPage() {
         <p className="eyebrow">Publish advert</p>
         <h1>Publish your listing</h1>
         <p>
-          Upload up to 10 photos, then publish using the £9.99 launch offer or by
-          paying £24.99.
+          {LAUNCH_FREE_LISTING
+            ? "Upload up to 10 photos, then publish your advert for free."
+            : "Upload up to 10 photos, then publish using the £9.99 launch offer or by paying £24.99."}
         </p>
       </section>
 
@@ -305,78 +310,23 @@ export default function PublishAdvertPage() {
 
             <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
 
-            <h3>Launch offer</h3>
-            <p style={{ color: "var(--muted)" }}>
-              The launch price is £{LISTING_PRICE_GBP.toFixed(2)} to advertise until sold.
-              Standard price is £{STANDARD_LISTING_PRICE_GBP.toFixed(2)}. If you have a separate promo code, you can apply it here.
-            </p>
-
-            <input
-              value={promoCode}
-              onChange={(e) => {
-                setPromoCode(e.target.value);
-                setAppliedPromoCode("");
-                setDiscountedPrice(LISTING_PRICE_GBP);
-                setPromoMessage("");
-                setPaymentMessage("");
-              }}
-              placeholder="Enter promo code"
-              style={{
-                width: "100%",
-                padding: "16px",
-                borderRadius: "14px",
-                border: "1px solid var(--line)",
-                marginBottom: "14px",
-              }}
-            />
-
-            <button
-              type="button"
-              onClick={applyPromo}
-              disabled={isApplyingPromo || isStartingPayment || isPublishingWithCredit}
-            >
-              {isApplyingPromo ? "Checking promo code..." : "Apply promo code"}
-            </button>
-
-            {promoMessage && (
-              <p
-                role="status"
-                aria-live="polite"
-                style={{
-                  marginTop: "14px",
-                  padding: "14px 16px",
-                  borderRadius: "16px",
-                  border: "1px solid rgba(17, 24, 39, 0.12)",
-                  background:
-                    "linear-gradient(135deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92))",
-                  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
-                  color: "#111827",
-                  fontWeight: 600,
-                }}
-              >
-                {promoMessage}
-              </p>
-            )}
-
-            {publishCredits >= 1 && (
+            {LAUNCH_FREE_LISTING ? (
               <>
-                <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
-
-                <h3>Publish with a credit</h3>
+                <h3>Free during launch</h3>
                 <p style={{ color: "var(--muted)" }}>
-                  You have {publishCredits} publish credit{publishCredits === 1 ? "" : "s"}.
+                  Your advert is free to publish and stays live until sold.
                 </p>
 
                 <button
                   type="button"
-                  onClick={publishWithCredit}
-                  disabled={isPublishingWithCredit || isStartingPayment || isApplyingPromo}
+                  onClick={startPayment}
+                  disabled={isStartingPayment}
                   style={{ background: "#111827", marginTop: "8px" }}
                 >
-                  {isPublishingWithCredit ? "Publishing..." : "Publish with 1 credit"}
+                  {isStartingPayment ? "Publishing..." : "Publish free"}
                 </button>
 
-                {creditMessage && (
+                {paymentMessage && (
                   <p
                     role="status"
                     aria-live="polite"
@@ -392,49 +342,144 @@ export default function PublishAdvertPage() {
                       fontWeight: 600,
                     }}
                   >
-                    {creditMessage}
+                    {paymentMessage}
                   </p>
                 )}
               </>
-            )}
+            ) : (
+              <>
+                <h3>Launch offer</h3>
+                <p style={{ color: "var(--muted)" }}>
+                  The launch price is £{LISTING_PRICE_GBP.toFixed(2)} to advertise until sold.
+                  Standard price is £{STANDARD_LISTING_PRICE_GBP.toFixed(2)}. If you have a separate promo code, you can apply it here.
+                </p>
 
-            <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
+                <input
+                  value={promoCode}
+                  onChange={(e) => {
+                    setPromoCode(e.target.value);
+                    setAppliedPromoCode("");
+                    setDiscountedPrice(LISTING_PRICE_GBP);
+                    setPromoMessage("");
+                    setPaymentMessage("");
+                  }}
+                  placeholder="Enter promo code"
+                  style={{
+                    width: "100%",
+                    padding: "16px",
+                    borderRadius: "14px",
+                    border: "1px solid var(--line)",
+                    marginBottom: "14px",
+                  }}
+                />
 
-            <h3>Pay £{discountedPrice.toFixed(2)}</h3>
+                <button
+                  type="button"
+                  onClick={applyPromo}
+                  disabled={isApplyingPromo || isStartingPayment || isPublishingWithCredit}
+                >
+                  {isApplyingPromo ? "Checking promo code..." : "Apply promo code"}
+                </button>
 
-            <p style={{ color: "var(--muted)" }}>
-              Pay once and advertise until sold.
-            </p>
+                {promoMessage && (
+                  <p
+                    role="status"
+                    aria-live="polite"
+                    style={{
+                      marginTop: "14px",
+                      padding: "14px 16px",
+                      borderRadius: "16px",
+                      border: "1px solid rgba(17, 24, 39, 0.12)",
+                      background:
+                        "linear-gradient(135deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92))",
+                      boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+                      color: "#111827",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {promoMessage}
+                  </p>
+                )}
 
-            <button
-              type="button"
-              onClick={startPayment}
-              disabled={isStartingPayment || isApplyingPromo || isPublishingWithCredit}
-              style={{ background: "#111827", marginTop: "8px" }}
-            >
-              {isStartingPayment
-                ? "Preparing checkout..."
-                : `Pay £${discountedPrice.toFixed(2)} and publish`}
-            </button>
+                {publishCredits >= 1 && (
+                  <>
+                    <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
 
-            {paymentMessage && (
-              <p
-                role="status"
-                aria-live="polite"
-                style={{
-                  marginTop: "14px",
-                  padding: "14px 16px",
-                  borderRadius: "16px",
-                  border: "1px solid rgba(17, 24, 39, 0.12)",
-                  background:
-                    "linear-gradient(135deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92))",
-                  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
-                  color: "#111827",
-                  fontWeight: 600,
-                }}
-              >
-                {paymentMessage}
-              </p>
+                    <h3>Publish with a credit</h3>
+                    <p style={{ color: "var(--muted)" }}>
+                      You have {publishCredits} publish credit{publishCredits === 1 ? "" : "s"}.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={publishWithCredit}
+                      disabled={isPublishingWithCredit || isStartingPayment || isApplyingPromo}
+                      style={{ background: "#111827", marginTop: "8px" }}
+                    >
+                      {isPublishingWithCredit ? "Publishing..." : "Publish with 1 credit"}
+                    </button>
+
+                    {creditMessage && (
+                      <p
+                        role="status"
+                        aria-live="polite"
+                        style={{
+                          marginTop: "14px",
+                          padding: "14px 16px",
+                          borderRadius: "16px",
+                          border: "1px solid rgba(17, 24, 39, 0.12)",
+                          background:
+                            "linear-gradient(135deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92))",
+                          boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+                          color: "#111827",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {creditMessage}
+                      </p>
+                    )}
+                  </>
+                )}
+
+                <hr style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
+
+                <h3>Pay £{discountedPrice.toFixed(2)}</h3>
+
+                <p style={{ color: "var(--muted)" }}>
+                  Pay once and advertise until sold.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={startPayment}
+                  disabled={isStartingPayment || isApplyingPromo || isPublishingWithCredit}
+                  style={{ background: "#111827", marginTop: "8px" }}
+                >
+                  {isStartingPayment
+                    ? "Preparing checkout..."
+                    : `Pay £${discountedPrice.toFixed(2)} and publish`}
+                </button>
+
+                {paymentMessage && (
+                  <p
+                    role="status"
+                    aria-live="polite"
+                    style={{
+                      marginTop: "14px",
+                      padding: "14px 16px",
+                      borderRadius: "16px",
+                      border: "1px solid rgba(17, 24, 39, 0.12)",
+                      background:
+                        "linear-gradient(135deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92))",
+                      boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+                      color: "#111827",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {paymentMessage}
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}

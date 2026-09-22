@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LAUNCH_FREE_LISTING } from "@/lib/payments/config";
 
 export default function HowItWorksPage() {
   return (
@@ -33,8 +34,9 @@ export default function HowItWorksPage() {
           <span>3</span>
           <h2>Publish your listing</h2>
           <p>
-            Use the launch offer to advertise until sold for £9.99. Standard
-            OwnerCars pricing is £24.99.
+            {LAUNCH_FREE_LISTING
+              ? "Use the launch offer to advertise until sold for free. Listing fees will apply after launch."
+              : "Use the launch offer to advertise until sold for £9.99. Standard OwnerCars pricing is £24.99."}
           </p>
         </div>
 

@@ -4,7 +4,7 @@ import { useEffect, useState, FormEvent } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { LISTING_PRICE_GBP } from "@/lib/payments/config";
+import { LAUNCH_FREE_LISTING, LISTING_PRICE_GBP } from "@/lib/payments/config";
 import { DOCUMENT_DISPLAY_NAMES, type DocumentType } from "@/lib/vault/documents";
 import PhotoUploader from "@/app/components/PhotoUploader";
 
@@ -266,8 +266,9 @@ export default function EditAdvertPage() {
           <div className="draft-warning">
             <h3>This advert is not live yet</h3>
             <p>
-              Your advert is not published yet. Add photos, then continue to publish
-              for the £{LISTING_PRICE_GBP.toFixed(2)} launch price.
+              {LAUNCH_FREE_LISTING
+                ? "Your advert is not published yet. Add photos, then continue to publish for free during launch."
+                : `Your advert is not published yet. Add photos, then continue to publish for the £${LISTING_PRICE_GBP.toFixed(2)} launch price.`}
             </p>
             <Link href={`/publish-advert/${params.id}`}>
               Continue to publish

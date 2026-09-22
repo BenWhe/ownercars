@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
+import { LAUNCH_FREE_LISTING } from "@/lib/payments/config";
 
 // Featured cars are refreshed periodically rather than on every request.
 export const revalidate = 300;
@@ -72,21 +73,29 @@ export default async function HomePage() {
     <main>
       {/* HERO */}
       <section className="home-hero">
-        <p className="eyebrow home-eyebrow">Private cars. Private sellers. Privacy secured.</p>
+        <p className="eyebrow home-eyebrow">
+          {LAUNCH_FREE_LISTING
+            ? "Now launching across the South West"
+            : "Private cars. Private sellers. Privacy secured."}
+        </p>
         <h1 className="home-h1">
-          Sell your car privately.<br />
+          {LAUNCH_FREE_LISTING ? "Sell your car for free." : "Sell your car privately."}<br />
           Keep your details <span className="home-private">private</span> too.
         </h1>
         <p className="home-hero-sub">
           Advertise until sold. Buyers message you through OwnerCars — your phone number, email and address are never shown to anyone.
         </p>
         <div className="home-hero-price">
-          <span className="home-price-was">£24.99</span>
-          <span className="home-price-now">£9.99</span>
+          {!LAUNCH_FREE_LISTING && <span className="home-price-was">£24.99</span>}
+          <span className="home-price-now">{LAUNCH_FREE_LISTING ? "Free" : "£9.99"}</span>
         </div>
-        <p className="home-price-note">Launch price — first 500 adverts only</p>
+        <p className="home-price-note">
+          {LAUNCH_FREE_LISTING ? "Free to list during launch" : "Launch price — first 500 adverts only"}
+        </p>
         <div className="home-hero-ctas">
-          <Link className="home-btn home-btn-primary" href="/create-advert">Start for £9.99</Link>
+          <Link className="home-btn home-btn-primary" href="/create-advert">
+            {LAUNCH_FREE_LISTING ? "List your car free" : "Start for £9.99"}
+          </Link>
           <Link className="home-btn home-btn-ghost" href="/browse">Browse private cars</Link>
         </div>
       </section>
@@ -95,7 +104,7 @@ export default async function HomePage() {
       <section className="home-trust-strip">
         <div className="home-trust-inner">
           <div className="home-trust-item">
-            <div className="home-trust-big">£9.99</div>
+            <div className="home-trust-big">{LAUNCH_FREE_LISTING ? "Free" : "£9.99"}</div>
             <div className="home-trust-small">until sold — no renewals</div>
           </div>
           <div className="home-trust-item">
@@ -288,13 +297,21 @@ export default async function HomePage() {
       {/* CTA BAND */}
       <section className="home-cta-band">
         <h2>Your car. Your sale. Your privacy.</h2>
-        <p>Advertise until sold for £9.99 — launch price for the first 500 adverts.</p>
-        <Link className="home-btn home-cta-btn" href="/create-advert">Start for £9.99</Link>
+        <p>
+          {LAUNCH_FREE_LISTING
+            ? "Advertise until sold. Free to list during launch."
+            : "Advertise until sold for £9.99 — launch price for the first 500 adverts."}
+        </p>
+        <Link className="home-btn home-cta-btn" href="/create-advert">
+          {LAUNCH_FREE_LISTING ? "List your car free" : "Start for £9.99"}
+        </Link>
       </section>
 
       {/* Mobile sticky CTA */}
       <div className="home-sticky-cta">
-        <Link className="home-btn home-btn-primary" href="/create-advert">Start for £9.99</Link>
+        <Link className="home-btn home-btn-primary" href="/create-advert">
+          {LAUNCH_FREE_LISTING ? "List your car free" : "Start for £9.99"}
+        </Link>
         <Link className="home-btn home-btn-ghost" href="/browse">Browse private cars</Link>
       </div>
     </main>

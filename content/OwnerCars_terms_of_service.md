@@ -49,6 +49,8 @@ You are solely responsible for the content of your advert. We may, but are not o
 
 To publish an advert you pay the fee shown at the time of listing (currently a one-off launch price; standard pricing applies thereafter). Payment is taken through our payment provider, Stripe. Your advert remains live until the vehicle is sold or you remove it, subject to these Terms.
 
+During our launch period, listing is free. No payment is taken for adverts published during launch.
+
 When you ask us to publish your advert, you are requesting that the Service begins immediately. Because your advert is made available as soon as it is published, you agree that fees are **non-refundable once an advert has been published**, and you acknowledge that by asking us to publish you lose the right to cancel that would otherwise apply to digital services supplied online. This does not affect any statutory right to a refund where we have failed to provide the Service, or any other right you have under law that cannot be excluded. No refund is due where an advert is removed because you have breached these Terms.
 
 ## 6. Buying a vehicle / using the Service as a buyer

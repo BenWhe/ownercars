@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import PhotoUploader from "@/app/components/PhotoUploader";
+import { LAUNCH_FREE_LISTING } from "@/lib/payments/config";
 
 const SAVED_ADVERT_DRAFT_KEY = "ownercars:create-advert-draft";
 const PENDING_ADVERT_SUBMIT_KEY = "ownercars_pending_advert_submit";
@@ -468,8 +469,17 @@ export default function CreateAdvertPage() {
         <p className="ca-eyebrow">Create advert</p>
         <h1 className="ca-h1">Sell your car privately</h1>
         <p className="ca-sub">
-          Start with your registration and we&apos;ll fill in the details. Publish for our{" "}
-          <span className="ca-b">£9.99</span> launch price — your advert runs until it sells.
+          {LAUNCH_FREE_LISTING ? (
+            <>
+              Start with your registration and we&apos;ll fill in the details. Publish{" "}
+              <span className="ca-b">free</span> during launch — your advert runs until it sells.
+            </>
+          ) : (
+            <>
+              Start with your registration and we&apos;ll fill in the details. Publish for our{" "}
+              <span className="ca-b">£9.99</span> launch price — your advert runs until it sells.
+            </>
+          )}
         </p>
 
         {isCheckingAuth && (

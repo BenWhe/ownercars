@@ -2,10 +2,12 @@ import "./globals.css";
 import Link from "next/link";
 import Header from "./components/Header";
 import AuthSessionSync from "./components/AuthSessionSync";
+import { LAUNCH_FREE_LISTING } from "@/lib/payments/config";
 
 const TITLE = "OwnerCars — Sell your car privately";
-const DESCRIPTION =
-  "Sell your car privately and keep your details private. Buyers message you through OwnerCars — your phone number, email and address are never shown. Advertise until sold from £9.99.";
+const DESCRIPTION = LAUNCH_FREE_LISTING
+  ? "Sell your car free on OwnerCars. Buyers message you through the site, so your phone number, email and address stay private."
+  : "Sell your car privately and keep your details private. Buyers message you through OwnerCars — your phone number, email and address are never shown. Advertise until sold from £9.99.";
 
 export const metadata = {
   metadataBase: new URL("https://www.ownercars.co.uk"),

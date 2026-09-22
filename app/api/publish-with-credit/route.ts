@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle";
+import { LAUNCH_FREE_LISTING } from "@/lib/payments/config";
 import { notifyAdvertPublished } from "@/lib/admin/notifyPublished";
 import { matchAndNotifyAlerts } from "@/lib/alerts/matchAndNotify";
 import {
@@ -67,6 +68,13 @@ export async function POST(req: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "You must be logged in." }, { status: 401 });
+  }
+
+  if (LAUNCH_FREE_LISTING) {
+    return NextResponse.json(
+      { error: "Listing is free during launch — no credit needed." },
+      { status: 409 }
+    );
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
