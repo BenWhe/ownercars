@@ -3771,8 +3771,16 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 /* Reuses .home-trust-inner's look for 3-figure instances (seller-protection,
    homepage evidence band) instead of leaving an empty 4th grid column. */
 .trust-strip-3col { grid-template-columns: repeat(3, 1fr); }
+
+/* At <=860px, .home-trust-inner's own 2-column mobile rule (further down
+   this file) wins the cascade over a same-specificity override placed here,
+   so the grid stays 2 columns at that breakpoint — same as the 4-item
+   strip, untouched. Instead of fighting that, center the odd third item
+   on its own full-width row so it doesn't sit ragged under column 1. */
 @media (max-width: 860px) {
-  .trust-strip-3col { grid-template-columns: 1fr; }
+  .trust-strip-3col > :last-child {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Privacy split */
