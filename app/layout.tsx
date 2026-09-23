@@ -58,6 +58,7 @@ export default function RootLayout({
             <Link href="/how-it-works">How it works</Link>
             <Link href="/seller-guide">Seller guide</Link>
             <Link href="/safety-advice">Safety advice</Link>
+            <Link href="/car-selling-scams">Car selling scams</Link>
             <Link href="/contact">Contact</Link>
             <Link href="/privacy">Privacy Policy</Link>
             <Link href="/terms">Terms</Link>

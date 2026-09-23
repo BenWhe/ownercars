@@ -60,6 +60,11 @@ export default function SafetyAdvicePage() {
               Be cautious of screenshots, fake banking apps or overpayment
               scams.
             </p>
+            <p>
+              <Link href="/car-selling-scams">
+                See the scam messages sellers get most often →
+              </Link>
+            </p>
           </div>
 
           <div className="protection-card">

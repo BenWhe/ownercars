@@ -10,6 +10,7 @@ const STATIC_PATHS = [
   "/seller-protection",
   "/seller-guide",
   "/safety-advice",
+  "/car-selling-scams",
   "/contact",
   "/pricing",
   "/privacy",

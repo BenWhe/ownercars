@@ -284,7 +284,7 @@ export default async function HomePage() {
           <div className="home-step">
             <div className="home-step-num">2</div>
             <h3>Buyers message you here</h3>
-            <p>All contact happens through OwnerCars. Phone numbers and emails are automatically blocked.</p>
+            <p>All contact happens through OwnerCars. You never need to share your number or email.</p>
           </div>
           <div className="home-step">
             <div className="home-step-num">3</div>
