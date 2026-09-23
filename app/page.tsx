@@ -116,10 +116,90 @@ export default async function HomePage() {
             <div className="home-trust-small">personal details shown</div>
           </div>
           <div className="home-trust-item">
-            <div className="home-trust-big">100%</div>
-            <div className="home-trust-small">private sellers only</div>
+            <div className="home-trust-big">Private</div>
+            <div className="home-trust-small">sellers only</div>
           </div>
         </div>
+      </section>
+
+      {/* EVIDENCE BAND */}
+      <section className="home-split-section">
+        <div className="home-split-heading">
+          <p className="eyebrow">Why privacy matters</p>
+          <h2>Selling a car shouldn&apos;t mean handing out your life</h2>
+        </div>
+
+        <div className="home-trust-strip">
+          <div className="home-trust-inner trust-strip-3col">
+            <div className="home-trust-item">
+              <div className="home-trust-big">1 in 5</div>
+              <div className="home-trust-small">
+                people selling on second-hand marketplaces has experienced a scam
+              </div>
+            </div>
+            <div className="home-trust-item">
+              <div className="home-trust-big">Half</div>
+              <div className="home-trust-small">
+                of UK adults received a suspicious message in the previous three months
+              </div>
+            </div>
+            <div className="home-trust-item">
+              <div className="home-trust-big">11,394</div>
+              <div className="home-trust-small">
+                cloned number plates reported in 2025, up 54% since 2020
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p style={{ textAlign: "center", color: "var(--muted)", maxWidth: "640px", margin: "32px auto 0" }}>
+          DVLA warns that your logbook holds details scammers can use to steal your identity, or even clone your car.
+        </p>
+
+        <p style={{ textAlign: "center", marginTop: "24px" }}>
+          <Link className="home-cars-browse" href="/seller-protection">
+            How OwnerCars protects you →
+          </Link>
+        </p>
+
+        <p style={{ textAlign: "center", fontSize: "13px", color: "var(--muted)", marginTop: "28px" }}>
+          <a
+            href="https://www.which.co.uk/policy-and-insight/article/a-third-of-buyers-have-experienced-a-scam-on-popular-second-hand-marketplaces-in-the-last-two-years-which-warns-aEea68N4nnah"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "inherit" }}
+          >
+            Which?, 2024
+          </a>
+          {" · "}
+          <a
+            href="https://www.ofcom.org.uk/siteassets/resources/documents/consultations/category-3-4-weeks/consultation-combatting-mobile-messaging-scams/main-document/consultation-combatting-mobile-messaging-scams.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "inherit" }}
+          >
+            Ofcom, 2025
+          </a>
+          {" · "}
+          DVLA,{" "}
+          <a
+            href="https://www.gov.uk/government/news/dvlas-top-tips-for-avoiding-scams"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "inherit" }}
+          >
+            2025
+          </a>{" "}
+          and{" "}
+          <a
+            href="https://www.bodyshopmag.com/2026/news/number-plate-cloning-spikes-by-nine-per-cent/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "inherit" }}
+          >
+            2026
+          </a>
+        </p>
       </section>
 
       {/* FEATURED CARS */}
@@ -210,7 +290,7 @@ export default async function HomePage() {
             <div className="home-split-row">
               <span className="home-split-icon">👤</span>
               <span>Who&apos;s contacting you</span>
-              <span className="home-split-val">Registered buyers only</span>
+              <span className="home-split-val">Account holders only</span>
             </div>
           </div>
         </div>
@@ -264,7 +344,7 @@ export default async function HomePage() {
                 </span>
                 <span className="home-vault-lock">🔒</span>
               </div>
-              <p className="home-vault-footnote">This only exists at OwnerCars.</p>
+              <p className="home-vault-footnote">Built into every OwnerCars advert.</p>
             </div>
           </div>
         </div>
