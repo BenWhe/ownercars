@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
+import { buildMakeOptions, canonicalMake } from "@/lib/vehicles/makes";
+import { BODY_TYPE_OPTIONS, FUEL_OPTIONS, PRICE_OPTIONS } from "@/lib/vehicles/filters";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -29,40 +32,11 @@ function priceParams(value: string): Record<string, string> {
   return { maxPrice: value };
 }
 
-const PRICE_OPTIONS = [
-  { value: "", label: "Any price" },
-  { value: "2000", label: "Under £2,000" },
-  { value: "2000-5000", label: "£2,000–£5,000" },
-  { value: "5000-10000", label: "£5,000–£10,000" },
-  { value: "10000-20000", label: "£10,000–£20,000" },
-  { value: "over-20000", label: "Over £20,000" },
-];
-
 const MILEAGE_OPTIONS = [
   { value: "", label: "Any mileage" },
   { value: "20000", label: "Under 20,000" },
   { value: "50000", label: "Under 50,000" },
   { value: "100000", label: "Under 100,000" },
-];
-
-const FUEL_OPTIONS = [
-  { value: "", label: "Any fuel" },
-  { value: "Petrol", label: "Petrol" },
-  { value: "Diesel", label: "Diesel" },
-  { value: "Electric", label: "Electric" },
-  { value: "Hybrid", label: "Hybrid" },
-];
-
-const BODY_TYPE_OPTIONS = [
-  { value: "", label: "Any body type" },
-  { value: "Hatchback", label: "Hatchback" },
-  { value: "Saloon", label: "Saloon" },
-  { value: "SUV", label: "SUV" },
-  { value: "Estate", label: "Estate" },
-  { value: "Coupe", label: "Coupe" },
-  { value: "Convertible", label: "Convertible" },
-  { value: "MPV", label: "MPV" },
-  { value: "Van", label: "Van" },
 ];
 
 const COLOUR_OPTIONS = [
@@ -114,8 +88,38 @@ function filtersToAlertParams(f: typeof EMPTY_FILTERS) {
   };
 }
 
+// Match an incoming URL value against a known option list, case-insensitively,
+// and return the option's canonical value (or "" if it isn't a known option).
+function matchOption(options: { value: string }[], input: string | null): string {
+  if (!input) return "";
+  const wanted = input.trim().toLowerCase();
+  return options.find((o) => o.value && o.value.toLowerCase() === wanted)?.value ?? "";
+}
+
+function filtersFromParams(sp: { get(name: string): string | null }): typeof EMPTY_FILTERS {
+  return {
+    ...EMPTY_FILTERS,
+    make: canonicalMake(sp.get("make")),
+    bodyType: matchOption(BODY_TYPE_OPTIONS, sp.get("bodyType")),
+    fuel: matchOption(FUEL_OPTIONS, sp.get("fuel")),
+    price: matchOption(PRICE_OPTIONS, sp.get("price")),
+  };
+}
+
 export default function BrowsePage() {
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  return (
+    <Suspense fallback={<main><p style={{ padding: "24px" }}>Loading cars…</p></main>}>
+      <BrowseInner />
+    </Suspense>
+  );
+}
+
+function BrowseInner() {
+  const searchParams = useSearchParams();
+  // Read once on first load: the URL seeds the filters (and postcode), after
+  // which the page behaves exactly as if the user had chosen them.
+  const [urlPostcode] = useState(() => searchParams.get("postcode")?.trim().slice(0, 8) ?? "");
+  const [filters, setFilters] = useState(() => filtersFromParams(searchParams));
   const [makes, setMakes] = useState<string[]>([]);
   const [models, setModels] = useState<string[]>([]);
   const [adverts, setAdverts] = useState<any[]>([]);
@@ -143,6 +147,35 @@ export default function BrowsePage() {
       // linger in users' browsers after the geocode-town fix.
       localStorage.removeItem("buyer_postcode");
       localStorage.removeItem("buyer_town");
+
+      // A postcode in the URL (e.g. from the homepage search) wins over the
+      // profile/cache. It is geocoded and cached like a typed postcode, but is
+      // deliberately NOT saved to the profile: a link shouldn't be able to
+      // change an account's saved location.
+      if (urlPostcode) {
+        setMounted(true);
+        setPostcodeInput(urlPostcode);
+        setLocating(true);
+        try {
+          const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(urlPostcode)}`);
+          if (geoRes.ok) {
+            const geo = await geoRes.json();
+            setBuyerLat(geo.latitude);
+            setBuyerLng(geo.longitude);
+            setBuyerTown(geo.nearest_town ?? "");
+            setPostcodeInput(geo.postcode ?? urlPostcode);
+            localStorage.setItem("buyer_postcode_v2", geo.postcode ?? urlPostcode);
+            localStorage.setItem("buyer_town_v2", geo.nearest_town ?? "");
+            return;
+          }
+          setPostcodeError("Invalid postcode.");
+        } catch {
+          setPostcodeError("Invalid postcode.");
+        } finally {
+          setLocating(false);
+        }
+        // Invalid URL postcode: fall through to the normal profile/cache flow.
+      }
 
       // Instant fast-path: seed the field from cache before any async work so
       // returning same-account users see their location immediately.
@@ -229,7 +262,7 @@ export default function BrowsePage() {
       }
     }
     loadBuyerLocation();
-  }, []);
+  }, [urlPostcode]);
 
   useEffect(() => {
     fetch("/api/browse?makes=1")
@@ -371,6 +404,10 @@ export default function BrowsePage() {
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
 
+  // Full make list + live makes; the selected make is always included so a
+  // make from the URL that isn't listed anywhere still shows as selected.
+  const makeOptions = useMemo(() => buildMakeOptions(makes, filters.make), [makes, filters.make]);
+
   return (
     <main>
       <section className="browse-hero">
@@ -389,8 +426,8 @@ export default function BrowsePage() {
           aria-label="Filter by make"
         >
           <option value="">Any make</option>
-          {makes.map((m) => (
-            <option key={m} value={m}>{capitaliseWords(m)}</option>
+          {makeOptions.map((m) => (
+            <option key={m.value} value={m.value}>{m.label}</option>
           ))}
         </select>
 
