@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: 17 June 2026**
+**Last updated: 25 September 2026**
 
 This Privacy Policy explains how OwnerCars collects, uses, and protects your personal data when you use our website and services at www.ownercars.co.uk ("the Service"). We are committed to protecting your privacy — it is at the heart of what OwnerCars does.
 
@@ -49,6 +49,7 @@ Under UK GDPR, we must have a lawful basis for processing your data. We use your
 | Process payments | If you pay a listing fee for publishing | Performance of a contract |
 | Send service emails (confirmations, password resets, notifications) | To operate your account | Performance of a contract |
 | Prevent fraud, abuse and secure the platform | To keep the Service safe | Legitimate interests / legal obligation |
+| Website analytics | To understand how many people visit the site and which pages they use. We use Vercel Web Analytics. It does not use cookies, and we do not use it to identify individual visitors. | Legitimate interests |
 | Keep financial records | Tax and accounting | Legal obligation |
 
 We do not sell your personal data to anyone. We do not show third-party advertising that profiles you.
@@ -58,7 +59,7 @@ We do not sell your personal data to anyone. We do not show third-party advertis
 We use trusted third-party providers ("data processors") to run OwnerCars. They process data on our behalf, under contract, and only as needed to provide their service:
 
 - **Supabase** — database, authentication, and secure file storage
-- **Vercel** — website hosting
+- **Vercel** — website hosting and analytics
 - **Stripe** — payment processing
 - **Resend** — sending service emails
 - **DVSA** — vehicle and MOT history lookup (we send a registration number; we receive vehicle data)
