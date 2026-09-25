@@ -120,7 +120,7 @@ export default function HeroSearch({ liveMakes = [] }: { liveMakes?: string[] })
               type="text"
               value={postcode}
               onChange={(e) => setPostcode(e.target.value)}
-              placeholder="Your postcode"
+              placeholder="Full postcode, e.g. EX13 5RF"
               maxLength={8}
               autoComplete="postal-code"
             />
