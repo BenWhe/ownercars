@@ -161,6 +161,12 @@ export default function CreateAdvertPage() {
     const savedDraft = readSavedDraft();
     const draftRestoreTimer = window.setTimeout(() => {
       if (savedDraft) applyDraft(savedDraft);
+      // ?reg= (from the homepage) pre-fills the box only — the seller still
+      // presses "Find my car". Applied after the draft so it isn't overwritten.
+      const regParam = new URLSearchParams(window.location.search).get("reg");
+      if (regParam) {
+        setRegistration(regParam.replace(/\s+/g, "").toUpperCase().slice(0, 8));
+      }
       setHasLoadedSavedDraft(true);
     }, 0);
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { signOutAndClearSession } from "@/lib/auth/client";
+import { LAUNCH_FREE_LISTING } from "@/lib/payments/config";
 
 export default function Header() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -75,10 +76,12 @@ export default function Header() {
       </div>
 
       <nav className="site-nav">
-        <Link href="/browse">Browse cars</Link>
+        <Link href="/browse" className="mk-nav-link">Buy a car</Link>
+        <Link href="/car-selling-scams" className="mk-nav-link">Scam advice</Link>
+        <Link href="/how-it-works" className="mk-nav-link">How it works</Link>
 
         <Link href="/create-advert" className="nav-cta">
-          Advertise
+          {LAUNCH_FREE_LISTING ? "Sell your car free" : "Sell your car"}
         </Link>
 
         <button
@@ -100,16 +103,19 @@ export default function Header() {
             <div className="apple-menu-column">
               <p className="apple-menu-label">OwnerCars</p>
               <Link href="/browse" onClick={() => setMenuOpen(false)}>
-                Browse cars
+                Buy a car
               </Link>
               <Link href="/create-advert" onClick={() => setMenuOpen(false)}>
-                Start an advert
+                Sell your car
               </Link>
-              <Link href="/pricing" onClick={() => setMenuOpen(false)}>
-                Pricing
+              <Link href="/car-selling-scams" onClick={() => setMenuOpen(false)}>
+                Scam advice
               </Link>
               <Link href="/how-it-works" onClick={() => setMenuOpen(false)}>
                 How it works
+              </Link>
+              <Link href="/pricing" onClick={() => setMenuOpen(false)}>
+                Pricing
               </Link>
             </div>
 
