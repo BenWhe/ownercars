@@ -3,7 +3,7 @@ import Link from "next/link";
 import Header from "./components/Header";
 import AuthSessionSync from "./components/AuthSessionSync";
 import { LAUNCH_FREE_LISTING } from "@/lib/payments/config";
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics } from "@vercel/analytics/next";
 
 const TITLE = "OwnerCars — Sell your car privately";
 const DESCRIPTION = LAUNCH_FREE_LISTING
