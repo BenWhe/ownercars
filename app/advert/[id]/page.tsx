@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import AdvertClient from "./AdvertClient";
-import { getPublicAdvert } from "@/lib/adverts/publicAdvert";
+import { getPublicAdvert, isPublishedAdvertOwner } from "@/lib/adverts/publicAdvert";
 import { pageMetadata } from "@/lib/seo/site";
 import { advertSchema, JsonLd } from "@/lib/seo/jsonld";
 import { formatMileage, formatPrice, readableValue, vehicleName } from "@/lib/seo/vehicle";
@@ -51,14 +52,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
+// Rendered per request (it reads the session cookie for the owner check), so
+// an advert that is edited, paused or marked sold is reflected immediately and
+// no cache revalidation is needed.
 export default async function AdvertPage({ params }: Props) {
   const { id } = await params;
   const ad = await getPublicAdvert(id);
 
+  // Draft, paused, sold or unknown: real 404 status (see ./not-found.tsx).
+  if (!ad) notFound();
+
+  const isOwner = await isPublishedAdvertOwner(id);
+
   return (
     <>
-      {ad && !ad.is_example && <JsonLd data={advertSchema(ad)} />}
-      <AdvertClient />
+      {!ad.is_example && <JsonLd data={advertSchema(ad)} />}
+      <AdvertClient initialAdvert={ad} initialIsOwner={isOwner} />
     </>
   );
 }
