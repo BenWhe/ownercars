@@ -4,14 +4,23 @@ import Header from "./components/Header";
 import AuthSessionSync from "./components/AuthSessionSync";
 import { LAUNCH_FREE_LISTING } from "@/lib/payments/config";
 import { Analytics } from "@vercel/analytics/next";
+import type { Metadata } from "next";
+import { SITE_URL } from "@/lib/seo/site";
+import { JsonLd, SITE_GRAPH } from "@/lib/seo/jsonld";
 
-const TITLE = "OwnerCars — Sell your car privately";
+const TITLE = LAUNCH_FREE_LISTING
+  ? "OwnerCars: Sell your car privately, free during launch"
+  : "OwnerCars: Sell your car privately";
 const DESCRIPTION = LAUNCH_FREE_LISTING
-  ? "Sell your car free on OwnerCars. Buyers message you through the site, so your phone number, email and address stay private."
+  ? "Sell your car privately on OwnerCars. Free to list during launch. Buyers message you on-site, so your phone number, email and address are never shown."
   : "Sell your car privately and keep your details private. Buyers message you through OwnerCars — your phone number, email and address are never shown. Advertise until sold from £9.99.";
 
-export const metadata = {
-  metadataBase: new URL("https://www.ownercars.co.uk"),
+// Site-wide defaults only. Every indexable page sets its own title,
+// description, canonical and social tags via pageMetadata() in lib/seo/site.ts.
+// Deliberately no canonical or og:url here: pages that don't set their own
+// would inherit them and point at the homepage.
+export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
     default: TITLE,
     template: "%s | OwnerCars",
@@ -20,7 +29,6 @@ export const metadata = {
   openGraph: {
     title: TITLE,
     description: DESCRIPTION,
-    url: "https://www.ownercars.co.uk",
     siteName: "OwnerCars",
     type: "website",
     locale: "en_GB",
@@ -43,8 +51,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en-GB">
       <body>
+        <JsonLd data={SITE_GRAPH} />
 
         {/* HEADER */}
         <AuthSessionSync />
@@ -83,6 +92,7 @@ export default function RootLayout({
               <section>
                 <h2>Company</h2>
                 <ul>
+                  <li><Link href="/about">About</Link></li>
                   <li><Link href="/terms">Terms</Link></li>
                   <li><Link href="/privacy">Privacy</Link></li>
                 </ul>

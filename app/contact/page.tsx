@@ -1,3 +1,13 @@
+import { pageMetadata } from "@/lib/seo/site";
+
+export const metadata = pageMetadata({
+  title: "Contact OwnerCars",
+  description:
+    "Questions about selling, buying, your account or safety on OwnerCars? Call 01392 949008 or email contact@ownercars.co.uk.",
+  path: "/contact",
+  absoluteTitle: true,
+});
+
 export default function ContactPage() {
   return (
     <main>

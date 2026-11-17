@@ -1,13 +1,25 @@
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo/site";
+import { articleSchema, JsonLd } from "@/lib/seo/jsonld";
 
-export const metadata = {
-  title: "Seller guide",
-  description: "Get the most from your OwnerCars private car advert",
-};
+const TITLE = "Seller guide: how to write a private car advert that sells";
+const DESCRIPTION =
+  "Six steps to a better private car advert: photos, the seller's note, the Secure Vault, your For Sale card, quick replies and marking it sold.";
+
+export const metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: "/seller-guide" });
 
 export default function SellerGuidePage() {
   return (
     <main>
+      <JsonLd
+        data={articleSchema({
+          headline: TITLE,
+          description: DESCRIPTION,
+          path: "/seller-guide",
+          datePublished: "2026-06-27",
+          dateModified: "2026-06-27",
+        })}
+      />
       <section className="dashboard-hero">
         <p className="eyebrow">Seller guide</p>
         <h1>Get the most from your advert</h1>
