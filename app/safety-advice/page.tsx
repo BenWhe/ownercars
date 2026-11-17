@@ -1,8 +1,25 @@
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo/site";
+import { articleSchema, JsonLd } from "@/lib/seo/jsonld";
+
+const TITLE = "Safety advice for selling a car privately";
+const DESCRIPTION =
+  "Keep messages on-platform, protect your registration and address, spot pressure tactics and check payment carefully when you sell a car privately.";
+
+export const metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: "/safety-advice" });
 
 export default function SafetyAdvicePage() {
   return (
     <main>
+      <JsonLd
+        data={articleSchema({
+          headline: TITLE,
+          description: DESCRIPTION,
+          path: "/safety-advice",
+          datePublished: "2026-05-06",
+          dateModified: "2026-09-23",
+        })}
+      />
       <section className="dashboard-hero">
         <p className="eyebrow">Safety advice</p>
         <h1>Sell and buy privately with confidence</h1>

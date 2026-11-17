@@ -4,6 +4,18 @@ import { createClient } from "@supabase/supabase-js";
 import { LAUNCH_FREE_LISTING } from "@/lib/payments/config";
 import HeroSearch from "@/app/components/HeroSearch";
 import { PRICE_OPTIONS } from "@/lib/vehicles/filters";
+import { pageMetadata } from "@/lib/seo/site";
+
+export const metadata = pageMetadata({
+  title: LAUNCH_FREE_LISTING
+    ? "OwnerCars: Sell your car privately, free during launch"
+    : "OwnerCars: Sell your car privately",
+  description: LAUNCH_FREE_LISTING
+    ? "Sell your car privately on OwnerCars. Free to list during launch. Buyers message you on-site, so your phone number, email and address are never shown."
+    : "Sell your car privately on OwnerCars. Buyers message you on-site, so your phone number, email and address are never shown. Advertise until sold.",
+  path: "/",
+  absoluteTitle: true,
+});
 
 // Featured cars are refreshed periodically rather than on every request.
 export const revalidate = 300;

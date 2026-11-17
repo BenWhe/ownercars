@@ -1,13 +1,13 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { marked } from "marked";
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/site";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Terms of Service",
-  description:
-    "The Terms of Service governing your use of OwnerCars and its vehicle advertising and messaging services.",
-};
+  description: "The terms for using OwnerCars, the UK private-seller car marketplace run by OwnerCars Limited.",
+  path: "/terms",
+});
 
 export default function TermsPage() {
   const markdown = readFileSync(

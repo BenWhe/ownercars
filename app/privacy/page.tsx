@@ -1,13 +1,13 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { marked } from "marked";
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/site";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Privacy Policy",
-  description:
-    "How OwnerCars collects, uses, and protects your personal data when you use our website and services.",
-};
+  description: "How OwnerCars Limited collects, uses and protects your personal data.",
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   const markdown = readFileSync(

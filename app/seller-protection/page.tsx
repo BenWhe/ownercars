@@ -1,15 +1,14 @@
 import Link from "next/link";
-import type { Metadata } from "next";
 import { LAUNCH_FREE_LISTING } from "@/lib/payments/config";
+import { pageMetadata } from "@/lib/seo/site";
+import { articleSchema, JsonLd } from "@/lib/seo/jsonld";
 
-const TITLE = "Seller protection: sell your car privately | OwnerCars";
+// Title kept as it was (template adds " | OwnerCars").
+const TITLE = "Seller protection: sell your car privately";
 const DESCRIPTION =
   "Your phone number, email and address are never shown. Buyers message you through OwnerCars, and your documents are shared on your terms.";
 
-export const metadata: Metadata = {
-  title: { absolute: TITLE },
-  description: DESCRIPTION,
-};
+export const metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: "/seller-protection" });
 
 function CtaButton() {
   return (
@@ -22,6 +21,15 @@ function CtaButton() {
 export default function SellerProtectionPage() {
   return (
     <main>
+      <JsonLd
+        data={articleSchema({
+          headline: TITLE,
+          description: DESCRIPTION,
+          path: "/seller-protection",
+          datePublished: "2026-05-06",
+          dateModified: "2026-09-23",
+        })}
+      />
       <section className="dashboard-hero">
         <p className="eyebrow">Seller protection</p>
         <h1>Sell your car without handing out your life</h1>
