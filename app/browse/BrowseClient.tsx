@@ -1,0 +1,575 @@
+"use client";
+
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
+import { buildMakeOptions } from "@/lib/vehicles/makes";
+import { BODY_TYPE_OPTIONS, FUEL_OPTIONS, PRICE_OPTIONS } from "@/lib/vehicles/filters";
+import { EMPTY_FILTERS, filtersFromParams, priceParams } from "@/lib/vehicles/browseFilters";
+import type { BrowseAdvert } from "@/lib/adverts/browseAdverts";
+
+function capitaliseWords(str?: string) {
+  if (!str) return "";
+  return str
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function advertDisplayTitle(ad: any) {
+  const title = `${ad.year || ""} ${capitaliseWords(ad.make)} ${capitaliseWords(ad.model)}`.trim();
+  return title || ad.title || "Private car advert";
+}
+
+const MILEAGE_OPTIONS = [
+  { value: "", label: "Any mileage" },
+  { value: "20000", label: "Under 20,000" },
+  { value: "50000", label: "Under 50,000" },
+  { value: "100000", label: "Under 100,000" },
+];
+
+const COLOUR_OPTIONS = [
+  { value: "", label: "Any colour" },
+  { value: "Black", label: "Black" },
+  { value: "White", label: "White" },
+  { value: "Silver", label: "Silver" },
+  { value: "Grey", label: "Grey" },
+  { value: "Blue", label: "Blue" },
+  { value: "Red", label: "Red" },
+  { value: "Green", label: "Green" },
+  { value: "Yellow", label: "Yellow" },
+  { value: "Orange", label: "Orange" },
+  { value: "Brown", label: "Brown" },
+];
+
+const THIS_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = [
+  { value: "", label: "Any year" },
+  ...Array.from({ length: THIS_YEAR - 2000 + 1 }, (_, i) => {
+    const year = THIS_YEAR - i;
+    return { value: String(year), label: String(year) };
+  }),
+];
+
+function filtersToAlertParams(f: typeof EMPTY_FILTERS) {
+  const pp = priceParams(f.price);
+  return {
+    make: f.make || null,
+    model: f.model || null,
+    bodyType: f.bodyType || null,
+    fuelType: f.fuel || null,
+    colour: f.colour || null,
+    minYear: f.yearFrom ? Number(f.yearFrom) : null,
+    maxMileage: f.mileage ? Number(f.mileage) : null,
+    minPrice: pp.minPrice ? Number(pp.minPrice) : null,
+    maxPrice: pp.maxPrice ? Number(pp.maxPrice) : null,
+  };
+}
+
+type BrowseClientProps = {
+  // First page of results rendered on the server for the URL's filters.
+  // When present, the initial client fetch is skipped; later filter or
+  // location changes fetch from /api/browse exactly as before.
+  initialAdverts?: BrowseAdvert[];
+};
+
+export default function BrowseClient({ initialAdverts }: BrowseClientProps) {
+  return (
+    <Suspense fallback={<main><p style={{ padding: "24px" }}>Loading cars…</p></main>}>
+      <BrowseInner initialAdverts={initialAdverts} />
+    </Suspense>
+  );
+}
+
+function BrowseInner({ initialAdverts }: BrowseClientProps) {
+  const searchParams = useSearchParams();
+  // Read once on first load: the URL seeds the filters (and postcode), after
+  // which the page behaves exactly as if the user had chosen them.
+  const [urlPostcode] = useState(() => searchParams.get("postcode")?.trim().slice(0, 8) ?? "");
+  const [filters, setFilters] = useState(() => filtersFromParams(searchParams));
+  const [makes, setMakes] = useState<string[]>([]);
+  const [models, setModels] = useState<string[]>([]);
+  const [adverts, setAdverts] = useState<any[]>(initialAdverts ?? []);
+  const [loading, setLoading] = useState(initialAdverts === undefined);
+  // Skip the first results fetch when the server already rendered it.
+  const skipInitialFetch = useRef(initialAdverts !== undefined);
+  const [error, setError] = useState("");
+
+  // Buyer location state
+  const [postcodeInput, setPostcodeInput] = useState("");
+  const [buyerLat, setBuyerLat] = useState<number | null>(null);
+  const [buyerLng, setBuyerLng] = useState<number | null>(null);
+  const [buyerTown, setBuyerTown] = useState("");
+  const [mounted, setMounted] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [postcodeError, setPostcodeError] = useState("");
+
+  // Alert signup state
+  const [alertEmail, setAlertEmail] = useState("");
+  const [alertStatus, setAlertStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [alertError, setAlertError] = useState("");
+
+  // On mount: try to load postcode from logged-in profile, then localStorage
+  useEffect(() => {
+    async function loadBuyerLocation() {
+      // Remove stale v1 keys so old district values (e.g. "East Devon") don't
+      // linger in users' browsers after the geocode-town fix.
+      localStorage.removeItem("buyer_postcode");
+      localStorage.removeItem("buyer_town");
+
+      // A postcode in the URL (e.g. from the homepage search) wins over the
+      // profile/cache. It is geocoded and cached like a typed postcode, but is
+      // deliberately NOT saved to the profile: a link shouldn't be able to
+      // change an account's saved location.
+      if (urlPostcode) {
+        setMounted(true);
+        setPostcodeInput(urlPostcode);
+        setLocating(true);
+        try {
+          const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(urlPostcode)}`);
+          if (geoRes.ok) {
+            const geo = await geoRes.json();
+            setBuyerLat(geo.latitude);
+            setBuyerLng(geo.longitude);
+            setBuyerTown(geo.nearest_town ?? "");
+            setPostcodeInput(geo.postcode ?? urlPostcode);
+            localStorage.setItem("buyer_postcode_v2", geo.postcode ?? urlPostcode);
+            localStorage.setItem("buyer_town_v2", geo.nearest_town ?? "");
+            return;
+          }
+          setPostcodeError("Invalid postcode.");
+        } catch {
+          setPostcodeError("Invalid postcode.");
+        } finally {
+          setLocating(false);
+        }
+        // Invalid URL postcode: fall through to the normal profile/cache flow.
+      }
+
+      // Instant fast-path: seed the field from cache before any async work so
+      // returning same-account users see their location immediately.
+      const storedPostcode = localStorage.getItem("buyer_postcode_v2") ?? "";
+      const storedTown = localStorage.getItem("buyer_town_v2") ?? "";
+      setPostcodeInput(storedPostcode);
+      setBuyerTown(storedTown);
+      setMounted(true);
+
+      // Only show "Locating…" when there is no cached postcode — the field would
+      // otherwise be blank while we wait for the profile fetch + geocode.
+      // When a cached value exists it's applied synchronously above, so the fast
+      // path is instant and must never trigger the placeholder.
+      const noCache = !storedPostcode;
+      if (noCache) setLocating(true);
+
+      // Geocode a postcode and apply all derived state + cache in one place.
+      // uid is written to buyer_cache_uid so stale cross-account caches can be
+      // detected on the next load. Pass null for logged-out callers.
+      async function applyPostcode(postcode: string, uid: string | null) {
+        const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(postcode)}`);
+        if (!geoRes.ok) return false;
+        const geo = await geoRes.json();
+        setBuyerLat(geo.latitude);
+        setBuyerLng(geo.longitude);
+        setBuyerTown(geo.nearest_town ?? "");
+        setPostcodeInput(geo.postcode ?? postcode);
+        localStorage.setItem("buyer_postcode_v2", geo.postcode ?? postcode);
+        localStorage.setItem("buyer_town_v2", geo.nearest_town ?? "");
+        if (uid) localStorage.setItem("buyer_cache_uid", uid);
+        return true;
+      }
+
+      try {
+        const accountRes = await fetch("/api/account");
+        if (accountRes.ok) {
+          const accountResult = await accountRes.json();
+          const uid: string | null = accountResult.user?.id ?? null;
+
+          // Bug 2 — stale cross-account cache: if the cache was written by a
+          // different user, clear it and reset the displayed values now so the
+          // previous user's town never lingers. Logged-out visitors (uid = null)
+          // are unaffected — clearing only happens when both sides are known.
+          if (uid) {
+            const cachedUid = localStorage.getItem("buyer_cache_uid");
+            if (cachedUid && cachedUid !== uid) {
+              localStorage.removeItem("buyer_postcode_v2");
+              localStorage.removeItem("buyer_town_v2");
+              localStorage.removeItem("buyer_cache_uid");
+              setPostcodeInput("");
+              setBuyerTown("");
+            }
+          }
+
+          // Path 1 — profile has geocoded coords
+          const profile = accountResult.profile;
+          if (profile?.latitude && profile?.longitude && profile?.postcode) {
+            await applyPostcode(profile.postcode, uid);
+            return;
+          }
+
+          // Path 2 — profile empty but user signed up with a postcode; it lives
+          // in user_metadata until a profile row is geocoded and saved
+          const metaPostcode: string | null = accountResult.user?.user_metadata?.postcode ?? null;
+          if (metaPostcode) {
+            await applyPostcode(metaPostcode, uid);
+            return;
+          }
+        }
+
+        // Path 3 — not logged in or no postcode found anywhere; trust the
+        // localStorage cache (already seeded at the top), just resolve lat/lng
+        const stored = localStorage.getItem("buyer_postcode_v2");
+        if (stored) {
+          const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(stored)}`);
+          if (geoRes.ok) {
+            const geo = await geoRes.json();
+            setBuyerLat(geo.latitude);
+            setBuyerLng(geo.longitude);
+          }
+        }
+      } finally {
+        if (noCache) setLocating(false);
+      }
+    }
+    loadBuyerLocation();
+  }, [urlPostcode]);
+
+  useEffect(() => {
+    fetch("/api/browse?makes=1")
+      .then((r) => r.json())
+      .then((d) => setMakes(d.makes ?? []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!filters.make) {
+      setModels([]);
+      return;
+    }
+    fetch(`/api/browse?models=1&make=${encodeURIComponent(filters.make)}`)
+      .then((r) => r.json())
+      .then((d) => setModels(d.models ?? []))
+      .catch(() => setModels([]));
+  }, [filters.make]);
+
+  useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    const params = new URLSearchParams();
+    if (filters.make) params.set("make", filters.make);
+    if (filters.model) params.set("model", filters.model);
+    if (filters.bodyType) params.set("bodyType", filters.bodyType);
+    if (filters.fuel) params.set("fuelType", filters.fuel);
+    if (filters.mileage) params.set("maxMileage", filters.mileage);
+    if (filters.colour) params.set("colour", filters.colour);
+    if (filters.yearFrom) params.set("minYear", filters.yearFrom);
+    if (buyerLat !== null) params.set("buyer_lat", String(buyerLat));
+    if (buyerLng !== null) params.set("buyer_lng", String(buyerLng));
+
+    const pp = priceParams(filters.price);
+    Object.entries(pp).forEach(([k, v]) => params.set(k, v));
+
+    fetch(`/api/browse?${params}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) {
+          setError(d.error);
+        } else {
+          setAdverts(d.adverts ?? []);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Could not load adverts.");
+        setLoading(false);
+      });
+  }, [filters, buyerLat, buyerLng]);
+
+  function clearFilters() {
+    setFilters(EMPTY_FILTERS);
+  }
+
+  async function handleSetPostcode(e: React.FormEvent) {
+    e.preventDefault();
+    setPostcodeError("");
+
+    const trimmed = postcodeInput.trim();
+    if (!trimmed) return;
+
+    const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(trimmed)}`);
+    const geoResult = await geoRes.json();
+
+    if (!geoRes.ok) {
+      setPostcodeError("Invalid postcode.");
+      return;
+    }
+
+    setBuyerLat(geoResult.latitude);
+    setBuyerLng(geoResult.longitude);
+    setBuyerTown(geoResult.nearest_town ?? "");
+    setPostcodeInput(geoResult.postcode);
+    localStorage.setItem("buyer_postcode_v2", geoResult.postcode);
+    localStorage.setItem("buyer_town_v2", geoResult.nearest_town ?? "");
+
+    // Save to profile if logged in
+    try {
+      const accountRes = await fetch("/api/account");
+      if (accountRes.ok) {
+        const accountResult = await accountRes.json();
+        if (accountResult.user) {
+          await fetch("/api/account", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              postcode: geoResult.postcode,
+              latitude: geoResult.latitude,
+              longitude: geoResult.longitude,
+            }),
+          });
+        }
+      }
+    } catch {
+      // Non-blocking
+    }
+  }
+
+  async function handleAlertSignup(e: React.FormEvent) {
+    e.preventDefault();
+    setAlertStatus("sending");
+    setAlertError("");
+
+    try {
+      const res = await fetch("/api/alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: alertEmail,
+          filters: filtersToAlertParams(filters),
+          postcode: postcodeInput.trim() || undefined,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setAlertStatus("error");
+        setAlertError(result.error || "Could not save alert.");
+      } else {
+        setAlertStatus("sent");
+      }
+    } catch {
+      setAlertStatus("error");
+      setAlertError("Could not save alert. Please try again.");
+    }
+  }
+
+  function clearPostcode() {
+    setBuyerLat(null);
+    setBuyerLng(null);
+    setBuyerTown("");
+    setPostcodeInput("");
+    localStorage.removeItem("buyer_postcode_v2");
+    localStorage.removeItem("buyer_town_v2");
+    localStorage.removeItem("buyer_cache_uid");
+  }
+
+  const hasActiveFilters = Object.values(filters).some(Boolean);
+
+  // Full make list + live makes; the selected make is always included so a
+  // make from the URL that isn't listed anywhere still shows as selected.
+  const makeOptions = useMemo(() => buildMakeOptions(makes, filters.make), [makes, filters.make]);
+
+  return (
+    <main>
+      <section className="browse-hero">
+        <p className="eyebrow">Private cars only</p>
+        <h1>Latest adverts</h1>
+        <p>
+          Filter cars listed by private owners. Seller details stay protected
+          and buyer messages go through OwnerCars.
+        </p>
+      </section>
+
+      <div className="browse-filters">
+        <select
+          value={filters.make}
+          onChange={(e) => setFilters((f) => ({ ...f, make: e.target.value, model: "" }))}
+          aria-label="Filter by make"
+        >
+          <option value="">Any make</option>
+          {makeOptions.map((m) => (
+            <option key={m.value} value={m.value}>{m.label}</option>
+          ))}
+        </select>
+
+        <select
+          value={filters.model}
+          onChange={(e) => setFilters((f) => ({ ...f, model: e.target.value }))}
+          disabled={!filters.make}
+          aria-label="Filter by model"
+        >
+          {!filters.make ? (
+            <option value="">Select a make first</option>
+          ) : (
+            <>
+              <option value="">Any model</option>
+              {models.map((m) => (
+                <option key={m} value={m}>{capitaliseWords(m)}</option>
+              ))}
+            </>
+          )}
+        </select>
+
+        <select value={filters.bodyType} onChange={(e) => setFilters((f) => ({ ...f, bodyType: e.target.value }))} aria-label="Filter by body type">
+          {BODY_TYPE_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+        </select>
+
+        <select value={filters.fuel} onChange={(e) => setFilters((f) => ({ ...f, fuel: e.target.value }))} aria-label="Filter by fuel type">
+          {FUEL_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+        </select>
+
+        <select value={filters.price} onChange={(e) => setFilters((f) => ({ ...f, price: e.target.value }))} aria-label="Filter by price">
+          {PRICE_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+        </select>
+
+        <select value={filters.mileage} onChange={(e) => setFilters((f) => ({ ...f, mileage: e.target.value }))} aria-label="Filter by mileage">
+          {MILEAGE_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+        </select>
+
+        <select value={filters.colour} onChange={(e) => setFilters((f) => ({ ...f, colour: e.target.value }))} aria-label="Filter by colour">
+          {COLOUR_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+        </select>
+
+        <select value={filters.yearFrom} onChange={(e) => setFilters((f) => ({ ...f, yearFrom: e.target.value }))} aria-label="Filter by year from">
+          {YEAR_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+        </select>
+
+        {/* Postcode / location — only render after client has read localStorage */}
+        {mounted && (
+          buyerTown ? (
+            <button type="button" className="browse-postcode-active" onClick={clearPostcode}>
+              Near {buyerTown} ✕
+            </button>
+          ) : (
+            <form onSubmit={handleSetPostcode} style={{ display: "contents" }}>
+              <input
+                type="text"
+                className="browse-postcode-input"
+                placeholder={locating ? "Locating…" : "Your postcode"}
+                value={postcodeInput}
+                onChange={(e) => { setPostcodeInput(e.target.value); setPostcodeError(""); }}
+                maxLength={8}
+                aria-label="Your postcode for distance"
+              />
+              <button type="submit" className="browse-postcode-set">Set</button>
+            </form>
+          )
+        )}
+
+        {hasActiveFilters && (
+          <button type="button" className="browse-filters-clear" onClick={clearFilters}>
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {postcodeError && (
+        <p style={{ color: "#dc2626", fontSize: "13px", margin: "4px 0 0 24px" }}>{postcodeError}</p>
+      )}
+
+      <section className="listing-section">
+        {loading && <p>Loading cars…</p>}
+        {!loading && error && <p>{error}</p>}
+
+        {!loading && !error && adverts.length === 0 && (
+          hasActiveFilters ? (
+            <div className="browse-alert-card">
+              <p className="browse-alert-heading">No matches yet</p>
+              <p className="browse-alert-sub">Get notified when a matching car is listed.</p>
+              {alertStatus === "sent" ? (
+                <p className="browse-alert-success">✓ We'll email you when a match is found.</p>
+              ) : (
+                <form onSubmit={handleAlertSignup} className="browse-alert-form">
+                  <input
+                    type="email"
+                    required
+                    placeholder="Your email address"
+                    value={alertEmail}
+                    onChange={(e) => { setAlertEmail(e.target.value); setAlertError(""); }}
+                    className="browse-alert-input"
+                  />
+                  <button
+                    type="submit"
+                    disabled={alertStatus === "sending"}
+                    className="browse-alert-btn"
+                  >
+                    {alertStatus === "sending" ? "Saving…" : "Notify me"}
+                  </button>
+                  {alertError && <p className="browse-alert-error">{alertError}</p>}
+                </form>
+              )}
+            </div>
+          ) : (
+            <p>No adverts listed yet.</p>
+          )
+        )}
+
+        {!loading && !error && adverts.length >= 10 && (
+          <p style={{ color: "var(--muted)", marginBottom: "20px" }}>
+            Showing {adverts.length} private car{adverts.length === 1 ? "" : "s"}
+          </p>
+        )}
+
+        <div className="listing-grid">
+          {adverts.map((ad: any) => {
+            const displayTitle = advertDisplayTitle(ad);
+
+            return (
+              <Link className="listing-card" href={`/advert/${ad.id}`} key={ad.id}>
+                {ad.advert_photos?.[0]?.image_url ? (
+                  <img className="listing-photo-img" src={ad.advert_photos[0].image_url} alt={displayTitle} />
+                ) : ad.is_example ? (
+                  <ExampleAdvertPlaceholder className="listing-photo" />
+                ) : (
+                  <div className="listing-photo"></div>
+                )}
+
+                <div className="listing-body">
+                  <div className="listing-topline">
+                    <span className="seller-badge">Private seller</span>
+                    {ad.is_example && <span className="example-badge">Example listing</span>}
+                  </div>
+
+                  <h2>{displayTitle}</h2>
+
+                  <p className="listing-price">£{Number(ad.price).toLocaleString("en-GB")}</p>
+
+                  <div className="listing-meta">
+                    <span>{Number(ad.mileage).toLocaleString("en-GB")} miles</span>
+                    <span>OwnerCars protected contact</span>
+                  </div>
+
+                  {(ad.nearest_town || ad.distance_miles !== undefined) && (
+                    <p className="listing-location">
+                      {ad.nearest_town && `Near ${ad.nearest_town}`}
+                      {ad.nearest_town && ad.distance_miles !== undefined && " · "}
+                      {ad.distance_miles !== undefined && `~${ad.distance_miles} miles away`}
+                    </p>
+                  )}
+
+                  <p className="listing-description">{ad.description}</p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+    </main>
+  );
+}

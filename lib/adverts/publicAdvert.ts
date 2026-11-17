@@ -1,7 +1,9 @@
 import "server-only";
 
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
 import { ADVERT_STATUS } from "@/lib/adverts/lifecycle";
 
 // Public, published-only advert fetch for server rendering (metadata, JSON-LD
@@ -79,3 +81,46 @@ export const getPublicAdvert = cache(async (id: string): Promise<PublicAdvert | 
     return null;
   }
 });
+
+/**
+ * True when the signed-in user owns this published advert. Mirrors the
+ * isOwner check in /api/public-adverts/[id]: seller_id is read on the server
+ * and compared here, and only the boolean ever reaches the page.
+ */
+export async function isPublishedAdvertOwner(id: string): Promise<boolean> {
+  if (!UUID_RE.test(id)) return false;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return false;
+
+  try {
+    const cookieStore = await cookies();
+    const supabase = createServerClient(url, anonKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        // Server Components can't set cookies; session refresh is handled by
+        // proxy.ts and the browser client.
+        setAll() {},
+      },
+    });
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const { data } = await supabase
+      .from("adverts")
+      .select("seller_id")
+      .eq("id", id)
+      .eq("status", ADVERT_STATUS.PUBLISHED)
+      .maybeSingle();
+
+    return !!data && (data as { seller_id: string | null }).seller_id === user.id;
+  } catch {
+    return false;
+  }
+}
