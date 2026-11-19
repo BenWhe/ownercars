@@ -72,10 +72,14 @@ export async function POST(request: NextRequest) {
 
   // Require an existing message thread — buyer must have messaged the seller
   // first. Guards against thread injection by unrelated authenticated users.
+  // Delivered only: a held message (e.g. one caught by screenMessage) must
+  // not let a buyer reach the seller through a document request before any
+  // real message has actually gone through.
   const { count: threadCount } = await supabase
     .from("messages")
     .select("id", { count: "exact", head: true })
     .eq("advert_id", advert_id)
+    .eq("delivery_status", "delivered")
     .or(
       `and(sender_id.eq.${user.id},recipient_id.eq.${advert.seller_id}),` +
       `and(sender_id.eq.${advert.seller_id},recipient_id.eq.${user.id})`
@@ -88,8 +92,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const { data: buyerProfile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
   const displayName = DOCUMENT_DISPLAY_NAMES[document_type];
-  const buyerLabel = user.email?.split("@")[0] ?? "A buyer";
+  const buyerLabel = buyerProfile?.full_name?.trim()?.split(/\s+/)[0] || "A buyer";
 
   const { error } = await supabase.from("messages").insert({
     advert_id,

@@ -119,8 +119,8 @@ export default function MessageThreadPage() {
 
     const result = await res.json();
     if (!res.ok) {
-      if (result.code === "POSTCODE_REQUIRED") {
-        setNotice("__POSTCODE_REQUIRED__");
+      if (result.code === "PROFILE_INCOMPLETE") {
+        setNotice("__PROFILE_INCOMPLETE__");
       } else {
         setNotice(result.error || "Could not send message.");
       }
@@ -202,12 +202,12 @@ export default function MessageThreadPage() {
       </section>
 
       <section className="message-thread-section">
-        {notice && notice !== "__POSTCODE_REQUIRED__" && (
+        {notice && notice !== "__PROFILE_INCOMPLETE__" && (
           <p className="message-notice">{notice}</p>
         )}
-        {notice === "__POSTCODE_REQUIRED__" && (
+        {notice === "__PROFILE_INCOMPLETE__" && (
           <p className="message-notice">
-            Please <a href="/account" style={{ color: "var(--accent)", fontWeight: 700 }}>add your postcode to your account</a> before messaging sellers.
+            Please <a href="/account" style={{ color: "var(--accent)", fontWeight: 700 }}>add your name and postcode to your account</a> before messaging sellers.
           </p>
         )}
 
@@ -268,13 +268,21 @@ export default function MessageThreadPage() {
               );
             }
 
-            // Regular message
+            // Regular message — held/rejected states only ever show to the
+            // sender (RLS keeps the recipient from ever seeing the row).
+            const displayBody =
+              msg.delivery_status === "held"
+                ? "Pending review — we check some messages to protect sellers. Usually within a few hours."
+                : msg.delivery_status === "rejected"
+                  ? "Not delivered."
+                  : msg.body;
+
             return (
               <div
                 key={msg.id}
                 className={ownMessage ? "message-bubble own" : "message-bubble"}
               >
-                <p>{msg.body}</p>
+                <p>{displayBody}</p>
                 <time>{formatMessageDate(msg.created_at)}</time>
               </div>
             );

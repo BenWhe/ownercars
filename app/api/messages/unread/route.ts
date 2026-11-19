@@ -28,6 +28,7 @@ export async function GET() {
     .from("messages")
     .select("*", { count: "exact", head: true })
     .eq("recipient_id", user.id)
+    .eq("delivery_status", "delivered")
     .is("read_at", null);
 
   if (error) {

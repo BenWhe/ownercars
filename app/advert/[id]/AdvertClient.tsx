@@ -108,7 +108,9 @@ export default function AdvertClient() {
     }
 
     if (!res.ok) {
-      setSellerMessageStatus(result.error || "Could not send message.");
+      setSellerMessageStatus(
+        result.code === "PROFILE_INCOMPLETE" ? "__PROFILE_INCOMPLETE__" : result.error || "Could not send message."
+      );
       return;
     }
 
@@ -227,7 +229,14 @@ export default function AdvertClient() {
                   onChange={(e) => setSellerMessageBody(e.target.value)}
                   placeholder="Ask about the car, viewing availability, or history..."
                 />
-                {sellerMessageStatus && <p className="message-notice">{sellerMessageStatus}</p>}
+                {sellerMessageStatus === "__PROFILE_INCOMPLETE__" && (
+                  <p className="message-notice">
+                    Please <a href="/account" style={{ color: "var(--accent)", fontWeight: 700 }}>add your name and postcode to your account</a> before messaging sellers.
+                  </p>
+                )}
+                {sellerMessageStatus && sellerMessageStatus !== "__PROFILE_INCOMPLETE__" && (
+                  <p className="message-notice">{sellerMessageStatus}</p>
+                )}
                 <button className="secure-message-button" type="submit">
                   Send message
                 </button>

@@ -42,6 +42,9 @@ export default function LoginPage() {
       return;
     }
 
+    // Fire-and-forget — must never block or delay the redirect below.
+    fetch("/api/security/sign-in-event", { method: "POST" }).catch(() => {});
+
     const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
     window.location.replace(next || "/dashboard");
   }

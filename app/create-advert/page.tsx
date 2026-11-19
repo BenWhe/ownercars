@@ -52,6 +52,8 @@ export default function CreateAdvertPage() {
   const [description, setDescription] = useState("");
   const [message, setMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false);
 
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
@@ -397,6 +399,22 @@ export default function CreateAdvertPage() {
   async function handleCreateAdvertSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    // In-flight guard: the geocode call below makes the round trip long
+    // enough that a repeated click (or double-tap) before it resolves would
+    // otherwise create a second draft for the same advert.
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    setIsSaving(true);
+
+    try {
+      await submitCreateAdvert();
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
+    }
+  }
+
+  async function submitCreateAdvert() {
     console.log(`${LOG_PREFIX} create draft advert submitted`);
 
     setMessage("");
@@ -452,7 +470,11 @@ export default function CreateAdvertPage() {
       }
 
       if (!res.ok) {
-        setMessage(result.error || "Something went wrong saving your advert.");
+        setMessage(
+          result.code === "PROFILE_INCOMPLETE"
+            ? "__PROFILE_INCOMPLETE__"
+            : result.error || "Something went wrong saving your advert."
+        );
         return;
       }
 
@@ -812,11 +834,18 @@ export default function CreateAdvertPage() {
               {fieldError("confirmedPrivateSeller")}
 
               <div className="ca-submit-row">
-                <button type="submit" className="ca-btn-submit">Create draft advert</button>
+                <button type="submit" className="ca-btn-submit" disabled={isSaving}>
+                  {isSaving ? "Saving…" : "Create draft advert"}
+                </button>
                 <p className="ca-save-note">You&apos;ll add photos in the next step.</p>
               </div>
 
-              {message && (
+              {message === "__PROFILE_INCOMPLETE__" && (
+                <p role="alert" className="ca-form-message">
+                  Please <a href="/account" style={{ color: "var(--accent)", fontWeight: 700 }}>add your name and postcode to your account</a> before creating an advert.
+                </p>
+              )}
+              {message && message !== "__PROFILE_INCOMPLETE__" && (
                 <p role="alert" className="ca-form-message">{message}</p>
               )}
             </div>

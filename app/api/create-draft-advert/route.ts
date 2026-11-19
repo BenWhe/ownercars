@@ -1,14 +1,18 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { lookupVehicle, normaliseReg } from "@/lib/mot/client";
 import { geocodePostcode } from "@/lib/geocode/lookup";
+import { requireProfileDetails } from "@/lib/profile/requireProfileDetails";
+import { getRequestMeta, logSecurityEvent } from "@/lib/security/requestMeta";
 
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !anonKey) {
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     return NextResponse.json(
       { error: "Missing Supabase server environment variables" },
       { status: 500 }
@@ -24,6 +28,7 @@ export async function POST(request: Request) {
       setAll() {},
     },
   });
+  const admin = createClient(supabaseUrl, serviceRoleKey);
 
   const {
     data: { user },
@@ -31,6 +36,14 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const profileCheck = await requireProfileDetails(admin, user);
+  if (!profileCheck.ok) {
+    return NextResponse.json(
+      { error: profileCheck.error, code: profileCheck.code },
+      { status: 403 }
+    );
   }
 
   let draft;
@@ -108,6 +121,28 @@ export async function POST(request: Request) {
     promo_code: null,
   };
 
+  // Dedup: a double-click (or double-tap) on the client can still slip past
+  // the in-flight guard there — the real backstop is here. A matching draft
+  // from the last 60 seconds is treated as the same submission, not a new one.
+  const sixtySecondsAgo = new Date(Date.now() - 60 * 1000).toISOString();
+  const { data: duplicateDraft } = await supabase
+    .from("adverts")
+    .select("id")
+    .eq("seller_id", user.id)
+    .eq("status", "draft")
+    .eq("make", payload.make)
+    .eq("model", payload.model)
+    .eq("year", payload.year)
+    .eq("price", payload.price)
+    .gte("created_at", sixtySecondsAgo)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (duplicateDraft) {
+    return NextResponse.json({ id: duplicateDraft.id });
+  }
+
   const { data, error } = await supabase
     .from("adverts")
     .insert(payload)
@@ -117,6 +152,10 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  await logSecurityEvent(user.id, "draft_created", getRequestMeta(request), {
+    advertId: data.id,
+  });
 
   return NextResponse.json({ id: data.id });
 }

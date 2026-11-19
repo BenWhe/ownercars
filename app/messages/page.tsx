@@ -108,7 +108,11 @@ export default function MessagesPage() {
                     {conversation.lastMessage?.sender_id === userId
                       ? "You: "
                       : ""}
-                    {conversation.lastMessage?.body}
+                    {conversation.lastMessage?.delivery_status === "held"
+                      ? "Pending review — we check some messages to protect sellers."
+                      : conversation.lastMessage?.delivery_status === "rejected"
+                        ? "Not delivered."
+                        : conversation.lastMessage?.body}
                   </p>
 
                   <p className="message-card-time">

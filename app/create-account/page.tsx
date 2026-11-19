@@ -79,6 +79,13 @@ export default function CreateAccountPage() {
       // session (auto-confirm enabled). Without a session the values are still
       // captured in user_metadata at signup above and can be synced later.
       if (data.session) {
+        // Fire-and-forget — must never block the account-created flow below.
+        fetch("/api/security/sign-in-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event: "sign_up" }),
+        }).catch(() => {});
+
         try {
           const profileUpdate: {
             full_name: string;
