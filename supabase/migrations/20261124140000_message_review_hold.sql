@@ -39,6 +39,17 @@ revoke all on public.account_trust from anon, authenticated;
 
 -- 3. Recipients only ever see delivered messages. Senders see their own
 --    messages whatever their status.
+--
+--    Production also had four older policies that aren't in any migration
+--    (from an earlier hand-built version of messaging). Policies of the same
+--    kind are OR'd together, so an older SELECT policy could let a seller
+--    read held messages. They are removed; the two versioned policies below
+--    cover everything the app does (read own messages, mark as read).
+drop policy if exists "Users can send messages in their conversations" on public.messages;
+drop policy if exists "Users can read messages in their conversations" on public.messages;
+drop policy if exists "Users can view messages in their conversations" on public.messages;
+drop policy if exists "Users can mark messages in their conversations as read" on public.messages;
+
 drop policy if exists "Users can read their own messages" on public.messages;
 create policy "Users can read their own messages"
 on public.messages
@@ -61,5 +72,11 @@ insert into public.admin_users (user_id)
 select id from auth.users where lower(email) = lower('YOUR-LOGIN-EMAIL@example.com')
 on conflict do nothing;
 
--- Check: should return one row with your email.
-select u.email from public.admin_users a join auth.users u on u.id = a.user_id;
+-- Check: the policies should now be exactly "Users can read their own
+-- messages" (SELECT) and "Recipients can mark messages read" (UPDATE), and
+-- admin_users should contain your account (checked in the next statement).
+select u.email as admin_email from public.admin_users a join auth.users u on u.id = a.user_id;
+
+select policyname, cmd from pg_policies
+where schemaname = 'public' and tablename = 'messages'
+order by cmd, policyname;
