@@ -65,7 +65,11 @@ export async function GET(req: NextRequest, context: Context) {
     return NextResponse.json({ error: "Not authorised to view this conversation." }, { status: 403 });
   }
 
-  const { data: advert, error: advertError } = await supabase
+  // Read with the server key: the person is in this conversation, so they
+  // see the car's title even after it's sold or paused (the public database
+  // role only sees published adverts).
+  const advertClient = createAdminClient() ?? supabase;
+  const { data: advert, error: advertError } = await advertClient
     .from("adverts")
     .select("id, year, make, model, price, seller_id")
     .eq("id", advertId)
