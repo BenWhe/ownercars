@@ -89,9 +89,16 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 // over after the first render: changing filters or setting a postcode fetches
 // from /api/browse exactly as before.
 export default async function BrowsePage({ searchParams }: Props) {
-  const filters = filtersFromParams(paramsGetter(await searchParams));
+  const params = paramsGetter(await searchParams);
+  const filters = filtersFromParams(params);
   const adverts = await getBrowseAdverts(filters);
 
   // null (query failed) → let the client fetch as it always has.
-  return <BrowseClient initialAdverts={adverts ?? undefined} />;
+  return (
+    <BrowseClient
+      initialFilters={filters}
+      initialPostcode={params.get("postcode") ?? ""}
+      initialAdverts={adverts ?? undefined}
+    />
+  );
 }
