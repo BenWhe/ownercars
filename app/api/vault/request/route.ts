@@ -92,7 +92,9 @@ export async function POST(request: NextRequest) {
   }
 
   const displayName = DOCUMENT_DISPLAY_NAMES[document_type];
-  const buyerLabel = user.email?.split("@")[0] ?? "A buyer";
+  // Never derive the label from the buyer's email address: contact details
+  // stay private on OwnerCars (this previously showed the part before the @).
+  const buyerLabel = "A buyer";
 
   const { error } = await supabase.from("messages").insert({
     advert_id,

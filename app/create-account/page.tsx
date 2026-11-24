@@ -3,6 +3,7 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { checkName, NAME_PROBLEM_MESSAGES } from "@/lib/security/identityChecks";
 
 function safeNextPath(next: string | null) {
   return next?.startsWith("/") && !next.startsWith("//") ? next : null;
@@ -11,7 +12,8 @@ function safeNextPath(next: string | null) {
 export default function CreateAccountPage() {
   const router = useRouter();
 
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [nameError, setNameError] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,19 +36,25 @@ export default function CreateAccountPage() {
     setPostcodeError("");
     setNameError("");
 
-    // Name is required
-    if (!fullName.trim()) {
-      setNameError("Please enter your name.");
+    // First name and surname are required. Only problems a genuine person
+    // can fix are reported here; names that merely look made up are allowed
+    // and flagged for review when the account first messages a seller.
+    const nameProblem = checkName(firstName, lastName);
+    if (nameProblem && nameProblem !== "suspect") {
+      setNameError(NAME_PROBLEM_MESSAGES[nameProblem]);
       return;
     }
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
-    // Validate postcode before signup
-    if (postcode.trim()) {
-      const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(postcode.trim())}`);
-      if (!geoRes.ok) {
-        setPostcodeError("Please enter a valid UK postcode.");
-        return;
-      }
+    // Postcode is required and must be a real UK postcode
+    if (!postcode.trim()) {
+      setPostcodeError("Please enter your postcode.");
+      return;
+    }
+    const geoCheck = await fetch(`/api/geocode?postcode=${encodeURIComponent(postcode.trim())}`);
+    if (!geoCheck.ok) {
+      setPostcodeError("Please enter a valid UK postcode.");
+      return;
     }
 
     const supabase = createClient();
@@ -55,7 +63,12 @@ export default function CreateAccountPage() {
       email,
       password,
       options: {
-        data: { postcode: postcode.trim() || null, full_name: fullName.trim() },
+        data: {
+          postcode: postcode.trim(),
+          full_name: fullName,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+        },
       },
     });
 
@@ -85,7 +98,7 @@ export default function CreateAccountPage() {
             postcode?: string;
             latitude?: number;
             longitude?: number;
-          } = { full_name: fullName.trim() };
+          } = { full_name: fullName };
 
           if (postcode.trim()) {
             const geoRes = await fetch(`/api/geocode?postcode=${encodeURIComponent(postcode.trim())}`);
@@ -147,14 +160,28 @@ export default function CreateAccountPage() {
 
         <form onSubmit={handleCreateAccount} className="auth-form">
           <label>
-            Your name
+            First name
             <input
               type="text"
-              placeholder="e.g. Jane Smith"
-              value={fullName}
-              onChange={(e) => { setFullName(e.target.value); setNameError(""); }}
-              autoComplete="name"
+              placeholder="e.g. Jane"
+              value={firstName}
+              onChange={(e) => { setFirstName(e.target.value); setNameError(""); }}
+              autoComplete="given-name"
+              maxLength={40}
             />
+          </label>
+
+          <label>
+            Surname
+            <input
+              type="text"
+              placeholder="e.g. Smith"
+              value={lastName}
+              onChange={(e) => { setLastName(e.target.value); setNameError(""); }}
+              autoComplete="family-name"
+              maxLength={40}
+            />
+            <p className="field-hint">For our records. Never shown on adverts or to other users.</p>
             {nameError && <p className="field-error" role="alert">{nameError}</p>}
           </label>
 
@@ -187,7 +214,7 @@ export default function CreateAccountPage() {
               onChange={(e) => { setPostcode(e.target.value); setPostcodeError(""); }}
               maxLength={8}
             />
-            <p className="field-hint">Used to show distances to adverts and to help buyers find cars near them. Never shown to anyone.</p>
+            <p className="field-hint">Your home postcode. Used to show distances to adverts and to help buyers find cars near them. Never shown to anyone.</p>
             {postcodeError && <p className="field-error" role="alert">{postcodeError}</p>}
           </label>
 

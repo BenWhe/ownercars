@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { checkFullName, NAME_PROBLEM_MESSAGES } from "@/lib/security/identityChecks";
 import Link from "next/link";
 import { signOutAndClearSession } from "@/lib/auth/client";
 
@@ -141,9 +142,10 @@ export default function AccountPage() {
     setFullNameSaved(false);
     setFullNameSaving(true);
 
-    const trimmed = fullNameInput.trim();
-    if (!trimmed) {
-      setFullNameError("Please enter your name.");
+    const trimmed = fullNameInput.trim().replace(/\s+/g, " ");
+    const nameProblem = checkFullName(trimmed);
+    if (nameProblem && nameProblem !== "suspect") {
+      setFullNameError(NAME_PROBLEM_MESSAGES[nameProblem]);
       setFullNameSaving(false);
       return;
     }
@@ -190,6 +192,9 @@ export default function AccountPage() {
             {/* Name */}
             <div className="account-card">
               <p className="eyebrow" style={{ marginBottom: "6px" }}>YOUR NAME</p>
+              <p style={{ fontSize: "13px", color: "#6b7280", margin: "0 0 10px" }}>
+                First name and surname. Needed before you can message sellers; never shown to other users.
+              </p>
 
               <form onSubmit={handleSaveName} className="account-postcode-form">
                 <input

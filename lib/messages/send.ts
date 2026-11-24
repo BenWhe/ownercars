@@ -4,7 +4,13 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ADVERT_STATUS } from "@/lib/adverts/lifecycle";
 import { checkContactDetails, CONTACT_DETAILS_MESSAGE, type ContactReason } from "@/lib/messages/contactDetails";
 import type { RequestContext } from "@/lib/security/requestContext";
-import { assessHold, getTrustStatus } from "@/lib/messages/review";
+import { assessHold, getTrustStatus, type HoldReason } from "@/lib/messages/review";
+import {
+  checkFullName,
+  isDisposableEmail,
+  isLandmarkPostcode,
+  NAME_PROBLEM_MESSAGES,
+} from "@/lib/security/identityChecks";
 
 // The single path for creating buyer/seller messages.
 //
@@ -65,6 +71,66 @@ export async function canSendMessage(
   return (await checkPermission(admin, ids)).allowed;
 }
 
+type IdentityCheck =
+  | { ok: true; flags: HoldReason[] }
+  | { ok: false; status: number; error: string; code: string };
+
+/**
+ * A buyer must have confirmed their email and given a first name, surname
+ * and postcode before messaging (genuine buyers can fix these, so they're
+ * refused with an explanation). Details that look fake (landmark postcode,
+ * made-up name, throwaway email) aren't refused, which would only tell a
+ * scammer what to change: the message is held for review instead.
+ */
+async function checkBuyerIdentity(admin: SupabaseClient, senderId: string): Promise<IdentityCheck> {
+  let user: { email?: string | null; email_confirmed_at?: string | null; user_metadata?: Record<string, unknown> } | null = null;
+  try {
+    const { data } = await admin.auth.admin.getUserById(senderId);
+    user = data?.user ?? null;
+  } catch {
+    user = null;
+  }
+  if (!user) return { ok: false, status: 403, error: "Not authorised to send this message.", code: "NO_ACCOUNT" };
+
+  if (!user.email_confirmed_at) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Please confirm your email address before messaging sellers. Check your inbox for the link we sent you.",
+      code: "EMAIL_UNCONFIRMED",
+    };
+  }
+
+  const { data: profile } = await admin.from("profiles").select("full_name, postcode").eq("id", senderId).maybeSingle();
+  const meta = user.user_metadata ?? {};
+  const fullName = (profile?.full_name as string | null) ?? (meta.full_name as string | null) ?? null;
+  const postcode = (profile?.postcode as string | null) ?? (meta.postcode as string | null) ?? null;
+
+  const nameProblem = checkFullName(fullName);
+  if (nameProblem && nameProblem !== "suspect") {
+    return {
+      ok: false,
+      status: 403,
+      error: `${NAME_PROBLEM_MESSAGES[nameProblem]} You can add it on your Account page before messaging sellers.`,
+      code: "PROFILE_INCOMPLETE",
+    };
+  }
+  if (!postcode) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Please add your postcode to your account before messaging sellers.",
+      code: "POSTCODE_REQUIRED",
+    };
+  }
+
+  const flags: HoldReason[] = [];
+  if (isLandmarkPostcode(postcode)) flags.push("fake_postcode");
+  if (nameProblem === "suspect") flags.push("suspect_name");
+  if (isDisposableEmail(user.email)) flags.push("disposable_email");
+  return { ok: true, flags };
+}
+
 export type SendResult =
   | { ok: true; message: Record<string, unknown> }
   | { ok: false; status: number; error: string; code?: string };
@@ -109,10 +175,15 @@ export async function sendMessage(
     return { ok: false, status: 403, error: "Not authorised to send this message." };
   }
 
-  // Sellers replying on their own advert are never held.
-  const holdReasons = permission.senderIsSeller
-    ? []
-    : await assessHold(admin, { advertId, senderId, body, context, trust });
+  // Sellers replying on their own advert are never held or identity-checked.
+  let holdReasons: HoldReason[] = [];
+  if (!permission.senderIsSeller) {
+    const identity = await checkBuyerIdentity(admin, senderId);
+    if (!identity.ok) {
+      return { ok: false, status: identity.status, error: identity.error, code: identity.code };
+    }
+    holdReasons = await assessHold(admin, { advertId, senderId, body, context, trust, identityFlags: identity.flags });
+  }
 
   const { data: message, error } = await admin
     .from("messages")

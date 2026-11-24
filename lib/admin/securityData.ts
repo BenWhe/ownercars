@@ -4,6 +4,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { HOLD_REASON_LABELS, type HoldReason, type TrustStatus } from "@/lib/messages/review";
 import type { ContactReason } from "@/lib/messages/contactDetails";
 import { vehicleName } from "@/lib/seo/vehicle";
+import { checkFullName, isDisposableEmail, isLandmarkPostcode } from "@/lib/security/identityChecks";
 
 export const CONTACT_REASON_LABELS: Record<ContactReason, string> = {
   phone: "Phone number",
@@ -31,6 +32,8 @@ export type HeldMessage = {
   senderEmail: string | null;
   senderSignedUp: string | null;
   senderTrust: TrustStatus;
+  senderName: string | null;
+  senderPostcode: string | null;
   reasons: string[];
   ip: string | null;
   where: string;
@@ -70,7 +73,20 @@ export type RecentSignup = {
   postcode: string | null;
   trust: TrustStatus;
   messagesSent: number;
+  flags: string[];
 };
+
+/** Sign-up details that look fake, for the dashboard. */
+export function identityFlags(name: string | null, postcode: string | null, email: string | null): string[] {
+  const flags: string[] = [];
+  const nameProblem = checkFullName(name);
+  if (nameProblem === "suspect") flags.push("Name looks made up");
+  else if (nameProblem) flags.push("No full name");
+  if (!postcode) flags.push("No postcode");
+  else if (isLandmarkPostcode(postcode)) flags.push("Landmark postcode");
+  if (isDisposableEmail(email)) flags.push("Throwaway email");
+  return flags;
+}
 
 export type SecurityStats = {
   days: number;
@@ -197,6 +213,18 @@ export async function loadSecurityDashboard(admin: SupabaseClient): Promise<Secu
     for (const a of data ?? []) blockAdverts.set(a.id, advertTitle(a));
   }
 
+  const profileOf = new Map(profiles.map((p: Record<string, unknown>) => [p.id as string, p]));
+  const nameOf = (id: string): string | null => {
+    const p = profileOf.get(id) as Record<string, unknown> | undefined;
+    const meta = (users.get(id)?.user_metadata ?? {}) as Record<string, unknown>;
+    return (p?.full_name as string | undefined) ?? (meta.full_name as string | undefined) ?? null;
+  };
+  const postcodeOf = (id: string): string | null => {
+    const p = profileOf.get(id) as Record<string, unknown> | undefined;
+    const meta = (users.get(id)?.user_metadata ?? {}) as Record<string, unknown>;
+    return (p?.postcode as string | undefined) ?? (meta.postcode as string | undefined) ?? null;
+  };
+
   const held: HeldMessage[] = heldRows.map((m: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
     id: m.id,
     createdAt: m.created_at,
@@ -207,6 +235,8 @@ export async function loadSecurityDashboard(admin: SupabaseClient): Promise<Secu
     senderEmail: emailOf(m.sender_id),
     senderSignedUp: signedUpOf(m.sender_id),
     senderTrust: trustOf(m.sender_id),
+    senderName: nameOf(m.sender_id),
+    senderPostcode: postcodeOf(m.sender_id),
     reasons: ((m.hold_reasons ?? []) as HoldReason[]).map((r) => HOLD_REASON_LABELS[r] ?? r),
     ip: m.sender_ip,
     where: where(m.sender_city, m.sender_country),
@@ -259,7 +289,6 @@ export async function loadSecurityDashboard(admin: SupabaseClient): Promise<Secu
   }
   for (const t of trustRows) if (t.status === "suspended") touch(t.user_id, null, null, null);
 
-  const profileOf = new Map(profiles.map((p: Record<string, unknown>) => [p.id as string, p]));
   const sentCount = new Map<string, number>();
   for (const s of sentRows) sentCount.set(s.sender_id, (sentCount.get(s.sender_id) ?? 0) + 1);
 
@@ -267,22 +296,18 @@ export async function loadSecurityDashboard(admin: SupabaseClient): Promise<Secu
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 25)
     .map((u) => {
-      const p = profileOf.get(u.id) as Record<string, unknown> | undefined;
-      const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
-      const name =
-        [p?.first_name, p?.last_name].filter(Boolean).join(" ") ||
-        (p?.full_name as string | undefined) ||
-        (meta.full_name as string | undefined) ||
-        null;
+      const name = nameOf(u.id);
+      const postcode = postcodeOf(u.id);
       return {
         userId: u.id,
         email: u.email ?? null,
         signedUp: u.created_at,
         emailConfirmed: !!u.email_confirmed_at,
         name,
-        postcode: (p?.postcode as string | undefined) ?? (meta.postcode as string | undefined) ?? null,
+        postcode,
         trust: trustOf(u.id),
         messagesSent: sentCount.get(u.id) ?? 0,
+        flags: identityFlags(name, postcode, u.email ?? null),
       };
     });
 

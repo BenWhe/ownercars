@@ -19,7 +19,14 @@ import type { RequestContext } from "@/lib/security/requestContext";
 // can't send at all. Approving a message delivers it, emails the seller and
 // marks the account trusted.
 
-export type HoldReason = "new_account" | "non_uk" | "duplicate" | "rapid";
+export type HoldReason =
+  | "new_account"
+  | "non_uk"
+  | "duplicate"
+  | "rapid"
+  | "fake_postcode"
+  | "suspect_name"
+  | "disposable_email";
 export type TrustStatus = "new" | "trusted" | "suspended";
 
 export const HOLD_REASON_LABELS: Record<HoldReason, string> = {
@@ -27,6 +34,9 @@ export const HOLD_REASON_LABELS: Record<HoldReason, string> = {
   non_uk: "Sent from outside the UK",
   duplicate: "Same text sent about another advert",
   rapid: "Messaged 3+ adverts within 15 minutes",
+  fake_postcode: "Gave a landmark or example postcode (e.g. Buckingham Palace)",
+  suspect_name: "Name looks made up",
+  disposable_email: "Throwaway email address",
 };
 
 const UK_COUNTRY_CODES = new Set(["GB", "IM", "JE", "GG"]);
@@ -58,17 +68,19 @@ function normaliseText(text: string): string {
 /** Decides whether a buyer's message should be held for review, and why. */
 export async function assessHold(
   admin: SupabaseClient,
-  { advertId, senderId, body, context, trust }: {
+  { advertId, senderId, body, context, trust, identityFlags = [] }: {
     advertId: string;
     senderId: string;
     body: string;
     context: RequestContext;
     trust: TrustStatus;
+    identityFlags?: HoldReason[];
   }
 ): Promise<HoldReason[]> {
   const reasons: HoldReason[] = [];
   if (trust !== "trusted") reasons.push("new_account");
   if (context.country && !UK_COUNTRY_CODES.has(context.country.toUpperCase())) reasons.push("non_uk");
+  reasons.push(...identityFlags);
 
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data: recent } = await admin

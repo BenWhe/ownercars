@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: 17 June 2026**
+**Last updated: 24 November 2026**
 
 This Privacy Policy explains how OwnerCars collects, uses, and protects your personal data when you use our website and services at www.ownercars.co.uk ("the Service"). We are committed to protecting your privacy — it is at the heart of what OwnerCars does.
 
@@ -27,13 +27,13 @@ Depending on how you use OwnerCars, we may collect:
 
 **Vehicle information** — details of the vehicle you list (make, model, year, mileage, price, photographs, description). If you use our registration lookup, we collect your vehicle registration number and retrieve vehicle and MOT history data from the DVSA. **Your registration number is used only to populate your advert's details and is never displayed publicly on your advert.**
 
-**Messages** — messages you send and receive through our on-platform messaging system between buyers and sellers.
+**Messages** — messages you send and receive through our on-platform messaging system between buyers and sellers. To protect our users from scams, messages are checked automatically when they are sent: messages containing contact details (such as phone numbers, email addresses or links) are not delivered, and some messages (for example, a new account's first message) are held until they have been reviewed by OwnerCars staff. Only messages that are held or reported are read by our staff.
 
 **Documents** — files you choose to upload and share through our Secure Vault feature.
 
 **Payment information** — if you pay a listing fee to publish an advert, payment is processed by our payment provider, Stripe. We do not collect or store your full card details; these are handled directly by Stripe. We retain a record that a payment was made.
 
-**Technical information** — your IP address, browser type, and similar technical data, including for security purposes such as preventing abuse and rate-limiting.
+**Technical information** — your IP address, browser type, and similar technical data, including for security purposes such as preventing abuse and rate-limiting. When you send a message, we record the IP address, the approximate location derived from it (town and country) and the browser or device it was sent from, so that we can detect and investigate fraud.
 
 ## 3. How and why we use your data (legal bases)
 
@@ -66,7 +66,7 @@ We use trusted third-party providers ("data processors") to run OwnerCars. They 
 
 Some of these providers may process data outside the UK. Where they do, we rely on appropriate safeguards (such as UK adequacy regulations or standard contractual clauses) to protect your data.
 
-We may also disclose data if required by law, to enforce our terms, or to protect the rights, safety, or property of OwnerCars or others.
+We may also disclose data if required by law, to enforce our terms, or to protect the rights, safety, or property of OwnerCars or others. Where we suspect fraud or a scam, we may share relevant information about the account involved (such as its email address, name and postcode given, messages sent, and the IP addresses and approximate locations they were sent from) with the police and with Report Fraud, to help prevent and detect crime.
 
 **What other users see:** other users of OwnerCars can see the information in your public advert (vehicle details, photos, description, and the nearest town) and can message you through the platform. They cannot see your postcode, email address, phone number, registration number, or other contact details.
 
