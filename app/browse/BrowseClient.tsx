@@ -1,12 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
 import { buildMakeOptions } from "@/lib/vehicles/makes";
 import { BODY_TYPE_OPTIONS, FUEL_OPTIONS, PRICE_OPTIONS } from "@/lib/vehicles/filters";
-import { EMPTY_FILTERS, filtersFromParams, priceParams } from "@/lib/vehicles/browseFilters";
+import { EMPTY_FILTERS, priceParams, type BrowseFilters } from "@/lib/vehicles/browseFilters";
 import type { BrowseAdvert } from "@/lib/adverts/browseAdverts";
 
 function capitaliseWords(str?: string) {
@@ -70,26 +69,23 @@ function filtersToAlertParams(f: typeof EMPTY_FILTERS) {
 }
 
 type BrowseClientProps = {
-  // First page of results rendered on the server for the URL's filters.
-  // When present, the initial client fetch is skipped; later filter or
-  // location changes fetch from /api/browse exactly as before.
+  // The URL's filters and postcode, read on the server from the page's
+  // searchParams. Taking them as props (rather than useSearchParams) means no
+  // Suspense boundary is needed, so the server HTML contains the real grid
+  // instead of a "Loading cars…" fallback with the grid in a hidden block.
+  initialFilters: BrowseFilters;
+  initialPostcode: string;
+  // First page of results rendered on the server for those filters. When
+  // present, the initial client fetch is skipped; later filter or location
+  // changes fetch from /api/browse exactly as before.
   initialAdverts?: BrowseAdvert[];
 };
 
-export default function BrowseClient({ initialAdverts }: BrowseClientProps) {
-  return (
-    <Suspense fallback={<main><p style={{ padding: "24px" }}>Loading cars…</p></main>}>
-      <BrowseInner initialAdverts={initialAdverts} />
-    </Suspense>
-  );
-}
-
-function BrowseInner({ initialAdverts }: BrowseClientProps) {
-  const searchParams = useSearchParams();
+export default function BrowseClient({ initialFilters, initialPostcode, initialAdverts }: BrowseClientProps) {
   // Read once on first load: the URL seeds the filters (and postcode), after
   // which the page behaves exactly as if the user had chosen them.
-  const [urlPostcode] = useState(() => searchParams.get("postcode")?.trim().slice(0, 8) ?? "");
-  const [filters, setFilters] = useState(() => filtersFromParams(searchParams));
+  const [urlPostcode] = useState(() => initialPostcode.trim().slice(0, 8));
+  const [filters, setFilters] = useState(() => initialFilters);
   const [makes, setMakes] = useState<string[]>([]);
   const [models, setModels] = useState<string[]>([]);
   const [adverts, setAdverts] = useState<any[]>(initialAdverts ?? []);
