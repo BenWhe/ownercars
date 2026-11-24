@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ADVERT_STATUS } from "@/lib/adverts/lifecycle";
 import { checkContactDetails, CONTACT_DETAILS_MESSAGE, type ContactReason } from "@/lib/messages/contactDetails";
 import type { RequestContext } from "@/lib/security/requestContext";
+import { assessHold, getTrustStatus } from "@/lib/messages/review";
 
 // The single path for creating buyer/seller messages.
 //
@@ -23,22 +24,24 @@ export function createAdminClient(): SupabaseClient | null {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-export async function canSendMessage(
+type Permission = { allowed: false } | { allowed: true; senderIsSeller: boolean };
+
+async function checkPermission(
   admin: SupabaseClient,
   { advertId, senderId, recipientId }: { advertId: string; senderId: string; recipientId: string }
-): Promise<boolean> {
-  if (!advertId || !senderId || !recipientId || senderId === recipientId) return false;
+): Promise<Permission> {
+  if (!advertId || !senderId || !recipientId || senderId === recipientId) return { allowed: false };
 
   const { data: advert } = await admin
     .from("adverts")
     .select("id, seller_id, status")
     .eq("id", advertId)
     .maybeSingle();
-  if (!advert) return false;
+  if (!advert) return { allowed: false };
 
   // 1. Buyer → seller about a published advert.
   if (advert.status === ADVERT_STATUS.PUBLISHED && advert.seller_id === recipientId) {
-    return true;
+    return { allowed: true, senderIsSeller: false };
   }
 
   // 2. Seller → someone who has already messaged them about this advert.
@@ -49,10 +52,17 @@ export async function canSendMessage(
       .eq("advert_id", advertId)
       .eq("sender_id", recipientId)
       .eq("recipient_id", senderId);
-    return (count ?? 0) > 0;
+    return (count ?? 0) > 0 ? { allowed: true, senderIsSeller: true } : { allowed: false };
   }
 
-  return false;
+  return { allowed: false };
+}
+
+export async function canSendMessage(
+  admin: SupabaseClient,
+  ids: { advertId: string; senderId: string; recipientId: string }
+): Promise<boolean> {
+  return (await checkPermission(admin, ids)).allowed;
 }
 
 export type SendResult =
@@ -61,7 +71,10 @@ export type SendResult =
 
 /**
  * Checks the text for contact details (blocking and logging the attempt if
- * found), checks permission, then inserts the message with where it came from.
+ * found), refuses suspended accounts, checks permission, decides whether a
+ * buyer's message must be held for review, then inserts it with where it
+ * came from. Held messages are stored as "pending" and are invisible to the
+ * recipient until approved.
  */
 export async function sendMessage(
   admin: SupabaseClient,
@@ -81,9 +94,25 @@ export async function sendMessage(
     return { ok: false, status: 422, error: CONTACT_DETAILS_MESSAGE, code: "CONTACT_DETAILS" };
   }
 
-  if (!(await canSendMessage(admin, { advertId, senderId, recipientId }))) {
+  const trust = await getTrustStatus(admin, senderId);
+  if (trust === "suspended") {
+    return {
+      ok: false,
+      status: 403,
+      error: "This account can't send messages. If you think this is a mistake, email contact@ownercars.co.uk.",
+      code: "ACCOUNT_SUSPENDED",
+    };
+  }
+
+  const permission = await checkPermission(admin, { advertId, senderId, recipientId });
+  if (!permission.allowed) {
     return { ok: false, status: 403, error: "Not authorised to send this message." };
   }
+
+  // Sellers replying on their own advert are never held.
+  const holdReasons = permission.senderIsSeller
+    ? []
+    : await assessHold(admin, { advertId, senderId, body, context, trust });
 
   const { data: message, error } = await admin
     .from("messages")
@@ -92,13 +121,15 @@ export async function sendMessage(
       sender_id: senderId,
       recipient_id: recipientId,
       body,
+      status: holdReasons.length ? "pending" : "delivered",
+      hold_reasons: holdReasons,
       sender_ip: context.ip,
       sender_country: context.country,
       sender_region: context.region,
       sender_city: context.city,
       sender_user_agent: context.userAgent,
     })
-    .select("id, advert_id, sender_id, recipient_id, body, created_at, read_at")
+    .select("id, advert_id, sender_id, recipient_id, body, created_at, read_at, status")
     .single();
 
   if (error || !message) {
@@ -106,8 +137,8 @@ export async function sendMessage(
   }
 
   // Never hand the sender_* evidence columns back to a client.
-  const { id, advert_id, sender_id, recipient_id, body: text, created_at, read_at } = message as Record<string, unknown>;
-  return { ok: true, message: { id, advert_id, sender_id, recipient_id, body: text, created_at, read_at } };
+  const { id, advert_id, sender_id, recipient_id, body: text, created_at, read_at, status } = message as Record<string, unknown>;
+  return { ok: true, message: { id, advert_id, sender_id, recipient_id, body: text, created_at, read_at, status } };
 }
 
 async function logBlockedMessage(

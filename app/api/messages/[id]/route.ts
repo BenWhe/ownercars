@@ -7,6 +7,7 @@ import { messageThreadId, parseMessageThreadId } from "@/lib/messages/thread";
 import { createAdminClient, sendMessage } from "@/lib/messages/send";
 import { MESSAGE_PUBLIC_COLUMNS } from "@/lib/messages/columns";
 import { getRequestContext } from "@/lib/security/requestContext";
+import { notifyAdminOfHeldMessage } from "@/lib/messages/review";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -165,6 +166,13 @@ export async function POST(request: NextRequest, context: Context) {
   }
 
   const message = sent.message;
+
+  // Held for review: the recipient can't see it yet, so alert the admin
+  // instead of emailing the recipient (they're emailed on approval).
+  if (message.status === "pending") {
+    await notifyAdminOfHeldMessage(admin, String(message.id));
+    return NextResponse.json({ message });
+  }
 
   // Notify the recipient — non-blocking, failures never block the message send
   try {

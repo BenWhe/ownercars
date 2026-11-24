@@ -76,6 +76,9 @@ export async function POST(request: NextRequest) {
     .from("messages")
     .select("id", { count: "exact", head: true })
     .eq("advert_id", advert_id)
+    // Only delivered messages count: a buyer whose first message is still
+    // held for review can't send document requests yet.
+    .eq("status", "delivered")
     .or(
       `and(sender_id.eq.${user.id},recipient_id.eq.${advert.seller_id}),` +
       `and(sender_id.eq.${advert.seller_id},recipient_id.eq.${user.id})`
