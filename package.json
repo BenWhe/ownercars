@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:contact": "node --experimental-strip-types scripts/test-contact-details.ts"
+    "test:contact": "node --experimental-strip-types scripts/test-contact-details.ts",
+    "test:identity": "node --experimental-strip-types scripts/test-identity-checks.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

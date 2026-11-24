@@ -57,6 +57,11 @@ const PROTECTIONS: { name: string; detail: string }[] = [
       "The same text sent about different adverts, or one account messaging three or more adverts within 15 minutes, is held for review.",
   },
   {
+    name: "Real-identity checks",
+    detail:
+      "Buyers must confirm their email and give a first name, surname and postcode before messaging. Accounts using landmark or example postcodes, made-up names or throwaway email addresses are held for review.",
+  },
+  {
     name: "Single secure send path",
     detail:
       "Every message goes through these checks on our server. Accounts can't write messages directly to the database.",
@@ -144,8 +149,10 @@ export default async function SecurityDashboardPage() {
               <dl>
                 <dt>From</dt>
                 <dd>
-                  {m.senderEmail ?? "Unknown"} · signed up {ago(m.senderSignedUp)}
+                  {m.senderName ?? "No name"} · {m.senderEmail ?? "Unknown"} · signed up {ago(m.senderSignedUp)}
                 </dd>
+                <dt>Postcode given</dt>
+                <dd>{m.senderPostcode ?? "None"}</dd>
                 <dt>Sent from</dt>
                 <dd>
                   {m.where} · IP {m.ip ?? "unknown"}
@@ -278,6 +285,7 @@ export default async function SecurityDashboardPage() {
                 <th>Postcode</th>
                 <th>Status</th>
                 <th>Messages sent</th>
+                <th>Flags</th>
               </tr>
             </thead>
             <tbody>
@@ -292,6 +300,17 @@ export default async function SecurityDashboardPage() {
                     <span className={`sec-badge ${u.trust}`}>{u.trust}</span>
                   </td>
                   <td>{u.messagesSent}</td>
+                  <td>
+                    {u.flags.length ? (
+                      u.flags.map((f) => (
+                        <span key={f} className="sec-flag">
+                          {f}
+                        </span>
+                      ))
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { checkFullName, NAME_PROBLEM_MESSAGES } from "@/lib/security/identityChecks";
 
 function createAuthClient(cookieStore: Awaited<ReturnType<typeof cookies>>) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -108,8 +109,14 @@ export async function PATCH(request: NextRequest) {
   }
 
   if ("full_name" in body) {
-    const trimmed = typeof body.full_name === "string" ? body.full_name.trim() : "";
-    updates.full_name = trimmed || null;
+    const trimmed = typeof body.full_name === "string" ? body.full_name.trim().replace(/\s+/g, " ") : "";
+    // First name and surname required (same rule as sign-up). Names that
+    // only look made up are accepted here and flagged when messaging.
+    const nameProblem = checkFullName(trimmed);
+    if (nameProblem && nameProblem !== "suspect") {
+      return NextResponse.json({ error: NAME_PROBLEM_MESSAGES[nameProblem] }, { status: 400 });
+    }
+    updates.full_name = trimmed;
   }
 
   const admin = createClient(supabaseUrl, serviceRoleKey);
