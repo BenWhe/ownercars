@@ -1,5 +1,20 @@
 import Link from "next/link";
 import { LAUNCH_FREE_LISTING } from "@/lib/payments/config";
+import { pageMetadata } from "@/lib/seo/site";
+
+export const metadata = LAUNCH_FREE_LISTING
+  ? pageMetadata({
+      title: "Pricing: free to list during launch",
+      description:
+        "No listing fee and no commission during launch. Adverts published now stay free until sold. Private sellers only, with no upgrade packages.",
+      path: "/pricing",
+    })
+  : pageMetadata({
+      title: "Pricing: one fixed price, advertise until sold",
+      description:
+        "One fixed price to advertise your car privately until it sells. No commission and no upgrade packages. Private sellers only.",
+      path: "/pricing",
+    });
 
 export default function PricingPage() {
   return (

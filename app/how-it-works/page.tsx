@@ -1,5 +1,14 @@
 import Link from "next/link";
 import { LAUNCH_FREE_LISTING } from "@/lib/payments/config";
+import { pageMetadata } from "@/lib/seo/site";
+
+export const metadata = pageMetadata({
+  title: "How it works: sell your car in five steps",
+  description: LAUNCH_FREE_LISTING
+    ? "Create your advert, add up to 10 photos, publish free during launch, talk to buyers securely through OwnerCars and mark it sold. Here's how it works."
+    : "Create your advert, add up to 10 photos, publish, talk to buyers securely through OwnerCars and mark it sold. Here's how it works.",
+  path: "/how-it-works",
+});
 
 export default function HowItWorksPage() {
   return (
