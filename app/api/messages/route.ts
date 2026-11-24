@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ADVERT_STATUS } from "@/lib/adverts/lifecycle";
 import { messageThreadId } from "@/lib/messages/thread";
 import { geocodePostcode } from "@/lib/geocode/lookup";
+import { createAdminClient, sendMessage } from "@/lib/messages/send";
+import { getRequestContext } from "@/lib/security/requestContext";
 
 function createSupabase(cookieStore: Awaited<ReturnType<typeof cookies>>) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -180,20 +182,26 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { data: message, error } = await supabase
-    .from("messages")
-    .insert({
-      advert_id: advert.id,
-      sender_id: user.id,
-      recipient_id: advert.seller_id,
-      body,
-    })
-    .select("id, advert_id, sender_id, recipient_id, body, created_at")
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  // Single send path: contact-detail filter, permission check, and insert
+  // (with sender IP/location/device) using the service role.
+  const admin = createAdminClient();
+  if (!admin) {
+    return NextResponse.json({ error: "Server configuration error." }, { status: 500 });
   }
+
+  const sent = await sendMessage(admin, {
+    advertId: advert.id,
+    senderId: user.id,
+    recipientId: advert.seller_id,
+    body,
+    context: getRequestContext(request),
+  });
+
+  if (!sent.ok) {
+    return NextResponse.json({ error: sent.error, code: sent.code }, { status: sent.status });
+  }
+
+  const message = sent.message;
 
   // Send email notification to recipient — non-blocking
   try {
