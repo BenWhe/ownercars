@@ -6,6 +6,7 @@ import PromoteAdvertTools from "@/app/components/PromoteAdvertTools";
 import { DownloadForSaleCardButton } from "@/app/components/ForSaleCard";
 import ExampleAdvertPlaceholder from "@/app/components/ExampleAdvertPlaceholder";
 import ShareAdvertButton from "@/app/components/ShareAdvertButton";
+import type { PublicAdvert } from "@/lib/adverts/publicAdvert";
 
 function capitaliseWords(str?: string) {
   if (!str) return "";
@@ -25,15 +26,22 @@ function advertDisplayTitle(advert: any) {
   return title || advert.title || "Private car advert";
 }
 
-export default function AdvertClient() {
+type AdvertClientProps = {
+  // Server-rendered advert (published only). When present the page renders
+  // immediately on the server and the client fetch below is skipped.
+  initialAdvert?: PublicAdvert;
+  initialIsOwner?: boolean;
+};
+
+export default function AdvertClient({ initialAdvert, initialIsOwner = false }: AdvertClientProps = {}) {
   const params = useParams();
   const router = useRouter();
 
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [advert, setAdvert] = useState<any>(null);
-  const [isAdvertOwner, setIsAdvertOwner] = useState<boolean>(false);
-  const [message, setMessage] = useState("Loading advert...");
-  const [loading, setLoading] = useState(true);
+  const [advert, setAdvert] = useState<any>(initialAdvert ?? null);
+  const [isAdvertOwner, setIsAdvertOwner] = useState<boolean>(initialIsOwner);
+  const [message, setMessage] = useState(initialAdvert ? "" : "Loading advert...");
+  const [loading, setLoading] = useState(!initialAdvert);
   const [sellerMessageBody, setSellerMessageBody] = useState("");
   const [sellerMessageStatus, setSellerMessageStatus] = useState("");
   const touchStartX = useRef<number | null>(null);
@@ -55,8 +63,8 @@ export default function AdvertClient() {
       setLoading(false);
     }
 
-    if (params.id) fetchAdvert();
-  }, [params.id]);
+    if (params.id && !initialAdvert) fetchAdvert();
+  }, [params.id, initialAdvert]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -161,7 +169,8 @@ export default function AdvertClient() {
             <img
               className="advert-photo-main-img"
               src={advert.advert_photos[0].image_url}
-              alt={displayTitle}
+              alt={`${displayTitle}, photo 1 of ${advert.advert_photos.length}`}
+              fetchPriority="high"
               onClick={() => {
                 touchStartX.current = null;
                 setActiveIndex(0);
@@ -180,7 +189,8 @@ export default function AdvertClient() {
                 <img
                   key={photo.id}
                   src={photo.image_url}
-                  alt={`${displayTitle} thumbnail ${i + 2}`}
+                  alt={`${displayTitle}, photo ${i + 2} of ${advert.advert_photos.length}`}
+                  loading="lazy"
                   onClick={() => setActiveIndex(i + 1)}
                   style={{ cursor: "zoom-in" }}
                 />
@@ -200,11 +210,11 @@ export default function AdvertClient() {
 
             <div className="advert-summary-row">
               <span className="advert-price">
-                £{Number(advert.price).toLocaleString()}
+                £{Number(advert.price).toLocaleString("en-GB")}
               </span>
 
               <span className="advert-mileage">
-                {Number(advert.mileage).toLocaleString()} miles
+                {Number(advert.mileage).toLocaleString("en-GB")} miles
               </span>
 
               {advert.nearest_town && (
@@ -247,7 +257,7 @@ export default function AdvertClient() {
             </div>
             <ShareAdvertButton
               advertId={advert.id}
-              shareText={`${displayTitle} — £${Number(advert.price).toLocaleString()} on OwnerCars`}
+              shareText={`${displayTitle} — £${Number(advert.price).toLocaleString("en-GB")} on OwnerCars`}
             />
           </div>
 
