@@ -4,6 +4,9 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
 import { messageThreadId, parseMessageThreadId } from "@/lib/messages/thread";
+import { createAdminClient, sendMessage } from "@/lib/messages/send";
+import { MESSAGE_PUBLIC_COLUMNS } from "@/lib/messages/columns";
+import { getRequestContext } from "@/lib/security/requestContext";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -46,7 +49,7 @@ export async function GET(req: NextRequest, context: Context) {
 
   const { data: messages, error: messagesError } = await supabase
     .from("messages")
-    .select("*")
+    .select(MESSAGE_PUBLIC_COLUMNS)
     .eq("advert_id", advertId)
     .or(`and(sender_id.eq.${user.id},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${user.id})`)
     .order("created_at", { ascending: true });
@@ -142,20 +145,26 @@ export async function POST(request: NextRequest, context: Context) {
     return NextResponse.json({ error: "Not authorised to reply to this conversation." }, { status: 403 });
   }
 
-  const { data: message, error } = await supabase
-    .from("messages")
-    .insert({
-      advert_id: advertId,
-      sender_id: user.id,
-      recipient_id: otherUserId,
-      body,
-    })
-    .select("*")
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  // Single send path: contact-detail filter, permission check (same rules as
+  // the old RLS insert policy), and insert with sender IP/location/device.
+  const admin = createAdminClient();
+  if (!admin) {
+    return NextResponse.json({ error: "Server configuration error." }, { status: 500 });
   }
+
+  const sent = await sendMessage(admin, {
+    advertId,
+    senderId: user.id,
+    recipientId: otherUserId,
+    body,
+    context: getRequestContext(request),
+  });
+
+  if (!sent.ok) {
+    return NextResponse.json({ error: sent.error, code: sent.code }, { status: sent.status });
+  }
+
+  const message = sent.message;
 
   // Notify the recipient — non-blocking, failures never block the message send
   try {

@@ -26,7 +26,7 @@ export async function GET() {
 
   const { count, error } = await supabase
     .from("messages")
-    .select("*", { count: "exact", head: true })
+    .select("id", { count: "exact", head: true })
     .eq("recipient_id", user.id)
     .is("read_at", null);
 

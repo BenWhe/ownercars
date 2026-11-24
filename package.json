@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:contact": "node --experimental-strip-types scripts/test-contact-details.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
