@@ -4,4 +4,4 @@
 // rather than "*" (and signed-in users only have SELECT on these columns).
 export const MESSAGE_PUBLIC_COLUMNS =
   "id, advert_id, sender_id, recipient_id, body, read_at, created_at, " +
-  "event_type, document_type, signed_url, url_expires_at";
+  "event_type, document_type, signed_url, url_expires_at, status";

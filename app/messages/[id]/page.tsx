@@ -276,6 +276,13 @@ export default function MessageThreadPage() {
               >
                 <p>{msg.body}</p>
                 <time>{formatMessageDate(msg.created_at)}</time>
+                {ownMessage && msg.status && msg.status !== "delivered" && (
+                  // Held for a safety check. Rejected messages show the same
+                  // label, so the outcome isn't revealed to the sender.
+                  <span className="message-pending-note">
+                    Being checked. We&rsquo;ll deliver it once it has passed our safety checks.
+                  </span>
+                )}
               </div>
             );
           })}
