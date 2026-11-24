@@ -70,6 +70,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Sellers cannot request their own documents." }, { status: 403 });
   }
 
+  // The request always goes to this advert's seller, whatever the thread id
+  // names, so it can't be used to drop a message into anyone else's inbox.
+  if (sellerId !== advert.seller_id) {
+    return NextResponse.json({ error: "Invalid thread_id." }, { status: 400 });
+  }
+
   // Require an existing message thread — buyer must have messaged the seller
   // first. Guards against thread injection by unrelated authenticated users.
   const { count: threadCount } = await supabase

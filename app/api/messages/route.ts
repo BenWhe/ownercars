@@ -86,6 +86,18 @@ export async function GET() {
     }
   }
 
+  // Fill in car titles the user's own database session can't see (sold or
+  // paused adverts) using the server key, for adverts they're messaging about.
+  const missing = [...new Set([...conversations.values()].filter((c) => !c.adverts).map((c) => c.advert_id))];
+  const admin = missing.length ? createAdminClient() : null;
+  if (admin) {
+    const { data: rows } = await admin.from("adverts").select("id, year, make, model, price").in("id", missing);
+    const byId = new Map((rows ?? []).map((r) => [r.id, r]));
+    for (const c of conversations.values()) {
+      if (!c.adverts) c.adverts = byId.get(c.advert_id) ?? null;
+    }
+  }
+
   return NextResponse.json({ conversations: Array.from(conversations.values()), userId: user.id });
 }
 

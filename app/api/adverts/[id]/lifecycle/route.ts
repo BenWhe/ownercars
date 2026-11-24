@@ -6,6 +6,15 @@ import { ADVERT_STATUS, nextConfirmationDueDate } from "@/lib/adverts/lifecycle"
 
 type Action = "pause" | "reactivate" | "sold";
 
+// Which states each action may start from. "reactivate" only resumes an
+// advert that was already live and then paused: it must never publish a
+// draft or an unpaid advert, which would skip checkout and its checks.
+const ALLOWED_FROM: Record<Action, string[]> = {
+  pause: [ADVERT_STATUS.PUBLISHED],
+  reactivate: [ADVERT_STATUS.PAUSED],
+  sold: [ADVERT_STATUS.DRAFT, ADVERT_STATUS.PENDING_PAYMENT, ADVERT_STATUS.PUBLISHED, ADVERT_STATUS.PAUSED],
+};
+
 function targetForAction(action: Action) {
   switch (action) {
     case "pause":
@@ -99,6 +108,7 @@ export async function POST(
     .update(update)
     .eq("id", id)
     .eq("seller_id", user.id)
+    .in("status", ALLOWED_FROM[action])
     .select("id, status")
     .maybeSingle();
 
@@ -108,8 +118,8 @@ export async function POST(
 
   if (!data) {
     return NextResponse.json(
-      { error: "Not authorised to manage this advert." },
-      { status: 403 }
+      { error: "This advert can't be changed that way. Only a paused advert can be reactivated." },
+      { status: 409 }
     );
   }
 
