@@ -42,7 +42,48 @@ const DOMAIN =
 const ALLOWED_DOMAINS = /\b(www\.)?ownercars\.co\.uk\b/gi;
 
 const MESSAGING_APP =
-  /\b(whats\s*-?\s*app|whatapp|watsapp|wats\s*app|whtsapp|w\/app|wapp|telegram|viber|wechat|imessage|signal\s+(me|app)|on\s+signal|snapchat|facebook\s+messenger)\b/i;
+  /\b(whats\s*-?\s*app|whatapp|watsapp|wats\s*app|whtsapp|w\s*[./]\s*app|wapp|telegram|viber|wechat|imessage|signal\s+(me|app)|on\s+signal|snapchat|facebook\s+messenger|instagram|insta|messenger)\b/i;
+
+// Email providers named on their own ("my gmail is…", "find me on hotmail").
+const EMAIL_PROVIDER = /\b(gmail|googlemail|hotmail|yahoo|icloud|protonmail|aol|btinternet)\b/i;
+
+// A UK mobile number once disguises are undone: digits separated by dots,
+// slashes, underscores or asterisks as well as spaces and dashes. Exact
+// length (07 + 9 digits, or 44 7 + 9 digits) so dates and prices can't
+// match: "07/12/2025 13:00" has a colon and too few digits.
+const MOBILE_SEP = "[\\s.\\-()/_*]*";
+const UK_MOBILE = new RegExp(
+  `(?<!\\d)(?:\\+?${MOBILE_SEP}4${MOBILE_SEP}4${MOBILE_SEP}(?:\\(?0\\)?)?|0)${MOBILE_SEP}7(?:${MOBILE_SEP}\\d){9}(?!${MOBILE_SEP}\\d)`,
+);
+
+const WORD_DIGITS: [RegExp, string][] = [
+  [/zero|nought/gi, "0"], [/one/gi, "1"], [/two/gi, "2"], [/three/gi, "3"], [/four/gi, "4"],
+  [/five/gi, "5"], [/six/gi, "6"], [/seven/gi, "7"], [/eight/gi, "8"], [/nine/gi, "9"],
+];
+
+// Undo the usual disguises before looking for a mobile number: keycap emoji
+// (0️⃣), number words run together ("zero7four4"), and the letters O, l and I
+// used for 0 and 1 inside a run of digits ("O7447464O97").
+function undisguiseDigits(text: string): string {
+  let t = text.replace(/[\uFE0F\u20E3]/g, "");
+  for (const [word, digit] of WORD_DIGITS) t = t.replace(word, digit);
+  return t
+    .split(/(\s+)/)
+    .map((token) => (/\d/.test(token) && /^[\d.\-()/_*+oOlI|]+$/.test(token) ? token.replace(/[oO]/g, "0").replace(/[lI|]/g, "1") : token))
+    .join("");
+}
+
+// "W h a t s A p p", "T.e.l.e.g.r.a.m": single letters with gaps between.
+// Only runs of single characters are joined, so ordinary words next to each
+// other ("what's appealing") are never merged.
+function joinSpacedLetters(text: string): string {
+  return text.replace(/\b(?:[a-z@][\s.\-_*]+){3,}[a-z@]\b/gi, (m) => m.replace(/[\s.\-_*]+/g, ""));
+}
+
+// wh@tsapp, wh4tsapp, te1egram
+function undoLeetspeak(text: string): string {
+  return text.replace(/@/g, "a").replace(/4/g, "a").replace(/3/g, "e").replace(/0/g, "o").replace(/1/g, "l").replace(/\$/g, "s");
+}
 
 // "text me on…", "my mobile is…". "Message me on here / on OwnerCars" is fine.
 const CONTACT_REQUEST =
@@ -84,11 +125,14 @@ export function checkContactDetails(body: string): ContactCheck {
   const text = body.normalize("NFKC");
   const withoutOwnLinks = text.replace(ALLOWED_DOMAINS, " ");
 
-  if (hasPhoneNumber(text)) reasons.add("phone");
+  if (hasPhoneNumber(text) || UK_MOBILE.test(undisguiseDigits(text))) reasons.add("phone");
   if (hasPhoneInWords(text)) reasons.add("phone_words");
-  if (EMAIL.test(text) || EMAIL_SPELLED.test(text)) reasons.add("email");
+  if (EMAIL.test(text) || EMAIL_SPELLED.test(text) || EMAIL_PROVIDER.test(withoutOwnLinks)) reasons.add("email");
   if (LINK.test(withoutOwnLinks) || DOMAIN.test(withoutOwnLinks)) reasons.add("link");
-  if (MESSAGING_APP.test(text)) reasons.add("messaging_app");
+  const lettersJoined = joinSpacedLetters(text);
+  if (MESSAGING_APP.test(text) || MESSAGING_APP.test(lettersJoined) || MESSAGING_APP.test(undoLeetspeak(lettersJoined))) {
+    reasons.add("messaging_app");
+  }
   if (CONTACT_REQUEST.test(text)) reasons.add("contact_request");
 
   return { blocked: reasons.size > 0, reasons: [...reasons] };

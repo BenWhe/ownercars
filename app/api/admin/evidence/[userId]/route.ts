@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/admin/session";
 import { createAdminClient } from "@/lib/messages/send";
 import { getTrustStatus } from "@/lib/messages/review";
+import { isBrowserUserAgent, NON_BROWSER_NOTE } from "@/lib/security/clientKind";
 
 type Context = { params: Promise<{ userId: string }> };
 
@@ -91,9 +92,15 @@ export async function GET(_req: NextRequest, context: Context) {
       `Text: ${b.body}`
     );
   }
-  lines.push("", `SIGN-UP AND SIGN-IN IP ADDRESSES (${authIps.length}) — recorded by our authentication provider`);
+  lines.push(
+    "",
+    `SIGN-IN SESSIONS (${authIps.length}) — recorded by our authentication provider`,
+    "Only sessions still open are held, so older ones may be missing. Each line says whether a web",
+    "browser opened the session; only browser sessions show the account holder's own connection."
+  );
   for (const a of [...authIps].sort((x, y) => x.seen_at.localeCompare(y.seen_at))) {
-    lines.push(`${a.seen_at} · ${a.source} · IP ${a.ip}${a.user_agent ? ` · ${a.user_agent}` : ""}`);
+    const kind = isBrowserUserAgent(a.user_agent) ? "web browser" : NON_BROWSER_NOTE;
+    lines.push(`${a.seen_at} · IP ${a.ip} · ${kind}`, `  Device: ${a.user_agent ?? "not recorded"}`);
   }
   lines.push("", `SITE VISITS BY IP ADDRESS (${visits.length})`);
   for (const v of visits as any[]) { // eslint-disable-line @typescript-eslint/no-explicit-any

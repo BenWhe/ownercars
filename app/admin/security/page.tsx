@@ -351,7 +351,7 @@ export default async function SecurityDashboardPage() {
                 <th>Postcode</th>
                 <th>Status</th>
                 <th>Messages sent</th>
-                <th>Sign-up IP</th>
+                <th title="Earliest IP of a browser sign-in we still hold">First browser IP</th>
                 <th>Last seen from</th>
                 <th>Flags</th>
               </tr>
