@@ -32,6 +32,7 @@ type DashboardAdvert = {
 export default function DashboardPage() {
   const [adverts, setAdverts] = useState<DashboardAdvert[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [message, setMessage] = useState("Loading your adverts...");
 
   async function updateLifecycle(advertId: string, action: "pause" | "reactivate" | "sold") {
@@ -71,6 +72,7 @@ export default function DashboardPage() {
 
       setAdverts(result.adverts || []);
       setUnreadCount(result.unreadCount || 0);
+      setIsAdmin(result.isAdmin === true);
       setMessage("");
     }
 
@@ -94,6 +96,12 @@ export default function DashboardPage() {
         {unreadCount > 0 && (
           <Link className="dashboard-message-alert" href="/messages">
             You have {unreadCount} unread message{unreadCount === 1 ? "" : "s"}
+          </Link>
+        )}
+
+        {isAdmin && (
+          <Link className="dashboard-message-alert" href="/admin/security">
+            Security dashboard →
           </Link>
         )}
       </section>

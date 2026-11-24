@@ -9,6 +9,12 @@ const block = [
  "see https://example.com", "www.carbuyer.net", "wa.me/447460680493", "t.me/bob",
  "please WhatsApp me to finalise", "whats app me", "Whats-App", "message me on telegram",
  "my mobile is 07...", "my number: 0746", "My email - x",
+ // Disguises scammers use to get a number or app past a filter
+ "call 07447.464.097", "07447/464/097", "O7447464O97", "0744 7464 O97", "07447_464_097", "07447*464*097",
+ "0\uFE0F\u20E37\uFE0F\u20E34\uFE0F\u20E34\uFE0F\u20E37\uFE0F\u20E34\uFE0F\u20E36\uFE0F\u20E34\uFE0F\u20E30\uFE0F\u20E39\uFE0F\u20E37\uFE0F\u20E3",
+ "zero7four4seven4six4zero9seven", "+44.7447.464.097", "44/7447/464097",
+ "W h a t s A p p", "W.h.a.t.s.a.p.p me", "wh@tsapp me", "wh4tsapp", "drop me a message on w.app", "T e l e g r a m",
+ "find me on insta", "my gmail is harley.flynn999", "add me on hotmail",
 ];
 const allow = [
  "Is it still available? Could I view it on 24/11/2026 13:00?",
@@ -23,6 +29,9 @@ const allow = [
  "Price 8995, mileage 44980, year 2009",
  "I have two kids and one dog, need 5 seats",
  "text me on here pls",
+ "Could I view on 07/12/2025 13:00?", "Viewing 07/12/2025 at 1300 ok?", "Reg 07 plate, 74,000 miles, £7,450",
+ "What's appealing about it? Did you install the stereo?", "The outlook for classics is good", "Someone told me it had one owner",
+ "Weight 1,450kg, 0-60 in 7.4s", "Is the 4x4 system working?", "I am a cash buyer",
 ];
 let fail=0;
 if (process.argv.includes("--list")) console.log(block, allow);

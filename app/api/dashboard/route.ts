@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/messages/send";
+import { isAdmin } from "@/lib/messages/review";
 
 export async function GET() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -70,5 +72,15 @@ export async function GET() {
     return NextResponse.json({ error: unreadError.message }, { status: 400 });
   }
 
-  return NextResponse.json({ adverts, userId: user.id, unreadCount: unreadCount || 0 });
+  // Admins get a link to the security dashboard. A failure here must never
+  // stop a seller seeing their adverts.
+  let admin = false;
+  try {
+    const adminClient = createAdminClient();
+    admin = adminClient ? await isAdmin(adminClient, user.id) : false;
+  } catch {
+    admin = false;
+  }
+
+  return NextResponse.json({ adverts, userId: user.id, unreadCount: unreadCount || 0, isAdmin: admin });
 }

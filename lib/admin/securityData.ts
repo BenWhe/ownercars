@@ -6,6 +6,7 @@ import { REPORT_REASONS, type ReportReason } from "@/lib/messages/reportReasons"
 import type { ContactReason } from "@/lib/messages/contactDetails";
 import { vehicleName } from "@/lib/seo/vehicle";
 import { checkFullName, isDisposableEmail, isLandmarkPostcode } from "@/lib/security/identityChecks";
+import { isBrowserUserAgent } from "@/lib/security/clientKind";
 
 export const CONTACT_REASON_LABELS: Record<ContactReason, string> = {
   phone: "Phone number",
@@ -68,7 +69,7 @@ export type AccountOfConcern = {
 };
 
 export type IpSummary = {
-  signupIp: string | null; // earliest IP Supabase Auth recorded
+  signupIp: string | null; // earliest IP of a browser session Supabase Auth still holds
   distinctIps: number; // across sign-ins, site visits and messages
   lastSeen: { ip: string; where: string; at: string } | null; // latest site visit
   countries: string[]; // countries seen from site visits and messages
@@ -252,11 +253,15 @@ export async function loadSecurityDashboard(admin: SupabaseClient): Promise<Secu
   // ---- IP summaries -------------------------------------------------------
   // Sign-in IPs from Supabase Auth (via a service-role-only function), plus
   // site visits (account_ip_history) and message IPs.
+  // Only sessions opened by a real browser count: sessions opened by a
+  // program ("node" and similar) come from cloud servers, often abroad, and
+  // appear on genuine accounts too, so their IPs aren't the user's own.
   const authIps = new Map<string, { ip: string; at: string }[]>();
   try {
     const { data } = await admin.rpc("admin_auth_ip_history", { p_user_ids: null });
-    for (const row of (data ?? []) as { user_id: string | null; ip: string; seen_at: string }[]) {
+    for (const row of (data ?? []) as { user_id: string | null; ip: string; user_agent: string | null; seen_at: string }[]) {
       if (!row.user_id || !row.ip) continue;
+      if (!isBrowserUserAgent(row.user_agent)) continue;
       const list = authIps.get(row.user_id) ?? [];
       list.push({ ip: row.ip, at: row.seen_at });
       authIps.set(row.user_id, list);
@@ -286,7 +291,7 @@ export async function loadSecurityDashboard(admin: SupabaseClient): Promise<Secu
     const latest = visits[0];
     const flags: string[] = [];
     if (countries.some((c) => !UK.has(c))) flags.push("Seen outside UK");
-    if (distinct.size >= 5) flags.push(`${distinct.size} different IPs`);
+    if (distinct.size >= 5) flags.push("Many IPs");
     return {
       signupIp: auth[0]?.ip ?? null,
       distinctIps: distinct.size,

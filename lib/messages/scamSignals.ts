@@ -11,6 +11,7 @@ const SIGNALS: { pattern: RegExp; label: string }[] = [
   { pattern: /\b(v5c?|logbook|log\s+book)\b.*\b(photo|picture|pic|send|copy)\b|\b(photo|picture|pic|send|copy)\b.*\b(v5c?|logbook|log\s+book)\b/i, label: "a request for logbook photos" },
   { pattern: /\b(deposit|refund|overpa(y|id)|extra\s+money|reimburse)\b/i, label: "deposits, refunds or overpayment" },
   { pattern: /\b(outside|off)\s+(of\s+)?(this\s+)?(site|platform|ownercars|app)\b|\bmore\s+privately\b|\b(email|text|ring|call)\s+(you|me)\s+directly\b/i, label: "moving the conversation elsewhere" },
+  { pattern: /\b(whats\s*-?\s*app|whatapp|watsapp|telegram|viber|signal\s+(me|app)|on\s+signal|wechat|snapchat|instagram|insta)\b/i, label: "moving the conversation to WhatsApp or another app" },
   { pattern: /\b(abroad|overseas|offshore|working\s+on\s+(an\s+)?(oil\s+)?rig|deployed|at\s+sea)\b/i, label: "a buyer who says they're away" },
 ];
 
