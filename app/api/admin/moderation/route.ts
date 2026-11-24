@@ -17,12 +17,14 @@ import {
  *   email (so a decision can be made from a phone without logging in).
  * Account actions: { action: "suspend" | "unsuspend", userId }
  *   Signed-in admin only.
+ * Report actions: { action: "dismiss_report" | "action_report", reportId }
+ *   Signed-in admin only.
  */
 export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   if (!admin) return NextResponse.json({ error: "Server configuration error." }, { status: 500 });
 
-  let body: { action?: string; messageId?: string; userId?: string; token?: string };
+  let body: { action?: string; messageId?: string; userId?: string; token?: string; reportId?: string };
   try {
     body = await req.json();
   } catch {
@@ -51,6 +53,21 @@ export async function POST(req: NextRequest) {
     if (action === "suspend") await suspendAccount(admin, body.userId, adminUser.id, "Suspended from dashboard");
     else await unsuspendAccount(admin, body.userId, adminUser.id);
     return NextResponse.json({ ok: true });
+  }
+
+  if (action === "dismiss_report" || action === "action_report") {
+    if (!adminUser) return NextResponse.json({ error: "Not authorised." }, { status: 403 });
+    const reportId = body.reportId;
+    if (!reportId) return NextResponse.json({ error: "reportId is required." }, { status: 400 });
+    await admin
+      .from("message_reports")
+      .update({
+        status: action === "dismiss_report" ? "dismissed" : "actioned",
+        resolved_at: new Date().toISOString(),
+        resolved_by: adminUser.id,
+      })
+      .eq("id", reportId);
+    return NextResponse.json({ ok: true, status: action === "dismiss_report" ? "dismissed" : "actioned" });
   }
 
   return NextResponse.json({ error: "Unknown action." }, { status: 400 });

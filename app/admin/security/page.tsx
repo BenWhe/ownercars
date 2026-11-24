@@ -62,6 +62,21 @@ const PROTECTIONS: { name: string; detail: string }[] = [
       "Buyers must confirm their email and give a first name, surname and postcode before messaging. Accounts using landmark or example postcodes, made-up names or throwaway email addresses are held for review.",
   },
   {
+    name: "Seller reports",
+    detail:
+      "Sellers can report any message they receive. A reported account's messages are held for review again until the report has been looked at.",
+  },
+  {
+    name: "Scam warnings for sellers",
+    detail:
+      "Messages that mention common scam tactics (couriers, unusual payments, codes, logbook photos, pressure to finalise) carry a warning to the seller.",
+  },
+  {
+    name: "Account IP history",
+    detail:
+      "Sign-in IP addresses, and the IP address and approximate location each account uses the site from, are recorded so accounts can be checked before they message anyone.",
+  },
+  {
     name: "Single secure send path",
     detail:
       "Every message goes through these checks on our server. Accounts can't write messages directly to the database.",
@@ -118,6 +133,10 @@ export default async function SecurityDashboardPage() {
             <span>accounts suspended</span>
           </div>
           <div className="sec-stat">
+            <strong>{data.reports.length}</strong>
+            <span>open reports from sellers</span>
+          </div>
+          <div className="sec-stat">
             <strong>{s.messagesApproved}</strong>
             <span>messages approved after review</span>
           </div>
@@ -169,6 +188,42 @@ export default async function SecurityDashboardPage() {
       </section>
 
       <section className="sec-section">
+        <h2>
+          Reported by sellers <span className="sec-count">{data.reports.length}</span>
+        </h2>
+        {data.reports.length === 0 ? (
+          <p className="sec-empty">No open reports. Sellers can report any message they receive.</p>
+        ) : (
+          data.reports.map((r) => (
+            <article key={r.id} className="sec-card">
+              <header>
+                <strong>{r.advert}</strong>
+                <span>{fmt(r.createdAt)}</span>
+              </header>
+              <blockquote>{r.body}</blockquote>
+              <dl>
+                <dt>Reason</dt>
+                <dd>{r.reason}</dd>
+                <dt>Reported by</dt>
+                <dd>{r.reporterEmail ?? "Unknown"}</dd>
+                <dt>Sender</dt>
+                <dd>
+                  {r.reportedEmail ?? r.reportedUserId} · <span className={`sec-badge ${r.reportedTrust}`}>{r.reportedTrust}</span>{" "}
+                  · <a className="sec-link" href={`/api/admin/evidence/${r.reportedUserId}`}>Evidence</a>
+                </dd>
+              </dl>
+              <ModerationButtons
+                kind="report"
+                reportId={r.id}
+                reportedUserId={r.reportedUserId}
+                suspended={r.reportedTrust === "suspended"}
+              />
+            </article>
+          ))
+        )}
+      </section>
+
+      <section className="sec-section">
         <h2>Checks in place</h2>
         <ul className="sec-protections">
           {PROTECTIONS.map((p) => (
@@ -200,7 +255,9 @@ export default async function SecurityDashboardPage() {
                   <th>Blocked</th>
                   <th>Rejected</th>
                   <th>Pending</th>
+                  <th>Reports</th>
                   <th>Last seen from</th>
+                  <th>IPs</th>
                   <th />
                 </tr>
               </thead>
@@ -215,9 +272,18 @@ export default async function SecurityDashboardPage() {
                     <td>{a.blocked}</td>
                     <td>{a.rejected}</td>
                     <td>{a.pending}</td>
+                    <td>{a.reports}</td>
                     <td>
                       {a.lastSeenWhere}
                       {a.lastSeenIp ? ` · ${a.lastSeenIp}` : ""}
+                    </td>
+                    <td>
+                      {a.ips.distinctIps || "—"}
+                      {a.ips.flags.map((f) => (
+                        <span key={f} className="sec-flag">
+                          {f}
+                        </span>
+                      ))}
                     </td>
                     <td>
                       <a className="sec-link" href={`/api/admin/evidence/${a.userId}`}>
@@ -285,6 +351,8 @@ export default async function SecurityDashboardPage() {
                 <th>Postcode</th>
                 <th>Status</th>
                 <th>Messages sent</th>
+                <th>Sign-up IP</th>
+                <th>Last seen from</th>
                 <th>Flags</th>
               </tr>
             </thead>
@@ -300,9 +368,21 @@ export default async function SecurityDashboardPage() {
                     <span className={`sec-badge ${u.trust}`}>{u.trust}</span>
                   </td>
                   <td>{u.messagesSent}</td>
+                  <td>{u.ips.signupIp ?? "—"}</td>
                   <td>
-                    {u.flags.length ? (
-                      u.flags.map((f) => (
+                    {u.ips.lastSeen ? (
+                      <>
+                        {u.ips.lastSeen.where} · {u.ips.lastSeen.ip}
+                        <br />
+                        <span className="sec-small">{fmt(u.ips.lastSeen.at)}</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td>
+                    {[...u.flags, ...u.ips.flags].length ? (
+                      [...u.flags, ...u.ips.flags].map((f) => (
                         <span key={f} className="sec-flag">
                           {f}
                         </span>
