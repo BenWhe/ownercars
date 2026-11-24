@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { lookupVehicle, normaliseReg } from "@/lib/mot/client";
 import { geocodePostcode } from "@/lib/geocode/lookup";
+import { createAdminClient } from "@/lib/messages/send";
 
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -108,7 +109,14 @@ export async function POST(request: Request) {
     promo_code: null,
   };
 
-  const { data, error } = await supabase
+  // Inserted with the server key: signed-in users can't write to the adverts
+  // table directly, so status, payment and email fields can only be set here.
+  const admin = createAdminClient();
+  if (!admin) {
+    return NextResponse.json({ error: "Missing Supabase server environment variables" }, { status: 500 });
+  }
+
+  const { data, error } = await admin
     .from("adverts")
     .insert(payload)
     .select("id")

@@ -122,52 +122,6 @@ async function waitForAuthenticatedUser(): Promise<User | null> {
   });
 }
 
-function advertInsertPayload(sellerId: string, sellerEmail: string | undefined, draft: AdvertDraft) {
-  return {
-    seller_id: sellerId,
-    seller_email: sellerEmail,
-    title: `${draft.year} ${draft.make} ${draft.model}`.trim(),
-    make: draft.make,
-    model: draft.model,
-    year: Number(draft.year),
-    mileage: Number(draft.mileage),
-    fuel_type: draft.fuelType,
-    gearbox: draft.gearbox,
-    price: Number(draft.price),
-    body_type: draft.bodyType,
-    colour: draft.colour,
-    doors: Number(draft.doors),
-    seats: Number(draft.seats),
-    previously_written_off: draft.previouslyWrittenOff,
-    description: draft.description,
-    status: "draft",
-    paid: false,
-    promo_code: null,
-  };
-}
-
-async function createAdvertForUser(sellerId: string, sellerEmail: string | undefined, draft: AdvertDraft) {
-  const supabase = createClient();
-  const payload = advertInsertPayload(sellerId, sellerEmail, draft);
-
-  console.log(`${LOG_PREFIX} Supabase insert call`, {
-    table: "adverts",
-    method: "insert(...).select().single()",
-    payload,
-  });
-
-  const response = await supabase.from("adverts").insert(payload).select().single();
-
-  console.log(`${LOG_PREFIX} Supabase insert response`, {
-    data: response.data,
-    error: response.error,
-    status: response.status,
-    statusText: response.statusText,
-  });
-
-  return response;
-}
-
 export default function CreateAdvertResumePage() {
   const router = useRouter();
   const hasTriedResume = useRef(false);

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 import {
   escapePostgrestLikePattern,
   normalizePromoCode,
@@ -16,6 +18,21 @@ export async function POST(req: Request) {
       { error: "Missing Supabase server environment variables" },
       { status: 500 }
     );
+  }
+
+  // Signed-in sellers only (they're on their own publish page), so codes
+  // can't be guessed anonymously.
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!anonKey) {
+    return NextResponse.json({ error: "Missing Supabase server environment variables" }, { status: 500 });
+  }
+  const cookieStore = await cookies();
+  const supabaseAuth = createServerClient(supabaseUrl, anonKey, {
+    cookies: { getAll() { return cookieStore.getAll(); }, setAll() {} },
+  });
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "You must be logged in." }, { status: 401 });
   }
 
   let normalizedCode = "";

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
-import { DOCUMENT_DISPLAY_NAMES, isValidDocumentType } from "@/lib/vault/documents";
+import { DOCUMENT_DISPLAY_NAMES, isAllowedVideoUrl, isValidDocumentType } from "@/lib/vault/documents";
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -79,8 +79,8 @@ export async function POST(request: NextRequest) {
     if (!url) {
       return NextResponse.json({ error: "Missing url for video_link." }, { status: 400 });
     }
-    try { new URL(url); } catch {
-      return NextResponse.json({ error: "Invalid URL." }, { status: 400 });
+    if (!isAllowedVideoUrl(url)) {
+      return NextResponse.json({ error: "Please use a YouTube or Vimeo link for your video." }, { status: 400 });
     }
 
     const { error } = await supabase.from("vault_documents").upsert(

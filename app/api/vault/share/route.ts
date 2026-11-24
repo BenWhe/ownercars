@@ -2,8 +2,10 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
-import { isValidDocumentType, DOCUMENT_DISPLAY_NAMES } from "@/lib/vault/documents";
+import { isAllowedVideoUrl, isValidDocumentType, DOCUMENT_DISPLAY_NAMES } from "@/lib/vault/documents";
 import { messageThreadId, parseMessageThreadId } from "@/lib/messages/thread";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const SIGNED_URL_EXPIRY_SECONDS = 900; // 15 minutes
 
@@ -73,6 +75,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not authorised to share documents for this advert." }, { status: 403 });
   }
 
+  // Only share with a buyer who has actually messaged about this advert and
+  // whose message passed our checks. Without this, a seller could push a
+  // link into any user's inbox, skipping the contact filter and review hold.
+  if (!UUID_RE.test(buyerId) || buyerId === user.id) {
+    return NextResponse.json({ error: "Invalid thread_id." }, { status: 400 });
+  }
+  const { count: buyerMessages } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("advert_id", advert_id)
+    .eq("sender_id", buyerId)
+    .eq("recipient_id", user.id)
+    .eq("status", "delivered");
+  if (!buyerMessages) {
+    return NextResponse.json({ error: "You can only share documents with a buyer who has messaged you about this car." }, { status: 403 });
+  }
+
   // Fetch the vault document
   const { data: doc } = await supabase
     .from("vault_documents")
@@ -88,6 +107,10 @@ export async function POST(request: NextRequest) {
   const displayName = DOCUMENT_DISPLAY_NAMES[document_type];
   let signedUrl: string;
   let urlExpiresAt: string;
+
+  if (document_type === "video_link" && !isAllowedVideoUrl(doc.file_url)) {
+    return NextResponse.json({ error: "Please replace your video with a YouTube or Vimeo link before sharing it." }, { status: 400 });
+  }
 
   if (document_type === "video_link") {
     // Video links are stored as plain URLs — share directly

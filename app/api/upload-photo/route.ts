@@ -55,8 +55,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing file or advertId" }, { status: 400 });
   }
 
-  if (!file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "Only image files are allowed" }, { status: 400 });
+  // Photos are served publicly, so only accept ordinary photo formats. SVG
+  // and other "image" types can carry scripts; the file extension comes from
+  // the checked type, never from the uploaded file's name.
+  const PHOTO_TYPES: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/heic": "heic",
+    "image/heif": "heif",
+  };
+  const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
+  if (!PHOTO_TYPES[file.type]) {
+    return NextResponse.json({ error: "Please upload a JPEG, PNG, WebP or HEIC photo." }, { status: 400 });
+  }
+  if (file.size > MAX_PHOTO_BYTES) {
+    return NextResponse.json({ error: "That photo is too large. The limit is 20 MB." }, { status: 400 });
   }
 
   // All data operations use the service-role key so RLS join policies don't
@@ -79,18 +94,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Derive file extension from MIME type as a fallback to avoid bare filenames.
-  const mimeExt: Record<string, string> = {
-    "image/jpeg": "jpg",
-    "image/jpg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp",
-    "image/gif": "gif",
-    "image/heic": "heic",
-    "image/heif": "heif",
-  };
-  const extFromName = file.name.split(".").pop()?.toLowerCase();
-  const fileExt = extFromName || mimeExt[file.type] || "jpg";
+  const fileExt = PHOTO_TYPES[file.type];
   const filePath = `${advertId}/${Date.now()}.${fileExt}`;
 
   console.log("[upload-photo POST] uploading to storage path:", filePath);
