@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { HOLD_REASON_LABELS, type HoldReason, type TrustStatus } from "@/lib/messages/review";
+import { REPORT_REASONS, type ReportReason } from "@/lib/messages/reportReasons";
 import type { ContactReason } from "@/lib/messages/contactDetails";
 import { vehicleName } from "@/lib/seo/vehicle";
 import { checkFullName, isDisposableEmail, isLandmarkPostcode } from "@/lib/security/identityChecks";
@@ -60,8 +61,31 @@ export type AccountOfConcern = {
   blocked: number;
   rejected: number;
   pending: number;
+  reports: number;
   lastSeenIp: string | null;
   lastSeenWhere: string;
+  ips: IpSummary;
+};
+
+export type IpSummary = {
+  signupIp: string | null; // earliest IP Supabase Auth recorded
+  distinctIps: number; // across sign-ins, site visits and messages
+  lastSeen: { ip: string; where: string; at: string } | null; // latest site visit
+  countries: string[]; // countries seen from site visits and messages
+  flags: string[];
+};
+
+export type OpenReport = {
+  id: string;
+  createdAt: string;
+  reason: string;
+  messageId: string;
+  body: string;
+  advert: string;
+  reporterEmail: string | null;
+  reportedUserId: string;
+  reportedEmail: string | null;
+  reportedTrust: TrustStatus;
 };
 
 export type RecentSignup = {
@@ -74,6 +98,7 @@ export type RecentSignup = {
   trust: TrustStatus;
   messagesSent: number;
   flags: string[];
+  ips: IpSummary;
 };
 
 /** Sign-up details that look fake, for the dashboard. */
@@ -106,6 +131,7 @@ export type SecurityDashboardData = {
   blocked: BlockedAttempt[];
   accounts: AccountOfConcern[];
   signups: RecentSignup[];
+  reports: OpenReport[];
 };
 
 function where(city?: string | null, country?: string | null): string {
@@ -166,7 +192,7 @@ async function allUsers(admin: SupabaseClient): Promise<Map<string, User>> {
 }
 
 export async function loadSecurityDashboard(admin: SupabaseClient): Promise<SecurityDashboardData> {
-  const [last30, allTime, users, trustRows, heldRows, blockRows, rejectedRows, profiles, sentRows] = await Promise.all([
+  const [last30, allTime, users, trustRows, heldRows, blockRows, rejectedRows, profiles, sentRows, reportRows, activityRows, messageIpRows] = await Promise.all([
     stats(admin, 30),
     stats(admin, null),
     allUsers(admin),
@@ -198,12 +224,77 @@ export async function loadSecurityDashboard(admin: SupabaseClient): Promise<Secu
       .is("event_type", null)
       .limit(5000)
       .then((r) => r.data ?? []),
+    admin
+      .from("message_reports")
+      .select("id, created_at, reason, message_id, reporter_id, reported_user_id, status")
+      .order("created_at", { ascending: false })
+      .limit(200)
+      .then((r) => r.data ?? []),
+    admin
+      .from("account_ip_history")
+      .select("user_id, ip, country, region, city, last_seen_at")
+      .order("last_seen_at", { ascending: false })
+      .limit(5000)
+      .then((r) => r.data ?? []),
+    admin
+      .from("messages")
+      .select("sender_id, sender_ip, sender_country")
+      .not("sender_ip", "is", null)
+      .limit(5000)
+      .then((r) => r.data ?? []),
   ]);
 
   const trust = new Map<string, TrustStatus>(trustRows.map((t: { user_id: string; status: TrustStatus }) => [t.user_id, t.status]));
   const trustOf = (id: string): TrustStatus => trust.get(id) ?? "new";
   const emailOf = (id: string) => users.get(id)?.email ?? null;
   const signedUpOf = (id: string) => users.get(id)?.created_at ?? null;
+
+  // ---- IP summaries -------------------------------------------------------
+  // Sign-in IPs from Supabase Auth (via a service-role-only function), plus
+  // site visits (account_ip_history) and message IPs.
+  const authIps = new Map<string, { ip: string; at: string }[]>();
+  try {
+    const { data } = await admin.rpc("admin_auth_ip_history", { p_user_ids: null });
+    for (const row of (data ?? []) as { user_id: string | null; ip: string; seen_at: string }[]) {
+      if (!row.user_id || !row.ip) continue;
+      const list = authIps.get(row.user_id) ?? [];
+      list.push({ ip: row.ip, at: row.seen_at });
+      authIps.set(row.user_id, list);
+    }
+  } catch {
+    // Function not installed yet: show what we have.
+  }
+  const visitsOf = new Map<string, typeof activityRows>();
+  for (const v of activityRows) {
+    const list = visitsOf.get(v.user_id) ?? [];
+    list.push(v);
+    visitsOf.set(v.user_id, list);
+  }
+  const messageIpsOf = new Map<string, { ip: string; country: string | null }[]>();
+  for (const m of messageIpRows) {
+    const list = messageIpsOf.get(m.sender_id) ?? [];
+    list.push({ ip: m.sender_ip, country: m.sender_country });
+    messageIpsOf.set(m.sender_id, list);
+  }
+  const UK = new Set(["GB", "IM", "JE", "GG"]);
+  const ipSummary = (userId: string): IpSummary => {
+    const auth = (authIps.get(userId) ?? []).sort((a, b) => a.at.localeCompare(b.at));
+    const visits = visitsOf.get(userId) ?? [];
+    const msgIps = messageIpsOf.get(userId) ?? [];
+    const distinct = new Set([...auth.map((a) => a.ip), ...visits.map((v) => v.ip), ...msgIps.map((m) => m.ip)]);
+    const countries = [...new Set([...visits.map((v) => v.country), ...msgIps.map((m) => m.country)].filter(Boolean) as string[])];
+    const latest = visits[0];
+    const flags: string[] = [];
+    if (countries.some((c) => !UK.has(c))) flags.push("Seen outside UK");
+    if (distinct.size >= 5) flags.push(`${distinct.size} different IPs`);
+    return {
+      signupIp: auth[0]?.ip ?? null,
+      distinctIps: distinct.size,
+      lastSeen: latest ? { ip: latest.ip, where: where(latest.city, latest.country), at: latest.last_seen_at } : null,
+      countries,
+      flags,
+    };
+  };
 
   // Blocked attempts need advert titles; fetch the few adverts involved.
   const blockAdvertIds = [...new Set(blockRows.map((b: { advert_id: string | null }) => b.advert_id).filter(Boolean))] as string[];
@@ -268,8 +359,10 @@ export async function loadSecurityDashboard(admin: SupabaseClient): Promise<Secu
         blocked: 0,
         rejected: 0,
         pending: 0,
+        reports: 0,
         lastSeenIp: ip,
         lastSeenWhere: where(city, country),
+        ips: ipSummary(id),
       };
       concern.set(id, a);
     }
@@ -288,6 +381,14 @@ export async function loadSecurityDashboard(admin: SupabaseClient): Promise<Secu
     if (a) a.pending++;
   }
   for (const t of trustRows) if (t.status === "suspended") touch(t.user_id, null, null, null);
+  for (const r of reportRows) touch(r.reported_user_id, null, null, null).reports++;
+  // Fill in "last seen" from site visits where messages didn't give one.
+  for (const a of concern.values()) {
+    if (!a.lastSeenIp && a.ips.lastSeen) {
+      a.lastSeenIp = a.ips.lastSeen.ip;
+      a.lastSeenWhere = a.ips.lastSeen.where;
+    }
+  }
 
   const sentCount = new Map<string, number>();
   for (const s of sentRows) sentCount.set(s.sender_id, (sentCount.get(s.sender_id) ?? 0) + 1);
@@ -308,15 +409,42 @@ export async function loadSecurityDashboard(admin: SupabaseClient): Promise<Secu
         trust: trustOf(u.id),
         messagesSent: sentCount.get(u.id) ?? 0,
         flags: identityFlags(name, postcode, u.email ?? null),
+        ips: ipSummary(u.id),
       };
     });
+
+  // Open reports, with the message and who was involved.
+  const openReports = reportRows.filter((r) => r.status === "open");
+  const reportMessages = new Map<string, { body: string; advert: string }>();
+  if (openReports.length) {
+    const { data } = await admin
+      .from("messages")
+      .select("id, body, adverts(year, make, model)")
+      .in("id", openReports.map((r) => r.message_id));
+    for (const m of (data ?? []) as any[]) reportMessages.set(m.id, { body: m.body, advert: advertTitle(m.adverts) }); // eslint-disable-line @typescript-eslint/no-explicit-any
+  }
+  const reports: OpenReport[] = openReports.map((r) => ({
+    id: r.id,
+    createdAt: r.created_at,
+    reason: REPORT_REASONS[r.reason as ReportReason] ?? r.reason,
+    messageId: r.message_id,
+    body: reportMessages.get(r.message_id)?.body ?? "",
+    advert: reportMessages.get(r.message_id)?.advert ?? "Advert",
+    reporterEmail: emailOf(r.reporter_id),
+    reportedUserId: r.reported_user_id,
+    reportedEmail: emailOf(r.reported_user_id),
+    reportedTrust: trustOf(r.reported_user_id),
+  }));
 
   return {
     stats: last30,
     allTime,
     held,
     blocked,
-    accounts: [...concern.values()].sort((a, b) => b.blocked + b.rejected - (a.blocked + a.rejected)),
+    accounts: [...concern.values()].sort(
+      (a, b) => b.reports + b.blocked + b.rejected - (a.reports + a.blocked + a.rejected)
+    ),
     signups,
+    reports,
   };
 }

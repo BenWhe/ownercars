@@ -5,7 +5,8 @@ import { useState } from "react";
 
 type Props =
   | { kind: "message"; messageId: string; token?: string; onDone?: (status: string) => void }
-  | { kind: "account"; userId: string; suspended: boolean };
+  | { kind: "account"; userId: string; suspended: boolean }
+  | { kind: "report"; reportId: string; reportedUserId: string; suspended: boolean };
 
 export default function ModerationButtons(props: Props) {
   const router = useRouter();
@@ -19,7 +20,11 @@ export default function ModerationButtons(props: Props) {
     const payload =
       props.kind === "message"
         ? { action, messageId: props.messageId, token: props.token }
-        : { action, userId: props.userId };
+        : props.kind === "report"
+          ? action === "suspend"
+            ? { action, userId: props.reportedUserId }
+            : { action, reportId: props.reportId }
+          : { action, userId: props.userId };
     const res = await fetch("/api/admin/moderation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -32,11 +37,36 @@ export default function ModerationButtons(props: Props) {
       return;
     }
     const status = data.status ?? (action === "unsuspend" ? "unsuspended" : action === "suspend" ? "suspended" : "done");
-    setResult(
-      status === "delivered" ? "Approved and delivered." : status === "rejected" ? "Rejected." : status === "suspended" ? "Account suspended." : status === "unsuspended" ? "Suspension lifted." : "Done."
-    );
+    const labels: Record<string, string> = {
+      delivered: "Approved and delivered.",
+      rejected: "Rejected.",
+      suspended: "Account suspended.",
+      unsuspended: "Suspension lifted.",
+      dismissed: "Report dismissed.",
+      actioned: "Report closed.",
+    };
+    setResult(labels[status] ?? "Done.");
     if (props.kind === "message") props.onDone?.(status);
     router.refresh();
+  }
+
+  if (props.kind === "report") {
+    return (
+      <div className="sec-actions">
+        {!props.suspended && (
+          <button className="sec-btn danger" disabled={busy} onClick={() => act("suspend", "Suspend the reported account? It will be signed out, can't sign in or message, and anything pending is rejected. Nothing is deleted.")}>
+            Suspend account
+          </button>
+        )}
+        <button className="sec-btn" disabled={busy} onClick={() => act("action_report")}>
+          Close report
+        </button>
+        <button className="sec-btn" disabled={busy} onClick={() => act("dismiss_report")}>
+          Dismiss (not a problem)
+        </button>
+        {result && <span className="sec-result">{result}</span>}
+      </div>
+    );
   }
 
   if (props.kind === "account") {

@@ -4691,3 +4691,15 @@ h1 { font-size: clamp(46px, 7vw, 82px); letter-spacing: -.07em; line-height: .95
 .sec-badge.suspended { background: #fee2e2; color: #991b1b; }
 .sec-link { font-size: 13px; text-decoration: underline; margin-right: 8px; }
 .sec-flag { display: inline-block; font-size: 11px; font-weight: 700; background: #fef3c7; color: #92400e; border-radius: 999px; padding: 2px 8px; margin: 0 4px 4px 0; white-space: nowrap; }
+
+/* Seller safety: scam warning and report link on received messages */
+.message-scam-warning { background: #fffbeb; border: 1px solid #fcd34d; color: #78350f; border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.45; margin-bottom: 10px; }
+.message-scam-warning a { color: #78350f; text-decoration: underline; font-weight: 700; }
+.message-report-link { background: none; border: none; padding: 0; margin-top: 8px; font-size: 12px; color: var(--muted, #6b7280); text-decoration: underline; cursor: pointer; }
+.message-report-form { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line, #e5e7eb); font-size: 13px; display: grid; gap: 6px; }
+.message-report-form p { margin: 0; font-weight: 600; }
+.message-report-form label { display: flex; gap: 6px; align-items: flex-start; font-weight: 400; }
+.message-report-actions { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
+.message-report-actions button:first-child { background: var(--accent); color: #fff; border: none; border-radius: 999px; padding: 7px 14px; font-weight: 700; font-size: 13px; cursor: pointer; }
+.message-report-actions .secondary-link { background: none; border: none; text-decoration: underline; color: var(--muted, #6b7280); cursor: pointer; font-size: 13px; }
+.message-report-done { margin-top: 8px; font-size: 12px; color: #166534; }

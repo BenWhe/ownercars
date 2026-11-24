@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { scamSignals } from "@/lib/messages/scamSignals";
+import ReportMessage from "./ReportMessage";
 import { useParams } from "next/navigation";
 import { DOCUMENT_DISPLAY_NAMES, type DocumentType } from "@/lib/vault/documents";
 import { messageThreadId } from "@/lib/messages/thread";
@@ -274,8 +276,18 @@ export default function MessageThreadPage() {
                 key={msg.id}
                 className={ownMessage ? "message-bubble own" : "message-bubble"}
               >
+                {!ownMessage && scamSignals(msg.body).length > 0 && (
+                  <div className="message-scam-warning" role="note">
+                    <strong>Be careful with this message.</strong> It mentions{" "}
+                    {scamSignals(msg.body).join(", ")}. These are common in car-selling scams. Keep the
+                    conversation on OwnerCars, never share codes or logbook photos, and don&rsquo;t accept
+                    courier or overpayment arrangements.{" "}
+                    <a href="/car-selling-scams">How these scams work</a>
+                  </div>
+                )}
                 <p>{msg.body}</p>
                 <time>{formatMessageDate(msg.created_at)}</time>
+                {!ownMessage && <ReportMessage messageId={msg.id} />}
                 {ownMessage && msg.status && msg.status !== "delivered" && (
                   // Held for a safety check. Rejected messages show the same
                   // label, so the outcome isn't revealed to the sender.

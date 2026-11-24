@@ -25,7 +25,7 @@ export async function GET(_req: NextRequest, context: Context) {
   const user = userData?.user;
   if (!user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
-  const [trust, profile, messages, blocks] = await Promise.all([
+  const [trust, profile, messages, blocks, authIps, visits] = await Promise.all([
     getTrustStatus(admin, userId),
     admin.from("profiles").select("*").eq("id", userId).maybeSingle().then((r) => r.data),
     admin
@@ -39,6 +39,15 @@ export async function GET(_req: NextRequest, context: Context) {
       .select("created_at, body, reasons, sender_ip, sender_city, sender_region, sender_country, sender_user_agent, advert_id")
       .eq("sender_id", userId)
       .order("created_at")
+      .then((r) => r.data ?? []),
+    admin
+      .rpc("admin_auth_ip_history", { p_user_ids: [userId] })
+      .then((r) => (r.data ?? []) as { ip: string; user_agent: string | null; seen_at: string; source: string }[]),
+    admin
+      .from("account_ip_history")
+      .select("ip, country, region, city, user_agent, first_seen_at, last_seen_at, seen_count")
+      .eq("user_id", userId)
+      .order("first_seen_at")
       .then((r) => r.data ?? []),
   ]);
 
@@ -82,10 +91,21 @@ export async function GET(_req: NextRequest, context: Context) {
       `Text: ${b.body}`
     );
   }
+  lines.push("", `SIGN-UP AND SIGN-IN IP ADDRESSES (${authIps.length}) — recorded by our authentication provider`);
+  for (const a of [...authIps].sort((x, y) => x.seen_at.localeCompare(y.seen_at))) {
+    lines.push(`${a.seen_at} · ${a.source} · IP ${a.ip}${a.user_agent ? ` · ${a.user_agent}` : ""}`);
+  }
+  lines.push("", `SITE VISITS BY IP ADDRESS (${visits.length})`);
+  for (const v of visits as any[]) { // eslint-disable-line @typescript-eslint/no-explicit-any
+    lines.push(
+      `${v.first_seen_at} to ${v.last_seen_at} · IP ${v.ip} · ${where({ sender_city: v.city, sender_region: v.region, sender_country: v.country })} · ${v.seen_count} visit(s)`,
+      `  Device: ${v.user_agent ?? "not recorded"}`
+    );
+  }
   lines.push(
     "",
-    "Note: IP addresses and messages sent before 24 Nov 2026 were not recorded with location data. Sign-in IPs",
-    "for the account are held by our authentication provider (Supabase) and can be supplied on request."
+    "Note: message IP addresses and site-visit locations were recorded from 24 Nov 2026. Locations are",
+    "approximate, derived from the IP address."
   );
 
   const safeEmail = (user.email ?? user.id).replace(/[^a-z0-9.@_-]+/gi, "_");
